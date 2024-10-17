@@ -2,14 +2,14 @@ import {
   Controller,
   Get,
   Post,
-  Body,
+  // Body,
   Patch,
   Param,
   Delete,
 } from '@nestjs/common';
 import { YadService } from './yad.service';
-import { CreateYadDto } from './dto/create-yad.dto';
-import { UpdateYadDto } from './dto/update-yad.dto';
+// import { CreateYadDto } from './dto/create-yad.dto';
+// import { UpdateYadDto } from './dto/update-yad.dto';
 
 @Controller('yad')
 export class YadController {
@@ -26,12 +26,12 @@ export class YadController {
   }
 
   @Post()
-  create(@Body() createYadDto: CreateYadDto) {
+  create(/*@Body() createYadDto: CreateYadDto*/) {
     return this.yadService.create(/*createYadDto*/);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateYadDto: UpdateYadDto) {
+  update(@Param('id') id: string /*@Body() updateYadDto: UpdateYadDto*/) {
     return this.yadService.update(+id /*updateYadDto*/);
   }
 
