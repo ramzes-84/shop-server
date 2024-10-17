@@ -27,12 +27,12 @@ export class YadController {
 
   @Post()
   create(@Body() createYadDto: CreateYadDto) {
-    return this.yadService.create(createYadDto);
+    return this.yadService.create(/*createYadDto*/);
   }
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateYadDto: UpdateYadDto) {
-    return this.yadService.update(+id, updateYadDto);
+    return this.yadService.update(+id /*updateYadDto*/);
   }
 
   @Delete(':id')
