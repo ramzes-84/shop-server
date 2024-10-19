@@ -1,6 +1,6 @@
 const { createServer, proxy } = require('aws-serverless-express');
 const express = require('express');
-const { AppModule } = require('./dist/main'); // Adjust the path to your main module
+const { AppModule } = require('dist/main.js'); // Adjust the path to your main module
 
 const app = express();
 const server = createServer(app);
