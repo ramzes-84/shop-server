@@ -2,11 +2,10 @@ import { Injectable } from '@nestjs/common';
 // import { CreateYadDto } from './dto/create-yad.dto';
 // import { UpdateYadDto } from './dto/update-yad.dto';
 
-const token = process.env.YAAPI_BEARER_TOKEN;
-
 @Injectable()
 export class YadService {
   async getHistoryById(id: string) {
+    const token = process.env.YAAPI_BEARER_TOKEN;
     const url = new URL(
       'https://b2b-authproxy.taxi.yandex.net/api/b2b/platform/request/history',
     );
@@ -16,11 +15,20 @@ export class YadService {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        // 'Content-Type': 'application/json',
       },
     });
-    const responseBody = await response.text();
-    return responseBody;
+    return JSON.stringify({
+      token: token,
+      reqUrl: url.toString(),
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      type: response.type,
+      headers: response.headers.entries(),
+      // body: await response.text(),
+      url: response.url,
+    });
   }
 
   create(/*createYadDto: CreateYadDto*/) {
