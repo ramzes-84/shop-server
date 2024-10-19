@@ -19,7 +19,6 @@ export class YadService {
       },
     });
     return JSON.stringify({
-      token: token,
       reqUrl: url.toString(),
       status: response.status,
       statusText: response.statusText,
