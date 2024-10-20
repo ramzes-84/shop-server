@@ -7,36 +7,36 @@ import {
   Param,
   Delete,
 } from '@nestjs/common';
-import { YadService } from './yad.service';
+import { YaService } from './ya.service';
 // import { CreateYadDto } from './dto/create-yad.dto';
 // import { UpdateYadDto } from './dto/update-yad.dto';
 
-@Controller('yad')
-export class YadController {
-  constructor(private readonly yadService: YadService) {}
+@Controller('ya')
+export class YaController {
+  constructor(private readonly yaService: YaService) {}
 
   @Get()
   findAll() {
-    return this.yadService.findAll();
+    return this.yaService.findAll();
   }
 
   @Get('request/history/:id')
   getHistoryById(@Param('id') id: string) {
-    return this.yadService.getHistoryById(id);
+    return this.yaService.getHistoryById(id);
   }
 
   @Post()
   create(/*@Body() createYadDto: CreateYadDto*/) {
-    return this.yadService.create(/*createYadDto*/);
+    return this.yaService.create(/*createYadDto*/);
   }
 
   @Patch(':id')
   update(@Param('id') id: string /*@Body() updateYadDto: UpdateYadDto*/) {
-    return this.yadService.update(+id /*updateYadDto*/);
+    return this.yaService.update(+id /*updateYadDto*/);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.yadService.remove(+id);
+    return this.yaService.remove(+id);
   }
 }

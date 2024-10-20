@@ -4,7 +4,7 @@ import fetch from 'node-fetch';
 // import { UpdateYadDto } from './dto/update-yad.dto';
 
 @Injectable()
-export class YadService {
+export class YaService {
   async getHistoryById(id: string) {
     const token = process.env.YAAPI_BEARER_TOKEN;
     const url = new URL(
