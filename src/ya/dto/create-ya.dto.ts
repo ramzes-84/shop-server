@@ -1,5 +1,4 @@
 export class CreateYaOrderDto {
-  shop_order_id: string;
   info: {
     operator_request_id: string;
   };
@@ -52,7 +51,7 @@ export class CreateYaOrderDto {
   particular_items_refuse: false;
 }
 
-enum PlatformStation {
+export enum PlatformStation {
   RND = 'af1356a6-5b4e-42e2-b85d-2c67a11a1a7c',
   TUL = '8c78c9db-dd0f-45c4-851a-7df333b8c089',
   TEST = 'fbed3aa1-2cc6-4370-ab4d-59c5cc9bb92',

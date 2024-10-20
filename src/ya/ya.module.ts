@@ -5,5 +5,6 @@ import { YaController } from './ya.controller';
 @Module({
   controllers: [YaController],
   providers: [YaService],
+  exports: [YaService],
 })
 export class YaModule {}
