@@ -3,6 +3,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { YaModule } from './ya/ya.module';
+import { ShopModule } from './shop/shop.module';
 
 @Module({
   imports: [
@@ -10,6 +11,7 @@ import { YaModule } from './ya/ya.module';
       isGlobal: true,
     }),
     YaModule,
+    ShopModule,
   ],
   controllers: [AppController],
   providers: [AppService],
