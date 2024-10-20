@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import fetch from 'node-fetch';
 // import { CreateYadDto } from './dto/create-yad.dto';
 // import { UpdateYadDto } from './dto/update-yad.dto';
 
@@ -10,24 +11,13 @@ export class YadService {
       'https://b2b-authproxy.taxi.yandex.net/api/b2b/platform/request/history',
     );
     url.searchParams.append('request_id', id);
-
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
-        // 'Content-Type': 'application/json',
       },
     });
-    return JSON.stringify({
-      reqUrl: url.toString(),
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok,
-      type: response.type,
-      headers: response.headers.entries(),
-      // body: await response.text(),
-      url: response.url,
-    });
+    return await response.json();
   }
 
   create(/*createYadDto: CreateYadDto*/) {
