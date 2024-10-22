@@ -16,9 +16,11 @@ export function convertOrder(
     orderDetails.associations.order_rows.map((row) => ({
       article: row.product_reference,
       billing_details: {
-        assessed_unit_price: parseFloat(row.unit_price_tax_incl),
+        assessed_unit_price: Math.round(
+          parseFloat(row.unit_price_tax_incl) * 100,
+        ),
         nds: -1,
-        unit_price: parseFloat(row.unit_price_tax_excl),
+        unit_price: Math.round(parseFloat(row.unit_price_tax_excl) * 100),
       },
       count: parseInt(row.product_quantity),
       name: row.product_name,
