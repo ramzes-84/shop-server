@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import fetch from 'node-fetch';
 import { ServicesUrl } from 'src/types/services-url';
 import { CreateYaOrderDto, YaOrderCreationRes } from './dto/create-ya.dto';
+import { ErrorYaResDTO } from './dto/error-ya-res';
 
 @Injectable()
 export class YaService {
@@ -36,7 +37,7 @@ export class YaService {
 
   async createYaOrder(
     createYaOrderDto: CreateYaOrderDto,
-  ): Promise<YaOrderCreationRes> {
+  ): Promise<string | YaOrderCreationRes> {
     const url = new URL(this.endpoint + '/request/create');
     const response = await fetch(url.toString(), {
       method: 'POST',
@@ -49,10 +50,8 @@ export class YaService {
     });
 
     if (!response.ok) {
-      const errorDetails = await response.json();
-      throw new Error(
-        `Failed to create order in Yandex: ${response.status} ${response.statusText} - ${errorDetails}`,
-      );
+      const errorDetails: ErrorYaResDTO = await response.json();
+      return `Failed to create order in Yandex: ${response.status} ${response.statusText} - ${errorDetails.message}`;
     }
 
     return await response.json();
