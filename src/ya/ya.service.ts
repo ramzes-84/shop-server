@@ -1,27 +1,61 @@
 import { Injectable } from '@nestjs/common';
 import fetch from 'node-fetch';
-// import { CreateYadDto } from './dto/create-yad.dto';
-// import { UpdateYadDto } from './dto/update-yad.dto';
+import { ServicesUrl } from 'src/types/services-url';
+import { CreateYaOrderDto, YaOrderCreationRes } from './dto/create-ya.dto';
 
 @Injectable()
 export class YaService {
+  token =
+    process.env.NODE_ENV === 'production'
+      ? process.env.YAAPI_BEARER_TOKEN
+      : process.env.YAAPI_TEST_BEARER_TOKEN;
+  endpoint =
+    process.env.NODE_ENV === 'production'
+      ? ServicesUrl.YA
+      : ServicesUrl.YA_TEST;
+
   async getHistoryById(id: string) {
-    const token = process.env.YAAPI_BEARER_TOKEN;
-    const url = new URL(
-      'https://b2b-authproxy.taxi.yandex.net/api/b2b/platform/request/history',
-    );
+    const url = new URL(this.endpoint + '/request/history');
     url.searchParams.append('request_id', id);
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${this.token}`,
       },
     });
+
+    if (!response.ok) {
+      const errorDetails = await response.text();
+      throw new Error(
+        `Failed to get history from Yandex: ${response.status} ${response.statusText} - ${errorDetails}`,
+      );
+    }
+
     return await response.json();
   }
 
-  create(/*createYadDto: CreateYadDto*/) {
-    return 'This action adds a new yad';
+  async createYaOrder(
+    createYaOrderDto: CreateYaOrderDto,
+  ): Promise<YaOrderCreationRes> {
+    const url = new URL(this.endpoint + '/request/create');
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        'Content-Type': 'application/json',
+        'Accept-Language': 'ru',
+      },
+      body: JSON.stringify(createYaOrderDto),
+    });
+
+    if (!response.ok) {
+      const errorDetails = await response.json();
+      throw new Error(
+        `Failed to create order in Yandex: ${response.status} ${response.statusText} - ${errorDetails}`,
+      );
+    }
+
+    return await response.json();
   }
 
   findAll() {
