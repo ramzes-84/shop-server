@@ -1,14 +1,14 @@
 import { AddressInfoResDto } from 'src/shop/dto/address-info.dto';
 import { CustomerInfoResDto } from 'src/shop/dto/customer-info.dto';
 import { OrderInfoResDto } from 'src/shop/dto/order-info.dto';
-import { StatusesInfoResDto } from 'src/shop/dto/statuses-info.dto';
 import { CreateYaOrderDto, PlatformStation } from 'src/ya/dto/create-ya.dto';
 
 export function convertOrder(
   orderDetails: OrderInfoResDto['order'],
   addressDetails: AddressInfoResDto['address'],
   customerDetails: CustomerInfoResDto['customer'],
-  statuses: StatusesInfoResDto['order_histories'],
+  destination: string,
+  source: 'RND' | 'TUL',
 ): CreateYaOrderDto {
   const isDevelopment = process.env.NODE_ENV === 'development';
 
@@ -40,13 +40,15 @@ export function convertOrder(
       platform_station: {
         platform_id: isDevelopment
           ? PlatformStation.TEST
-          : getSourcePlatform(statuses),
+          : source === 'RND'
+            ? PlatformStation.RND
+            : PlatformStation.TUL,
       },
     },
     destination: {
       type: 'platform_station',
       platform_station: {
-        platform_id: PlatformStation.RND,
+        platform_id: destination,
       },
     },
     items: goods,
@@ -75,14 +77,14 @@ export function convertOrder(
   };
 }
 
-function getSourcePlatform(statuses: StatusesInfoResDto['order_histories']) {
-  const lastStatus = statuses[0].id_order_state;
+// function getSourcePlatform(statuses: StatusesInfoResDto['order_histories']) {
+//   const lastStatus = statuses[0].id_order_state;
 
-  if (lastStatus === '12') {
-    return PlatformStation.RND;
-  } else if (lastStatus === '13') {
-    return PlatformStation.TUL;
-  } else {
-    throw new Error(`Unknown last order's status: ${lastStatus}`);
-  }
-}
+//   if (lastStatus === '12') {
+//     return PlatformStation.RND;
+//   } else if (lastStatus === '13') {
+//     return PlatformStation.TUL;
+//   } else {
+//     throw new Error(`Unknown last order's status: ${lastStatus}`);
+//   }
+// }
