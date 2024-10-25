@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { AppService } from './app.service';
-import { TrackIdParams } from './validation/yandex';
+import { CreateOrderQueries, TrackIdParams } from './validation/yandex';
 
 @Controller()
 export class AppController {
@@ -12,7 +12,7 @@ export class AppController {
   }
 
   @Post('yandex/create')
-  createYaOrder(@Query() query) {
+  createYaOrder(@Query() query: CreateOrderQueries) {
     return this.appService.createYaOrder(query);
   }
 

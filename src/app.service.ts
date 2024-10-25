@@ -3,8 +3,8 @@ import { ShopService } from './shop/shop.service';
 import { YaService } from './ya/ya.service';
 import { CreateYaOrderDto } from './ya/dto/ya.dto';
 import { convertOrder } from './utils/convertOrder';
-import { CreateYaOrderQuery } from './types/create-ya-order-query';
 import { parseYaHistoryToHtml } from './utils/parseYaHistoryToHtml';
+import { CreateOrderQueries } from './validation/yandex';
 
 @Injectable()
 export class AppService {
@@ -17,7 +17,7 @@ export class AppService {
     return `Hello World!`;
   }
 
-  async createYaOrder({ order, destination, source }: CreateYaOrderQuery) {
+  async createYaOrder({ order, destination, source }: CreateOrderQueries) {
     const orderDetails = await this.shopService.getOrderInfo(+order);
     const addressDetails = await this.shopService.getAddressInfo(
       +orderDetails.id_address_delivery,
