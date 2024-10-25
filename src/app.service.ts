@@ -34,7 +34,11 @@ export class AppService {
       source,
     );
 
+    // const yaTrack = await this.yaService.createYaOrder(yaOrderData);
+    // return yaTrack;
+
     const response = await this.yaService.createYaOrder(yaOrderData);
+
     if (typeof response === 'string') {
       return response;
     }
@@ -45,7 +49,7 @@ export class AppService {
       return yaTrack;
     }
 
-    return yaTrack.sharing_url.replace('https://dostavka.yandex.ru/route/', '');
+    return `Заказ успешно создан в Яндекс.Доставке. Сохраните трек: \n${yaTrack.sharing_url.replace('https://dostavka.yandex.ru/route/', '')}`;
   }
 
   async trackYaOrder(id: string) {
