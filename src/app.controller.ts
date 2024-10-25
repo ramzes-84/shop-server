@@ -1,5 +1,6 @@
 import { Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { AppService } from './app.service';
+import { TrackIdParams } from './validation/yandex';
 
 @Controller()
 export class AppController {
@@ -16,7 +17,7 @@ export class AppController {
   }
 
   @Get('yandex/tracking/:id')
-  trackYaOrder(@Param('id') id: string) {
-    return this.appService.trackYaOrder(id);
+  trackYaOrder(@Param() params: TrackIdParams) {
+    return this.appService.trackYaOrder(params.id);
   }
 }
