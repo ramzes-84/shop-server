@@ -5,6 +5,7 @@ import {
   CreateYaOrderDto,
   YaOrderCreationRes,
   YaOrderHistoryRes,
+  YaOrderInfoRes,
 } from './dto/ya.dto';
 import { ErrorYaResDTO } from './dto/ya-errors';
 
@@ -59,15 +60,21 @@ export class YaService {
     return await response.json();
   }
 
-  findAll() {
-    return `This action returns all yad`;
-  }
+  async getOrderInfo(request_id: string): Promise<string | YaOrderInfoRes> {
+    const url = new URL(this.endpoint + '/request/info');
+    url.searchParams.append('request_id', request_id);
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+      },
+    });
 
-  update(id: number /*updateYadDto: UpdateYadDto*/) {
-    return `This action updates a #${id} yad`;
-  }
+    if (!response.ok) {
+      const errorDetails: ErrorYaResDTO = await response.json();
+      return `Failed to get tracking link from Yandex: ${response.status} ${response.statusText} - ${errorDetails.message}`;
+    }
 
-  remove(id: number) {
-    return `This action removes a #${id} yad`;
+    return await response.json();
   }
 }

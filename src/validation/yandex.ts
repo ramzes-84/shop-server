@@ -1,6 +1,6 @@
 import { IsDefined, IsString, IsUUID, Length, Matches } from 'class-validator';
 
-export class TrackIdParams {
+export class OrderIdParams {
   @IsDefined({ message: 'id is required' })
   @IsString({ message: 'id must be a string' })
   @Length(36, 36, { message: 'id is incorrect' })

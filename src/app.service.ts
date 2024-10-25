@@ -34,8 +34,18 @@ export class AppService {
       source,
     );
 
-    const yaTrack = await this.yaService.createYaOrder(yaOrderData);
-    return yaTrack;
+    const response = await this.yaService.createYaOrder(yaOrderData);
+    if (typeof response === 'string') {
+      return response;
+    }
+
+    const yaTrack = await this.getOrderInfo(response.request_id);
+
+    if (typeof yaTrack === 'string') {
+      return yaTrack;
+    }
+
+    return yaTrack.sharing_url.replace('https://dostavka.yandex.ru/route/', '');
   }
 
   async trackYaOrder(id: string) {
@@ -44,5 +54,13 @@ export class AppService {
       return response;
     }
     return parseYaHistoryToHtml(response);
+  }
+
+  async getOrderInfo(id: string) {
+    const response = await this.yaService.getOrderInfo(id);
+    if (typeof response === 'string') {
+      return response;
+    }
+    return response;
   }
 }

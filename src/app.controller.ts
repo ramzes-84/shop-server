@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { AppService } from './app.service';
-import { CreateOrderQueries, TrackIdParams } from './validation/yandex';
+import { CreateOrderQueries, OrderIdParams } from './validation/yandex';
 
 @Controller()
 export class AppController {
@@ -12,12 +12,17 @@ export class AppController {
   }
 
   @Post('yandex/create')
-  createYaOrder(@Query() query: CreateOrderQueries) {
+  yaOrderCreate(@Query() query: CreateOrderQueries) {
     return this.appService.createYaOrder(query);
   }
 
   @Get('yandex/tracking/:id')
-  trackYaOrder(@Param() params: TrackIdParams) {
+  yaOrderHistory(@Param() params: OrderIdParams) {
     return this.appService.trackYaOrder(params.id);
+  }
+
+  @Get('yandex/info/:id')
+  yaOrderInfo(@Param() params: OrderIdParams) {
+    return this.appService.getOrderInfo(params.id);
   }
 }
