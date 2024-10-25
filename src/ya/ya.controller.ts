@@ -8,7 +8,7 @@ import {
   Delete,
 } from '@nestjs/common';
 import { YaService } from './ya.service';
-import { CreateYaOrderDto } from './dto/create-ya.dto';
+import { CreateYaOrderDto } from './dto/ya.dto';
 
 @Controller('ya')
 export class YaController {

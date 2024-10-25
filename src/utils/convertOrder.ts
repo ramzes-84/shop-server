@@ -1,7 +1,7 @@
 import { AddressInfoResDto } from 'src/shop/dto/address-info.dto';
 import { CustomerInfoResDto } from 'src/shop/dto/customer-info.dto';
 import { OrderInfoResDto } from 'src/shop/dto/order-info.dto';
-import { CreateYaOrderDto, PlatformStation } from 'src/ya/dto/create-ya.dto';
+import { CreateYaOrderDto, PlatformStation } from 'src/ya/dto/ya.dto';
 
 export function convertOrder(
   orderDetails: OrderInfoResDto['order'],

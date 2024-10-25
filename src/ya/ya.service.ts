@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import fetch from 'node-fetch';
 import { ServicesUrl } from 'src/types/services-url';
-import { CreateYaOrderDto, YaOrderCreationRes } from './dto/create-ya.dto';
-import { ErrorYaResDTO } from './dto/error-ya-res';
+import {
+  CreateYaOrderDto,
+  YaOrderCreationRes,
+  YaOrderHistoryRes,
+} from './dto/ya.dto';
+import { ErrorYaResDTO } from './dto/ya-errors';
 
 @Injectable()
 export class YaService {
@@ -15,7 +19,7 @@ export class YaService {
       ? ServicesUrl.YA
       : ServicesUrl.YA_TEST;
 
-  async getHistoryById(id: string) {
+  async getHistoryById(id: string): Promise<string | YaOrderHistoryRes> {
     const url = new URL(this.endpoint + '/request/history');
     url.searchParams.append('request_id', id);
     const response = await fetch(url.toString(), {
@@ -26,10 +30,8 @@ export class YaService {
     });
 
     if (!response.ok) {
-      const errorDetails = await response.text();
-      throw new Error(
-        `Failed to get history from Yandex: ${response.status} ${response.statusText} - ${errorDetails}`,
-      );
+      const errorDetails: ErrorYaResDTO = await response.json();
+      return `Failed to get history from Yandex: ${response.status} ${response.statusText} - ${errorDetails.message}`;
     }
 
     return await response.json();

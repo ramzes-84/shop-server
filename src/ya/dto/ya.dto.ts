@@ -60,3 +60,12 @@ export enum PlatformStation {
 export type YaOrderCreationRes = {
   request_id: string;
 };
+
+export type YaOrderHistoryRes = {
+  state_history: {
+    status: string;
+    description: string;
+    timestamp: number;
+    timestamp_utc: string;
+  }[];
+};

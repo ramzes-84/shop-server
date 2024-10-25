@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ShopService } from './shop/shop.service';
 import { YaService } from './ya/ya.service';
-import { CreateYaOrderDto } from './ya/dto/create-ya.dto';
+import { CreateYaOrderDto } from './ya/dto/ya.dto';
 import { convertOrder } from './utils/convertOrder';
 import { CreateYaOrderQuery } from './types/create-ya-order-query';
+import { parseYaHistoryToHtml } from './utils/parseYaHistoryToHtml';
 
 @Injectable()
 export class AppService {
@@ -35,5 +36,13 @@ export class AppService {
 
     const yaTrack = await this.yaService.createYaOrder(yaOrderData);
     return yaTrack;
+  }
+
+  async trackYaOrder(id: string) {
+    const response = await this.yaService.getHistoryById(id);
+    if (typeof response === 'string') {
+      return response;
+    }
+    return parseYaHistoryToHtml(response);
   }
 }
