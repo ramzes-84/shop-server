@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, Injectable, NotFoundException } from '@nestjs/common';
 import { ServicesUrl } from 'src/types/services-url';
 import fetch from 'node-fetch';
 import { OrderInfoResDto } from './dto/order-info.dto';
@@ -24,10 +24,12 @@ export class ShopService {
     });
 
     if (!response.ok) {
-      const errorDetails = await response.text();
-      throw new Error(
-        `Failed to get order from Shop: ${response.status} ${response.statusText} - ${errorDetails}`,
-      );
+      if (response.status === 404) {
+        throw new NotFoundException(`Order with id ${id} not found in Shop`);
+      } else {
+        const errorDetails = await response.text();
+        throw new HttpException(errorDetails, response.status);
+      }
     }
 
     const data: OrderInfoResDto = await response.json();
@@ -47,10 +49,12 @@ export class ShopService {
     });
 
     if (!response.ok) {
-      const errorDetails = await response.text();
-      throw new Error(
-        `Failed to get address from Shop: ${response.status} ${response.statusText} - ${errorDetails}`,
-      );
+      if (response.status === 404) {
+        throw new NotFoundException(`Address with id ${id} not found in Shop`);
+      } else {
+        const errorDetails = await response.text();
+        throw new HttpException(errorDetails, response.status);
+      }
     }
 
     const data: AddressInfoResDto = await response.json();
@@ -70,10 +74,12 @@ export class ShopService {
     });
 
     if (!response.ok) {
-      const errorDetails = await response.text();
-      throw new Error(
-        `Failed to get customer from Shop: ${response.status} ${response.statusText} - ${errorDetails}`,
-      );
+      if (response.status === 404) {
+        throw new NotFoundException(`Customer with id ${id} not found in Shop`);
+      } else {
+        const errorDetails = await response.text();
+        throw new HttpException(errorDetails, response.status);
+      }
     }
 
     const data: CustomerInfoResDto = await response.json();

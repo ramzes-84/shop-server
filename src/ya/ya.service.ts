@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, Injectable } from '@nestjs/common';
 import fetch from 'node-fetch';
 import { ServicesUrl } from 'src/types/services-url';
 import {
@@ -20,7 +20,7 @@ export class YaService {
       ? ServicesUrl.YA
       : ServicesUrl.YA_TEST;
 
-  async getHistoryById(id: string): Promise<string | YaOrderHistoryRes> {
+  async getHistoryById(id: string): Promise<YaOrderHistoryRes> {
     const url = new URL(this.endpoint + '/request/history');
     url.searchParams.append('request_id', id);
     const response = await fetch(url.toString(), {
@@ -32,15 +32,16 @@ export class YaService {
 
     if (!response.ok) {
       const errorDetails: ErrorYaResDTO = await response.json();
-      return `Failed to get history from Yandex: ${response.status} ${response.statusText} - ${errorDetails.message}`;
+      throw new HttpException(errorDetails, response.status);
     }
 
-    return await response.json();
+    const history: YaOrderHistoryRes = await response.json();
+    return history;
   }
 
   async createYaOrder(
     createYaOrderDto: CreateYaOrderDto,
-  ): Promise<string | YaOrderCreationRes> {
+  ): Promise<YaOrderCreationRes> {
     const url = new URL(this.endpoint + '/request/create');
     const response = await fetch(url.toString(), {
       method: 'POST',
@@ -54,13 +55,14 @@ export class YaService {
 
     if (!response.ok) {
       const errorDetails: ErrorYaResDTO = await response.json();
-      return `Failed to create order in Yandex: ${response.status} ${response.statusText} - ${errorDetails.message}`;
+      throw new HttpException(errorDetails, response.status);
     }
+    const result: YaOrderCreationRes = await response.json();
 
-    return await response.json();
+    return result;
   }
 
-  async getOrderInfo(request_id: string): Promise<string | YaOrderInfoRes> {
+  async getOrderInfo(request_id: string): Promise<YaOrderInfoRes> {
     const url = new URL(this.endpoint + '/request/info');
     url.searchParams.append('request_id', request_id);
     const response = await fetch(url.toString(), {
@@ -72,9 +74,10 @@ export class YaService {
 
     if (!response.ok) {
       const errorDetails: ErrorYaResDTO = await response.json();
-      return `Failed to get tracking link from Yandex: ${response.status} ${response.statusText} - ${errorDetails.message}`;
+      throw new HttpException(errorDetails, response.status);
     }
 
-    return await response.json();
+    const orderInfo: YaOrderInfoRes = await response.json();
+    return orderInfo;
   }
 }

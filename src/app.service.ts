@@ -5,6 +5,7 @@ import { CreateYaOrderDto } from './ya/dto/ya.dto';
 import { convertOrder } from './utils/convertOrder';
 import { parseYaHistoryToHtml } from './utils/parseYaHistoryToHtml';
 import { CreateOrderQueries } from './validation/yandex';
+import { TransferInterface } from './types/transfer-interface';
 
 @Injectable()
 export class AppService {
@@ -17,42 +18,39 @@ export class AppService {
     return `Hello World!`;
   }
 
-  async createYaOrder({ order, destination, source }: CreateOrderQueries) {
-    const orderDetails = await this.shopService.getOrderInfo(+order);
-    const addressDetails = await this.shopService.getAddressInfo(
-      +orderDetails.id_address_delivery,
-    );
-    const customerDetails = await this.shopService.getCustomerInfo(
-      +orderDetails.id_customer,
-    );
+  async createYaOrder({
+    order,
+    destination,
+    source,
+  }: CreateOrderQueries): Promise<TransferInterface> {
+    try {
+      const orderDetails = await this.shopService.getOrderInfo(+order);
+      const addressDetails = await this.shopService.getAddressInfo(
+        +orderDetails.id_address_delivery,
+      );
+      const customerDetails = await this.shopService.getCustomerInfo(
+        +orderDetails.id_customer,
+      );
 
-    const yaOrderData: CreateYaOrderDto = convertOrder(
-      orderDetails,
-      addressDetails,
-      customerDetails,
-      destination,
-      source,
-    );
+      const yaOrderData: CreateYaOrderDto = convertOrder(
+        orderDetails,
+        addressDetails,
+        customerDetails,
+        destination,
+        source,
+      );
 
-    // const yaTrack = await this.yaService.createYaOrder(yaOrderData);
-    // return yaTrack;
-
-    const response = await this.yaService.createYaOrder(yaOrderData);
-
-    if (typeof response === 'string') {
-      return response;
+      const yaOrderId = await this.yaService.createYaOrder(yaOrderData);
+      return {
+        ok: true,
+        data: yaOrderId,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        data: error,
+      };
     }
-
-    const yaTrack = await this.getOrderInfo(response.request_id);
-
-    if (typeof yaTrack === 'string') {
-      return yaTrack;
-    }
-
-    return yaTrack.sharing_url
-      ? yaTrack.sharing_url
-      : 'Заказ успешно создан в Яндекс.Доставке.';
-    // return `Заказ успешно создан в Яндекс.Доставке. Сохраните трек: \n${yaTrack.sharing_url.replace('https://dostavka.yandex.ru/route/', '')}`;
   }
 
   async trackYaOrder(id: string) {
