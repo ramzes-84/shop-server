@@ -49,7 +49,10 @@ export class AppService {
       return yaTrack;
     }
 
-    return `Заказ успешно создан в Яндекс.Доставке. Сохраните трек: \n${yaTrack.sharing_url.replace('https://dostavka.yandex.ru/route/', '')}`;
+    return yaTrack.sharing_url
+      ? yaTrack.sharing_url
+      : 'Заказ успешно создан в Яндекс.Доставке.';
+    // return `Заказ успешно создан в Яндекс.Доставке. Сохраните трек: \n${yaTrack.sharing_url.replace('https://dostavka.yandex.ru/route/', '')}`;
   }
 
   async trackYaOrder(id: string) {
