@@ -61,11 +61,18 @@ export class AppService {
     return parseYaHistoryToHtml(response);
   }
 
-  async getOrderInfo(id: string) {
-    const response = await this.yaService.getOrderInfo(id);
-    if (typeof response === 'string') {
-      return response;
+  async getOrderInfo(id: string): Promise<TransferInterface> {
+    try {
+      const response = await this.yaService.getOrderInfo(id);
+      return {
+        ok: true,
+        data: response,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        data: error,
+      };
     }
-    return response;
   }
 }
