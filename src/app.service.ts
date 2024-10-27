@@ -66,7 +66,7 @@ export class AppService {
       const response = await this.yaService.getOrderInfo(id);
       return {
         ok: true,
-        data: response,
+        data: { sharing_url: response.sharing_url },
       };
     } catch (error) {
       return {
