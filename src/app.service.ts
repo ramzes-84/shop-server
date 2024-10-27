@@ -6,15 +6,18 @@ import { convertOrder } from './utils/convertOrder';
 import { parseYaHistoryToHtml } from './utils/parseYaHistoryToHtml';
 import { CreateOrderQueries } from './validation/yandex';
 import { TransferInterface } from './types/transfer-interface';
+import { MailService } from './mail/mail.service';
 
 @Injectable()
 export class AppService {
   constructor(
     private readonly shopService: ShopService,
     private readonly yaService: YaService,
+    private readonly mailService: MailService,
   ) {}
 
-  getHello(): string {
+  async getHello() {
+    await this.mailService.sendToAdmin();
     return `Hello World!`;
   }
 

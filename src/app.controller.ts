@@ -9,7 +9,7 @@ export class AppController {
 
   @Get()
   @UseGuards(AuthGuard('bearer'))
-  getHello(): string {
+  getHello() {
     return this.appService.getHello();
   }
 
