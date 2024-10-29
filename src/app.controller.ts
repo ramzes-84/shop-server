@@ -22,12 +22,18 @@ export class AppController {
   @Get('yandex/tracking/:id')
   @UseGuards(AuthGuard('bearer'))
   yaOrderHistory(@Param() params: OrderIdParams) {
-    return this.appService.trackYaOrder(params.id);
+    return this.appService.getYaOrderHistory(params.id);
   }
 
   @Get('yandex/info/:id')
   @UseGuards(AuthGuard('bearer'))
   yaOrderInfo(@Param() params: OrderIdParams) {
     return this.appService.getOrderInfo(params.id);
+  }
+
+  @Get('test/:order')
+  @UseGuards(AuthGuard('bearer'))
+  testEndpoint(@Param() params: Pick<CreateOrderQueries, 'order'>) {
+    return this.appService.testEndpoint(params.order);
   }
 }

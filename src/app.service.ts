@@ -24,7 +24,6 @@ export class AppService {
   async createYaOrder({
     order,
     destination,
-    source,
   }: CreateOrderQueries): Promise<TransferInterface> {
     try {
       const orderDetails = await this.shopService.getOrderInfo(+order);
@@ -34,13 +33,15 @@ export class AppService {
       const customerDetails = await this.shopService.getCustomerInfo(
         +orderDetails.id_customer,
       );
+      const shippingDetails =
+        await this.shopService.getOrderCarrierInfo(+order);
 
       const yaOrderData: CreateYaOrderDto = convertOrder(
         orderDetails,
         addressDetails,
         customerDetails,
+        shippingDetails,
         destination,
-        source,
       );
 
       const yaOrderId = await this.yaService.createYaOrder(yaOrderData);
@@ -56,7 +57,7 @@ export class AppService {
     }
   }
 
-  async trackYaOrder(id: string) {
+  async getYaOrderHistory(id: string) {
     const response = await this.yaService.getHistoryById(id);
     if (typeof response === 'string') {
       return response;
@@ -77,5 +78,26 @@ export class AppService {
         data: error,
       };
     }
+  }
+
+  async testEndpoint(id: string) {
+    const orderDetails = await this.shopService.getOrderInfo(+id);
+    const addressDetails = await this.shopService.getAddressInfo(
+      +orderDetails.id_address_delivery,
+    );
+    const customerDetails = await this.shopService.getCustomerInfo(
+      +orderDetails.id_customer,
+    );
+    const shippingDetails = await this.shopService.getOrderCarrierInfo(+id);
+
+    const yaOrderData: CreateYaOrderDto = convertOrder(
+      orderDetails,
+      addressDetails,
+      customerDetails,
+      shippingDetails,
+      'testDestination',
+    );
+
+    return yaOrderData;
   }
 }

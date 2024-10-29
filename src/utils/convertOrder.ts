@@ -1,5 +1,6 @@
 import { AddressInfoResDto } from 'src/shop/dto/address-info.dto';
 import { CustomerInfoResDto } from 'src/shop/dto/customer-info.dto';
+import { OrderCarrierInfo } from 'src/shop/dto/order-carrier-info';
 import { OrderInfoResDto } from 'src/shop/dto/order-info.dto';
 import { CreateYaOrderDto, PlatformStation } from 'src/ya/dto/ya.dto';
 
@@ -7,10 +8,14 @@ export function convertOrder(
   orderDetails: OrderInfoResDto['order'],
   addressDetails: AddressInfoResDto['address'],
   customerDetails: CustomerInfoResDto['customer'],
+  shippingDetails: OrderCarrierInfo,
   destination: string,
-  source: 'RND' | 'TUL',
 ): CreateYaOrderDto {
   const isDevelopment = process.env.NODE_ENV === 'development';
+  const discount = calcDiscount(
+    orderDetails.total_products,
+    orderDetails.total_discounts,
+  );
 
   const goods: CreateYaOrderDto['items'] =
     orderDetails.associations.order_rows.map((row) => ({
@@ -20,7 +25,11 @@ export function convertOrder(
           parseFloat(row.unit_price_tax_incl) * 100,
         ),
         nds: -1,
-        unit_price: Math.round(parseFloat(row.unit_price_tax_excl) * 100),
+        unit_price: Math.round(
+          (parseFloat(row.unit_price_tax_excl) -
+            parseFloat(row.unit_price_tax_excl) * discount) *
+            100,
+        ),
       },
       count: parseInt(row.product_quantity),
       name: row.product_name,
@@ -32,6 +41,23 @@ export function convertOrder(
       place_barcode: orderDetails.reference,
     }));
 
+  goods.push({
+    article: 'ship',
+    count: 1,
+    name: 'Доставка',
+    physical_dims: {
+      dx: 1,
+      dy: 2,
+      dz: 2,
+    },
+    billing_details: {
+      nds: -1,
+      assessed_unit_price: parseFloat(orderDetails.total_shipping) * 100,
+      unit_price: parseFloat(orderDetails.total_shipping) * 100,
+    },
+    place_barcode: orderDetails.reference,
+  });
+
   return {
     info: {
       operator_request_id: orderDetails.reference,
@@ -40,7 +66,7 @@ export function convertOrder(
       platform_station: {
         platform_id: isDevelopment
           ? PlatformStation.TEST
-          : source === 'RND'
+          : orderDetails.current_state === '12'
             ? PlatformStation.RND
             : PlatformStation.TUL,
       },
@@ -59,7 +85,7 @@ export function convertOrder(
           dx: 5,
           dy: 10,
           dz: 15,
-          weight_gross: 300,
+          weight_gross: parseFloat(shippingDetails.weight) * 1000 + 80,
         },
       },
     ],
@@ -75,6 +101,10 @@ export function convertOrder(
     last_mile_policy: 'self_pickup',
     particular_items_refuse: false,
   };
+}
+
+export function calcDiscount(total: string, discount: string) {
+  return parseFloat((parseFloat(discount) / parseFloat(total)).toFixed(2));
 }
 
 // function getSourcePlatform(statuses: StatusesInfoResDto['order_histories']) {

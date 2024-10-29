@@ -32,9 +32,11 @@ export class ShopService {
   }
 
   async getOrderCarrierInfo(id: number) {
-    const url = new URL(this.endpoint + '/order_carriers/' + id);
+    const url = new URL(this.endpoint + '/order_carriers');
+    url.searchParams.append('filter[id_order]', `[${id}]`);
+    url.searchParams.append('display', 'full');
     const data = await this.fetchData<OrderCarrierInfoResDto>(url);
-    return data.order_carrier;
+    return data.order_carriers[0];
   }
 
   async getOrderStatuses(id: number) {

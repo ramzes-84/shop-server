@@ -31,7 +31,7 @@ export class CreateYaOrderDto {
   }>;
   places: Array<{
     physical_dims: {
-      weight_gross: 300;
+      weight_gross: number;
       dx: 5;
       dy: 10;
       dz: 15;
