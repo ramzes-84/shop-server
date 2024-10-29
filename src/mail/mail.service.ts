@@ -9,7 +9,7 @@ export class MailService {
     await this.mailerService.sendMail({
       to: process.env.MAIL_ADMIN,
       subject: 'Info from Shop Server',
-      text: 'Hello world!',
+      text: 'The Server is alive!',
     });
   }
 }
