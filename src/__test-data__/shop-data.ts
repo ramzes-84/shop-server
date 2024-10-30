@@ -2,6 +2,7 @@ import { OrderInfoResDto } from 'src/shop/dto/order-info.dto';
 import { AddressInfoResDto } from 'src/shop/dto/address-info.dto';
 import { CustomerInfoResDto } from 'src/shop/dto/customer-info.dto';
 import { OrderCarrierInfoResDto } from 'src/shop/dto/order-carrier-info';
+import { StatusesInfoResDto } from 'src/shop/dto/statuses-info.dto';
 
 export const orderDetails: OrderInfoResDto['order'] = {
   id: 19979,
@@ -156,3 +157,24 @@ export const shippingDetails: OrderCarrierInfoResDto = {
     },
   ],
 };
+
+export const statusesDetails: StatusesInfoResDto['order_histories'] = [
+  {
+    id_order_state: '908',
+  },
+  {
+    id_order_state: '4',
+  },
+  {
+    id_order_state: '13',
+  },
+  {
+    id_order_state: '3',
+  },
+  {
+    id_order_state: '2',
+  },
+  {
+    id_order_state: '1',
+  },
+];

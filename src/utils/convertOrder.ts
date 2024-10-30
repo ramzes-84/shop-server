@@ -11,7 +11,6 @@ export function convertOrder(
   shippingDetails: OrderCarrierInfo,
   destination: string,
 ): CreateYaOrderDto {
-  const isDevelopment = process.env.NODE_ENV === 'development';
   const discount = calcDiscount(
     orderDetails.total_products,
     orderDetails.total_discounts,
@@ -64,9 +63,8 @@ export function convertOrder(
     },
     source: {
       platform_station: {
-        platform_id: isDevelopment
-          ? PlatformStation.TEST
-          : orderDetails.current_state === '12'
+        platform_id:
+          orderDetails.current_state === '12'
             ? PlatformStation.RND
             : PlatformStation.TUL,
       },
