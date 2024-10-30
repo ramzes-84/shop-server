@@ -81,23 +81,6 @@ export class AppService {
   }
 
   async testEndpoint(id: string) {
-    const orderDetails = await this.shopService.getOrderInfo(+id);
-    const addressDetails = await this.shopService.getAddressInfo(
-      +orderDetails.id_address_delivery,
-    );
-    const customerDetails = await this.shopService.getCustomerInfo(
-      +orderDetails.id_customer,
-    );
-    const shippingDetails = await this.shopService.getOrderCarrierInfo(+id);
-
-    const yaOrderData: CreateYaOrderDto = convertOrder(
-      orderDetails,
-      addressDetails,
-      customerDetails,
-      shippingDetails,
-      'testDestination',
-    );
-
-    return yaOrderData;
+    return this.yaService.getOrderInfo(id);
   }
 }

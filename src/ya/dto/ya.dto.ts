@@ -81,11 +81,11 @@ export type YaOrderInfoRes = {
       platform_station: {
         platform_id: string;
       };
-      interval: {
+      interval?: {
         from: number;
         to: number;
       };
-      interval_utc: {
+      interval_utc?: {
         from: string;
         to: string;
       };
