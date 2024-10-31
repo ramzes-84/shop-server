@@ -18,9 +18,4 @@ export class CreateOrderQueries {
   @IsString({ message: 'destination must be a string' })
   @IsUUID('4', { message: 'destination is incorrect' })
   destination: string;
-
-  // @IsDefined({ message: 'source is required' })
-  // @IsString({ message: 'source must be a string' })
-  // @Length(3, 3, { message: 'source is incorrect' })
-  // source: 'RND' | 'TUL';
 }

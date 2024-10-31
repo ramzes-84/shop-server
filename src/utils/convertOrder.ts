@@ -2,6 +2,7 @@ import { AddressInfoResDto } from 'src/shop/dto/address-info.dto';
 import { CustomerInfoResDto } from 'src/shop/dto/customer-info.dto';
 import { OrderCarrierInfo } from 'src/shop/dto/order-carrier-info';
 import { OrderInfoResDto } from 'src/shop/dto/order-info.dto';
+import { StatusesInfoResDto } from 'src/shop/dto/statuses-info.dto';
 import { CreateYaOrderDto, PlatformStation } from 'src/ya/dto/ya.dto';
 
 export function convertOrder(
@@ -102,17 +103,19 @@ export function convertOrder(
 }
 
 export function calcDiscount(total: string, discount: string) {
-  return parseFloat((parseFloat(discount) / parseFloat(total)).toFixed(2));
+  return parseFloat((parseFloat(discount) / parseFloat(total)).toFixed(5));
 }
 
-// function getSourcePlatform(statuses: StatusesInfoResDto['order_histories']) {
-//   const lastStatus = statuses[0].id_order_state;
+export function getSourcePlatform(
+  statuses: StatusesInfoResDto['order_histories'],
+) {
+  const lastStatus = statuses[0].id_order_state;
 
-//   if (lastStatus === '12') {
-//     return PlatformStation.RND;
-//   } else if (lastStatus === '13') {
-//     return PlatformStation.TUL;
-//   } else {
-//     throw new Error(`Unknown last order's status: ${lastStatus}`);
-//   }
-// }
+  if (lastStatus === '12') {
+    return PlatformStation.RND;
+  } else if (lastStatus === '13') {
+    return PlatformStation.TUL;
+  } else {
+    throw new Error(`Unknown last order's status: ${lastStatus}`);
+  }
+}

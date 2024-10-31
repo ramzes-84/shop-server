@@ -21,7 +21,7 @@ export const orderConverterResult: CreateYaOrderDto = {
       billing_details: {
         assessed_unit_price: 134999,
         nds: -1,
-        unit_price: 118799,
+        unit_price: 118853,
       },
       count: 1,
       name: 'Основа',
@@ -37,7 +37,7 @@ export const orderConverterResult: CreateYaOrderDto = {
       billing_details: {
         assessed_unit_price: 57999,
         nds: -1,
-        unit_price: 51039,
+        unit_price: 51062,
       },
       count: 1,
       name: 'Румяна',
@@ -53,7 +53,7 @@ export const orderConverterResult: CreateYaOrderDto = {
       billing_details: {
         assessed_unit_price: 79999,
         nds: -1,
-        unit_price: 70399,
+        unit_price: 70431,
       },
       count: 1,
       name: 'Пудра',
