@@ -1,6 +1,6 @@
 {
   "name": "server",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "",
   "author": "",
   "private": true,
@@ -78,7 +78,9 @@
       "**/*.(t|j)s"
     ],
     "coveragePathIgnorePatterns": [
-      "src/shop/dto/", "src/types", "src/main.ts"
+      "src/shop/dto/",
+      "src/types",
+      "src/main.ts"
     ],
     "coverageDirectory": "../coverage",
     "moduleNameMapper": {
