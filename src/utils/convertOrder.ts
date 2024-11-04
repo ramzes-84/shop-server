@@ -1,6 +1,6 @@
 import { AddressInfoResDto } from 'src/shop/dto/address-info.dto';
 import { CustomerInfoResDto } from 'src/shop/dto/customer-info.dto';
-import { OrderCarrierInfo } from 'src/shop/dto/order-carrier-info';
+import { OrderCarrierInfo } from 'src/shop/dto/order-carrier-info.dto';
 import { OrderInfoResDto } from 'src/shop/dto/order-info.dto';
 import { StatusesInfoResDto } from 'src/shop/dto/statuses-info.dto';
 import { CreateYaOrderDto, PlatformStation } from 'src/ya/dto/ya.dto';

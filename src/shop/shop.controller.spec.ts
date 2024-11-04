@@ -4,7 +4,7 @@ import { ShopService } from './shop.service';
 import { OrderInfoResDto } from './dto/order-info.dto';
 import { AddressInfoResDto } from './dto/address-info.dto';
 import { CustomerInfoResDto } from './dto/customer-info.dto';
-import { OrderCarrierInfoResDto } from './dto/order-carrier-info';
+import { OrderCarrierInfoResDto } from './dto/order-carrier-info.dto';
 import { StatusesInfoResDto } from './dto/statuses-info.dto';
 import {
   addressDetails,

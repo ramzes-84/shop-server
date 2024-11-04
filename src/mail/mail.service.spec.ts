@@ -27,14 +27,14 @@ describe('MailService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('sendToAdmin', () => {
+  describe('emitHealth', () => {
     it('should send an email to the admin', async () => {
       process.env.MAIL_ADMIN = 'admin@example.com';
       const sendMailSpy = jest
         .spyOn(mailerService, 'sendMail')
         .mockResolvedValueOnce(undefined);
 
-      await service.sendToAdmin();
+      await service.emitHealth();
 
       expect(sendMailSpy).toHaveBeenCalledWith({
         to: 'admin@example.com',

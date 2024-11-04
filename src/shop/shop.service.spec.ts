@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { HttpException } from '@nestjs/common';
+import { HttpException, RequestMethod } from '@nestjs/common';
 import { ShopService } from './shop.service';
 import fetch from 'node-fetch';
 
@@ -122,6 +122,47 @@ describe('ShopService', () => {
       );
 
       await expect(service.getOrderStatuses(1)).rejects.toThrow(HttpException);
+    });
+  });
+
+  describe('fetchData', () => {
+    it('should fetch JSON data successfully', async () => {
+      const mockJsonData = { key: 'value' };
+      (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+        new Response(JSON.stringify(mockJsonData), {
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+
+      const url = new URL('https://example.com/api');
+      const result = await service.fetchData<typeof mockJsonData>(url);
+      expect(result).toEqual(mockJsonData);
+    });
+
+    it('should fetch XML data successfully', async () => {
+      const mockXmlData = '<root><key>value</key></root>';
+      (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+        new Response(mockXmlData, {
+          headers: { 'content-type': 'text/xml' },
+        }),
+      );
+
+      const url = new URL('https://example.com/api');
+      const result = await service.fetchData<string>(
+        url,
+        RequestMethod.GET,
+        true,
+      );
+      expect(result).toEqual(mockXmlData);
+    });
+
+    it('should throw an error if fetch fails', async () => {
+      (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+        new Response('Not Found', { status: 404 }),
+      );
+
+      const url = new URL('https://example.com/api');
+      await expect(service.fetchData(url)).rejects.toThrow(HttpException);
     });
   });
 });

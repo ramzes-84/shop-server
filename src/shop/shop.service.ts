@@ -5,7 +5,9 @@ import { OrderInfoResDto } from './dto/order-info.dto';
 import { AddressInfoResDto } from './dto/address-info.dto';
 import { CustomerInfoResDto } from './dto/customer-info.dto';
 import { StatusesInfoResDto } from './dto/statuses-info.dto';
-import { OrderCarrierInfoResDto } from './dto/order-carrier-info';
+import { OrderCarrierInfoResDto } from './dto/order-carrier-info.dto';
+import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
+import { InTransitOrders } from './dto/in-transit-orders.dto';
 
 @Injectable()
 export class ShopService {
@@ -17,6 +19,15 @@ export class ShopService {
     const url = new URL(this.endpoint + '/orders/' + id);
     const data = await this.fetchData<OrderInfoResDto>(url);
     return data.order;
+  }
+
+  async getOrderInfoXML(id: number) {
+    const url = new URL(this.endpoint + '/orders/' + id);
+    const data = await this.fetchData<string>(url, RequestMethod.GET, true);
+    const xmlDoc = new DOMParser().parseFromString(data, 'text/xml');
+    // const reference = xmlDoc.getElementsByTagName('reference')[0].textContent;
+    const serializedDoc = new XMLSerializer().serializeToString(xmlDoc);
+    return serializedDoc;
   }
 
   async getAddressInfo(id: number) {
@@ -48,8 +59,23 @@ export class ShopService {
     return data.order_histories;
   }
 
-  async fetchData<T>(url: URL, method: RequestMethod = RequestMethod.GET) {
-    url.searchParams.append('output_format', 'JSON');
+  async getInTransitOrders() {
+    const url = new URL(this.endpoint + '/orders');
+    url.searchParams.append('filter[current_state]', `[4|908]`);
+    url.searchParams.append('display', '[id,current_state,reference]');
+    const data = await this.fetchData<InTransitOrders>(url);
+    return data.orders;
+  }
+
+  async fetchData<T>(
+    url: URL,
+    method: RequestMethod = RequestMethod.GET,
+    inXML = false,
+  ): Promise<T> {
+    let data: T;
+    if (!inXML) {
+      url.searchParams.append('output_format', 'JSON');
+    }
 
     const response = await fetch(url.toString(), {
       method: RequestMethod[method],
@@ -66,7 +92,14 @@ export class ShopService {
       );
     }
 
-    const data: T = await response.json();
+    const resType = response.headers.get('content-type');
+
+    if (resType.includes('text/xml')) {
+      data = (await response.text()) as unknown as T;
+    } else {
+      data = await response.json();
+    }
+
     return data;
   }
 }

@@ -1,4 +1,8 @@
-import { PlatformStation, YaOrderInfoRes } from 'src/ya/dto/ya.dto';
+import {
+  PlatformStation,
+  YaOrderInfoRes,
+  YaParcelStatus,
+} from 'src/ya/dto/ya.dto';
 
 export const yaOrderInfo: YaOrderInfoRes = {
   request_id: '00000000000000009a8f3ad7d35c6ff3-udp',
@@ -95,7 +99,7 @@ export const yaOrderInfo: YaOrderInfoRes = {
     last_mile_policy: 'default',
   },
   state: {
-    status: 'SORTING',
+    status: YaParcelStatus.SORTING_CENTER_AT_START,
     description: 'Sorting',
     reason: 'test',
   },

@@ -5,11 +5,19 @@ import { MailerService } from '@nestjs-modules/mailer';
 export class MailService {
   constructor(private readonly mailerService: MailerService) {}
 
-  async sendToAdmin() {
+  async emitHealth() {
     await this.mailerService.sendMail({
       to: process.env.MAIL_ADMIN,
       subject: 'Info from Shop Server',
       text: 'The Server is alive!',
+    });
+  }
+
+  async sendToAdmin(subject: string, text: string) {
+    await this.mailerService.sendMail({
+      to: process.env.MAIL_ADMIN,
+      subject,
+      text,
     });
   }
 }

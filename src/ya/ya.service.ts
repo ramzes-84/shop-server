@@ -6,6 +6,7 @@ import {
   YaOrderCreationRes,
   YaOrderHistoryRes,
   YaOrderInfoRes,
+  YaRecentParcelsRes,
 } from './dto/ya.dto';
 import { ErrorYaResDTO } from './dto/ya-errors';
 
@@ -24,6 +25,25 @@ export class YaService {
     const url = new URL(this.endpoint + '/request/history');
     url.searchParams.append('request_id', id);
     const response = await this.fetchData<YaOrderHistoryRes>(url);
+    return response;
+  }
+
+  async getRecentParcels() {
+    const url = new URL(this.endpoint + '/requests/info');
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept-Language': 'ru',
+    };
+    const interval = {
+      from: new Date(Date.now() - 86400000 * 30).toISOString(),
+      to: new Date(Date.now() - 86400000 * 2).toISOString(),
+    };
+    const response = await this.fetchData<YaRecentParcelsRes>(
+      url,
+      RequestMethod.POST,
+      headers,
+      JSON.stringify(interval),
+    );
     return response;
   }
 

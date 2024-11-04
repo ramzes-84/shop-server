@@ -7,6 +7,7 @@ import { parseYaHistoryToHtml } from './utils/parseYaHistoryToHtml';
 import { CreateOrderQueries } from './validation/yandex';
 import { TransferInterface } from './types/transfer-interface';
 import { MailService } from './mail/mail.service';
+import { reviseOrders } from './utils/reviseOrders';
 
 @Injectable()
 export class AppService {
@@ -17,7 +18,7 @@ export class AppService {
   ) {}
 
   async getHello() {
-    await this.mailService.sendToAdmin();
+    await this.mailService.emitHealth();
     return `Hello World!`;
   }
 
@@ -80,7 +81,24 @@ export class AppService {
     }
   }
 
-  async testEndpoint(id: string) {
-    return this.yaService.getOrderInfo(id);
+  async reviseOrdersStatuses(): Promise<string[]> {
+    const inTransitOrders = await this.shopService.getInTransitOrders();
+    const recentParcels = await this.yaService.getRecentParcels();
+    const message = reviseOrders(inTransitOrders, recentParcels);
+    if (message.length) {
+      try {
+        await this.mailService.sendToAdmin(
+          'Status updates',
+          message.join('\n'),
+        );
+      } catch (error) {
+        throw new Error(error);
+      }
+    }
+    return message;
+  }
+
+  async testEndpoint() {
+    return this.yaService.getRecentParcels();
   }
 }

@@ -31,9 +31,20 @@ export class AppController {
     return this.appService.getOrderInfo(params.id);
   }
 
-  @Get('test/:order')
+  @Get('revise')
   @UseGuards(AuthGuard('bearer'))
-  testEndpoint(@Param() params: Pick<CreateOrderQueries, 'order'>) {
-    return this.appService.testEndpoint(params.order);
+  reviseOrdersStatuses() {
+    return this.appService.reviseOrdersStatuses();
   }
+
+  @Get('test')
+  @UseGuards(AuthGuard('bearer'))
+  testEndpoint() {
+    return this.appService.testEndpoint();
+  }
+  // @Get('test/:order')
+  // @UseGuards(AuthGuard('bearer'))
+  // testEndpoint(@Param() params: Pick<CreateOrderQueries, 'order'>) {
+  //   return this.appService.testEndpoint(params.order);
+  // }
 }

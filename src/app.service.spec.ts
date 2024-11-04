@@ -52,7 +52,7 @@ describe('AppService', () => {
         {
           provide: MailService,
           useValue: {
-            sendToAdmin: jest.fn(),
+            emitHealth: jest.fn(),
           },
         },
       ],
@@ -70,11 +70,11 @@ describe('AppService', () => {
 
   describe('getHello', () => {
     it('should send an email to the admin and return "Hello World!"', async () => {
-      jest.spyOn(mailService, 'sendToAdmin').mockResolvedValue(undefined);
+      jest.spyOn(mailService, 'emitHealth').mockResolvedValue(undefined);
 
       const result = await service.getHello();
 
-      expect(mailService.sendToAdmin).toHaveBeenCalled();
+      expect(mailService.emitHealth).toHaveBeenCalled();
       expect(result).toBe('Hello World!');
     });
   });
