@@ -7,6 +7,7 @@ import { YaModule } from './ya/ya.module';
 import { ShopModule } from './shop/shop.module';
 import { AuthModule } from './auth/auth.module';
 import { MailService } from './mail/mail.service';
+import { BxbModule } from './bxb/bxb.module';
 
 describe('AppModule', () => {
   let module: TestingModule;
@@ -20,6 +21,7 @@ describe('AppModule', () => {
         YaModule,
         ShopModule,
         AuthModule,
+        BxbModule,
         MailerModule.forRootAsync({
           imports: [ConfigModule],
           useFactory: async (configService: ConfigService) => ({
@@ -71,6 +73,11 @@ describe('AppModule', () => {
   it('should import ShopModule', () => {
     const shopModule = module.get<ShopModule>(ShopModule);
     expect(shopModule).toBeDefined();
+  });
+
+  it('should import BxbModule', () => {
+    const bxbModule = module.get<BxbModule>(BxbModule);
+    expect(bxbModule).toBeDefined();
   });
 
   it('should import AuthModule', () => {

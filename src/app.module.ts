@@ -7,6 +7,7 @@ import { ShopModule } from './shop/shop.module';
 import { AuthModule } from './auth/auth.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { MailService } from './mail/mail.service';
+import { BxbModule } from './bxb/bxb.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { MailService } from './mail/mail.service';
     YaModule,
     ShopModule,
     AuthModule,
+    BxbModule,
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

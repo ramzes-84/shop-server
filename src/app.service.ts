@@ -8,6 +8,7 @@ import { CreateOrderQueries } from './validation/yandex';
 import { TransferInterface } from './types/transfer-interface';
 import { MailService } from './mail/mail.service';
 import { reviseOrders } from './utils/reviseOrders';
+import { BxbService } from './bxb/bxb.service';
 
 @Injectable()
 export class AppService {
@@ -15,6 +16,7 @@ export class AppService {
     private readonly shopService: ShopService,
     private readonly yaService: YaService,
     private readonly mailService: MailService,
+    private readonly bxbService: BxbService,
   ) {}
 
   async getHello() {
@@ -99,6 +101,6 @@ export class AppService {
   }
 
   async testEndpoint() {
-    return this.yaService.getRecentParcels();
+    return this.bxbService.getParcelStatuses('FJNJWJGVC');
   }
 }

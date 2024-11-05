@@ -20,7 +20,7 @@ export function reviseOrders(
     if (currReference in unifiedRecentParcelsData) {
       if (order.current_state !== unifiedRecentParcelsData[order.reference]) {
         message.push(
-          `${order.reference}: ${order.current_state} ⏩ ${unifiedRecentParcelsData[order.reference]}.`,
+          `Order [${order.reference}]: ${order.current_state}  ⏩  ${unifiedRecentParcelsData[order.reference]}.`,
         );
       }
     }
