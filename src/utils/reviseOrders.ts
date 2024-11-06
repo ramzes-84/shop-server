@@ -1,4 +1,6 @@
+import { ParselStatus } from 'src/bxb/dto/bxb.dto';
 import { InTransitOrderItem } from 'src/shop/dto/in-transit-orders.dto';
+import { RecentBxbParcelsType } from 'src/types/bxb-batch';
 import {
   YaOrderInfoRes,
   YaParcelStatus,
@@ -7,12 +9,14 @@ import {
 
 export function reviseOrders(
   inTransitOrders: InTransitOrderItem[],
-  recentParcels: YaRecentParcelsRes,
+  recentYaParcels: YaRecentParcelsRes,
+  recentBxbParcels: RecentBxbParcelsType[],
 ): string[] {
   const message: string[] = [];
   const unifiedInTransitOrders = unifyOrderStatus(inTransitOrders);
   const unifiedRecentParcelsData = unifyRecentParcelsData([
-    ...recentParcels.requests,
+    ...recentYaParcels.requests,
+    ...recentBxbParcels,
   ]);
 
   unifiedInTransitOrders.forEach((order) => {
@@ -20,17 +24,26 @@ export function reviseOrders(
     if (currReference in unifiedRecentParcelsData) {
       if (order.current_state !== unifiedRecentParcelsData[order.reference]) {
         message.push(
-          `Order [${order.reference}]: ${order.current_state}  ⏩  ${unifiedRecentParcelsData[order.reference]}.`,
+          `${order.reference}:  ${order.current_state}  ⏩  ${unifiedRecentParcelsData[order.reference]}.`,
         );
       }
     }
   });
 
+  const problems = Object.entries(unifiedRecentParcelsData)
+    .filter(([, state]) => state === UnifiedOrdersStateData.PROBLEM)
+    .map(([ref]) => ref);
+  if (problems.length) {
+    message.push(
+      `❌ There might be problems with following parcels: ${problems.join(', ')}.`,
+    );
+  }
+
   return message;
 }
 
 function unifyRecentParcelsData(
-  data: (YaOrderInfoRes | { other_cargo: string })[],
+  data: (YaOrderInfoRes | RecentBxbParcelsType)[],
 ): Record<string, UnifiedOrdersStateData> {
   const unifiedData: Record<string, UnifiedOrdersStateData> = {};
   data.forEach((order) => {
@@ -53,6 +66,7 @@ function unifyRecentParcelsData(
         case YaParcelStatus.SORTING_CENTER_PREPARED:
         case YaParcelStatus.SORTING_CENTER_TRANSMITTED:
         case YaParcelStatus.DELIVERY_AT_START:
+        case YaParcelStatus.DELIVERY_AT_START_SORT:
         case YaParcelStatus.DELIVERY_TRANSPORTATION:
           state = UnifiedOrdersStateData.IN_TRANSIT;
           break;
@@ -86,6 +100,49 @@ function unifyRecentParcelsData(
         case YaParcelStatus.RETURN_ARRIVED_DELIVERY:
         case YaParcelStatus.RETURN_READY_FOR_PICKUP:
         case YaParcelStatus.RETURN_RETURNED:
+          state = UnifiedOrdersStateData.PROBLEM;
+          break;
+
+        default:
+          break;
+      }
+
+      unifiedData[reference] = state;
+    } else if ('imId' in order) {
+      const reference = order.imId;
+      let state: UnifiedOrdersStateData;
+
+      switch (order.status.Name) {
+        case ParselStatus.LoadedRegistry:
+        case ParselStatus.OrderTransferredForDelivery:
+        case ParselStatus.SentToSortingTerminal:
+        case ParselStatus.TransferredForSorting:
+        case ParselStatus.SentToDestinationCity:
+        case ParselStatus.AcceptedForDelivery:
+        case ParselStatus.TransferredForDeliveryToPickupPoint:
+        case ParselStatus.InRecipientCity:
+        case ParselStatus.AtRecipientBranch:
+        case ParselStatus.EnRouteFromBranchToTerminal:
+        case ParselStatus.EnRouteToTerminal:
+        case ParselStatus.AtSenderTerminal:
+        case ParselStatus.TransferredForCourierDelivery:
+        case ParselStatus.CourierWillCall:
+          state = UnifiedOrdersStateData.IN_TRANSIT;
+          break;
+
+        case ParselStatus.ArrivedAtPickupPoint:
+          state = UnifiedOrdersStateData.WAITING;
+          break;
+
+        case ParselStatus.Issued:
+          state = UnifiedOrdersStateData.DELIVERED;
+          break;
+
+        case ParselStatus.PreparingForReturn:
+        case ParselStatus.SentToReceivingPoint:
+        case ParselStatus.ReturnedToReceivingPoint:
+        case ParselStatus.ReturnedToIM:
+        case ParselStatus.CustomProblem:
           state = UnifiedOrdersStateData.PROBLEM;
           break;
 

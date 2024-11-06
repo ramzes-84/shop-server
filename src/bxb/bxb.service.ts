@@ -1,6 +1,10 @@
 import { HttpException, Injectable, RequestMethod } from '@nestjs/common';
 import { ServicesUrl } from 'src/types/services-url';
-import { OrdersOnBalanceDTO, ParcelsStoryDTO } from './dto/bxb.dto';
+import {
+  ListStatusesDTO,
+  OrdersOnBalanceDTO,
+  ParcelsStoryDTO,
+} from './dto/bxb.dto';
 
 @Injectable()
 export class BxbService {
@@ -36,7 +40,7 @@ export class BxbService {
     const url = new URL(this.endpoint);
     url.searchParams.append('method', 'ListStatuses');
     url.searchParams.append('ImId', imId);
-    const data = await this.fetchData<OrdersOnBalanceDTO>(url);
+    const data = await this.fetchData<ListStatusesDTO>(url);
     return data;
   }
 

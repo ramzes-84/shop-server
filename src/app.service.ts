@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ShopService } from './shop/shop.service';
 import { YaService } from './ya/ya.service';
 import { CreateYaOrderDto } from './ya/dto/ya.dto';
@@ -9,6 +9,7 @@ import { TransferInterface } from './types/transfer-interface';
 import { MailService } from './mail/mail.service';
 import { reviseOrders } from './utils/reviseOrders';
 import { BxbService } from './bxb/bxb.service';
+import { ParselStatus } from './bxb/dto/bxb.dto';
 
 @Injectable()
 export class AppService {
@@ -84,9 +85,46 @@ export class AppService {
   }
 
   async reviseOrdersStatuses(): Promise<string[]> {
-    const inTransitOrders = await this.shopService.getInTransitOrders();
-    const recentParcels = await this.yaService.getRecentParcels();
-    const message = reviseOrders(inTransitOrders, recentParcels);
+    const [inTransitOrders, recentYaParcels, recentBxbRaw] = await Promise.all([
+      this.shopService.getInTransitOrders(),
+      this.yaService.getRecentParcels(),
+      this.bxbService.getParcelsInInterval(),
+    ]).catch((error) => {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Error in Promise.all while collecting data';
+      this.mailService.sendToAdmin('Error in Promise.all', message);
+      throw new HttpException(error, HttpStatus.SERVICE_UNAVAILABLE);
+    });
+
+    const recentBxbReferences = recentBxbRaw.map((parcel) => parcel.imid);
+    const recentBxbParcelsStats = await Promise.all(
+      recentBxbReferences.map((id) => this.bxbService.getParcelStatuses(id)),
+    );
+
+    const recentBxbParcels = recentBxbReferences.map((imId, index) => {
+      if (Array.isArray(recentBxbParcelsStats[index])) {
+        return {
+          imId,
+          status: recentBxbParcelsStats[index].at(-1),
+        };
+      } else if ('err' in recentBxbParcelsStats[index]) {
+        return {
+          imId,
+          status: {
+            Name: ParselStatus.CustomProblem,
+            Date: new Date().toISOString().split('T')[0].replace(/-/g, ''),
+          },
+        };
+      }
+    });
+
+    const message = reviseOrders(
+      inTransitOrders,
+      recentYaParcels,
+      recentBxbParcels,
+    );
     if (message.length) {
       try {
         await this.mailService.sendToAdmin(
@@ -101,6 +139,6 @@ export class AppService {
   }
 
   async testEndpoint() {
-    return this.bxbService.getParcelStatuses('FJNJWJGVC');
+    return await this.bxbService.getParcelsInInterval();
   }
 }

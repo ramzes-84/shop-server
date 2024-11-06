@@ -40,11 +40,16 @@ export enum ParselStatus {
   SentToReceivingPoint = 'Отправлено в пункт приема',
   ReturnedToReceivingPoint = 'Возвращено в пункт приема',
   ReturnedToIM = 'Возвращено в ИМ',
+  CustomProblem = 'Искусственная проблема',
 }
 
-export type ListStatusesDTO = StatusItem[];
+export type ListStatusesDTO = StatusItem[] | ListStatusesError;
 
 export type StatusItem = {
   Date: string;
   Name: ParselStatus;
+};
+
+export type ListStatusesError = {
+  err: string;
 };
