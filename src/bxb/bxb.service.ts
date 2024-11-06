@@ -1,5 +1,6 @@
 import { HttpException, Injectable, RequestMethod } from '@nestjs/common';
 import { ServicesUrl } from 'src/types/services-url';
+import fetch from 'node-fetch';
 import {
   ListStatusesDTO,
   OrdersOnBalanceDTO,
