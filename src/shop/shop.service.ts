@@ -62,7 +62,7 @@ export class ShopService {
   async getInTransitOrders() {
     const url = new URL(this.endpoint + '/orders');
     url.searchParams.append('filter[current_state]', `[4|908]`);
-    url.searchParams.append('display', '[id,current_state,reference]');
+    url.searchParams.append('display', '[id,current_state,reference,date_upd]');
     const data = await this.fetchData<InTransitOrders>(url);
     return data.orders;
   }

@@ -12,7 +12,9 @@ export function reviseOrders(
   recentYaParcels: YaRecentParcelsRes,
   recentBxbParcels: RecentBxbParcelsType[],
 ): string[] {
-  const message: string[] = [];
+  const updates: string[] = [];
+  const warnings: string[] = [];
+  const errors: string[] = [];
   const unifiedInTransitOrders = unifyOrderStatus(inTransitOrders);
   const unifiedRecentParcelsData = unifyRecentParcelsData([
     ...recentYaParcels.requests,
@@ -23,10 +25,19 @@ export function reviseOrders(
     const currReference = order.reference;
     if (currReference in unifiedRecentParcelsData) {
       if (order.current_state !== unifiedRecentParcelsData[order.reference]) {
-        message.push(
+        updates.push(
           `${order.reference}:  ${order.current_state}  ⏩  ${unifiedRecentParcelsData[order.reference]}.`,
         );
       }
+    }
+
+    if (
+      order.current_state === UnifiedOrdersStateData.WAITING &&
+      Date.now() - 86400000 * 5 > order.date_upd
+    ) {
+      warnings.push(
+        `⌛ ${order.reference} is waiting more than 5 days (since ${new Date(order.date_upd).toDateString()}).`,
+      );
     }
   });
 
@@ -34,12 +45,12 @@ export function reviseOrders(
     .filter(([, state]) => state === UnifiedOrdersStateData.PROBLEM)
     .map(([ref]) => ref);
   if (problems.length) {
-    message.push(
+    errors.push(
       `❌ There might be problems with following parcels: ${problems.join(', ')}.`,
     );
   }
 
-  return message;
+  return [...updates, ...warnings, ...errors];
 }
 
 function unifyRecentParcelsData(
@@ -160,9 +171,17 @@ function unifyOrderStatus(inTransitOrders: InTransitOrderItem[]) {
   return inTransitOrders.map((order) => {
     switch (order.current_state) {
       case '4':
-        return { ...order, current_state: UnifiedOrdersStateData.IN_TRANSIT };
+        return {
+          ...order,
+          current_state: UnifiedOrdersStateData.IN_TRANSIT,
+          date_upd: Date.parse(order.date_upd),
+        };
       case '908':
-        return { ...order, current_state: UnifiedOrdersStateData.WAITING };
+        return {
+          ...order,
+          current_state: UnifiedOrdersStateData.WAITING,
+          date_upd: Date.parse(order.date_upd),
+        };
       default:
         return;
     }

@@ -89,12 +89,12 @@ export class AppService {
       this.shopService.getInTransitOrders(),
       this.yaService.getRecentParcels(),
       this.bxbService.getParcelsInInterval(),
-    ]).catch((error) => {
+    ]).catch(async (error) => {
       const message =
         error instanceof Error
           ? error.message
-          : 'Error in Promise.all while collecting data';
-      this.mailService.sendToAdmin('Error in Promise.all', message);
+          : 'Error in Promise.all while gathering data';
+      await this.mailService.sendToAdmin('Error in Promise.all', message);
       throw new HttpException(error, HttpStatus.SERVICE_UNAVAILABLE);
     });
 
