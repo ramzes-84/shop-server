@@ -8,10 +8,12 @@ export class DpdService {
   endpoint = ServicesUrl.DPD;
   clientNumber = process.env.DPD_CLIENT;
 
-  makeSoapRequest() {
+  getStatesByDPDOrder() {
     const args = {
       request: {
         auth: { clientNumber: +this.clientNumber, clientKey: this.token },
+        dpdOrderNr: 'RU098687689',
+        pickupYear: 2024,
       },
     };
 
@@ -21,13 +23,14 @@ export class DpdService {
         return;
       }
 
-      client.getCitiesCashPay(args, (err, result) => {
+      client.getStatesByDPDOrder(args, (err, result) => {
         if (err) {
           console.error('Error making SOAP request:', err);
-          return;
+          return err;
         }
 
         console.log(result);
+        return result;
       });
     });
   }
