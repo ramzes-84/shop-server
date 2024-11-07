@@ -10,28 +10,23 @@ export class ShopController {
     return this.shopService.getOrderInfo(+id);
   }
 
-  @Get('address/:id')
-  findOneAddress(@Param('id') id: string) {
-    return this.shopService.getOrderInfo(+id);
+  @Get('customer/:id')
+  findOneCustomer(@Param('id') id: string) {
+    return this.shopService.getCustomerInfo(+id);
   }
 
-  // @Post()
-  // create() {
-  //   return this.shopService.create();
-  // }
+  @Get('address/:id')
+  findOneAddress(@Param('id') id: string) {
+    return this.shopService.getAddressInfo(+id);
+  }
 
-  // @Get()
-  // findAll() {
-  //   return this.shopService.findAll();
-  // }
+  @Get('history/:id')
+  getOrderStatuses(@Param('id') id: string) {
+    return this.shopService.getOrderStatuses(+id);
+  }
 
-  // @Patch(':id')
-  // update(@Param('id') id: string) {
-  //   return this.shopService.update(+id);
-  // }
-
-  // @Delete(':id')
-  // remove(@Param('id') id: string) {
-  //   return this.shopService.remove(+id);
-  // }
+  @Get('carrier/:id')
+  getOrderCarrier(@Param('id') id: string) {
+    return this.shopService.getOrderCarrierInfo(+id);
+  }
 }
