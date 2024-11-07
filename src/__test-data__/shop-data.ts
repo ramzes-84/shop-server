@@ -186,23 +186,27 @@ export const inTransitOrders: InTransitOrders['orders'] = [
     current_state: '4',
     reference: '0001',
     date_upd: '2024-10-26 17:36:28',
+    shipping_number: '00000000-0000-48ba-b85f-17db26a69905',
   },
   {
     id: 2,
     current_state: '4',
     reference: '0002',
     date_upd: '2024-10-26 17:36:28',
+    shipping_number: '00000000-0000-48ba-b85f-17db26a69905',
   },
   {
     id: 3,
     current_state: '908',
     reference: '0003',
     date_upd: '2024-10-26 17:36:28',
+    shipping_number: '00000000-0000-48ba-b85f-17db26a69905',
   },
   {
     id: 4,
     current_state: '908',
     reference: '0004',
     date_upd: '2024-10-26 17:36:28',
+    shipping_number: '00000000-0000-48ba-b85f-17db26a69905',
   },
 ];
