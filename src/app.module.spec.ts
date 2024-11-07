@@ -10,6 +10,7 @@ import { MailService } from './mail/mail.service';
 import { BxbModule } from './bxb/bxb.module';
 import { CashModule } from './cash/cash.module';
 import { BotModule } from './bot/bot.module';
+import { DpdModule } from './dpd/dpd.module';
 
 describe('AppModule', () => {
   let module: TestingModule;
@@ -26,6 +27,7 @@ describe('AppModule', () => {
         BxbModule,
         CashModule,
         BotModule,
+        DpdModule,
         MailerModule.forRootAsync({
           imports: [ConfigModule],
           useFactory: async (configService: ConfigService) => ({
@@ -92,6 +94,11 @@ describe('AppModule', () => {
   it('should import BotModule', () => {
     const botModule = module.get<BotModule>(BotModule);
     expect(botModule).toBeDefined();
+  });
+
+  it('should import DpdModule', () => {
+    const dpdModule = module.get<DpdModule>(DpdModule);
+    expect(dpdModule).toBeDefined();
   });
 
   it('should import AuthModule', () => {

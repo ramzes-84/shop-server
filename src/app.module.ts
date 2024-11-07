@@ -10,6 +10,7 @@ import { MailService } from './mail/mail.service';
 import { BxbModule } from './bxb/bxb.module';
 import { CashModule } from './cash/cash.module';
 import { BotModule } from './bot/bot.module';
+import { DpdModule } from './dpd/dpd.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { BotModule } from './bot/bot.module';
     AuthModule,
     BxbModule,
     CashModule,
+    DpdModule,
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

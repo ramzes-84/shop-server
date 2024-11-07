@@ -13,6 +13,7 @@ import { CashService } from './cash/cash.service';
 import { convertOrderShopToCash } from './utils/convert-order-shop-to-cash';
 import { generateCashInvoiceMessage } from './utils/messages';
 import { BotService } from './bot/bot.service';
+import { DpdService } from './dpd/dpd.service';
 import {
   Cargos,
   RevisingOrderData,
@@ -31,6 +32,7 @@ export class AppService {
     private readonly bxbService: BxbService,
     private readonly cashService: CashService,
     private readonly botService: BotService,
+    private readonly dpdService: DpdService,
   ) {}
 
   async getHello() {
