@@ -11,9 +11,11 @@ import { InTransitOrders } from './dto/in-transit-orders.dto';
 
 @Injectable()
 export class ShopService {
-  token = process.env.SHOP_TOKEN;
-  tokenBase64 = Buffer.from(`${this.token}:`).toString('base64');
-  endpoint = ServicesUrl.SHOP;
+  private readonly token = process.env.SHOP_TOKEN;
+  private readonly tokenBase64 = Buffer.from(`${this.token}:`).toString(
+    'base64',
+  );
+  private readonly endpoint = ServicesUrl.SHOP;
 
   async getOrderInfo(id: number) {
     const url = new URL(this.endpoint + '/orders/' + id);
@@ -62,7 +64,10 @@ export class ShopService {
   async getInTransitOrders() {
     const url = new URL(this.endpoint + '/orders');
     url.searchParams.append('filter[current_state]', `[4|908]`);
-    url.searchParams.append('display', '[id,current_state,reference,date_upd]');
+    url.searchParams.append(
+      'display',
+      '[id,current_state,reference,date_upd,shipping_number]',
+    );
     const data = await this.fetchData<InTransitOrders>(url);
     return data.orders;
   }

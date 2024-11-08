@@ -9,8 +9,8 @@ import {
 
 @Injectable()
 export class BxbService {
-  token = process.env.BB_TOKEN;
-  endpoint = ServicesUrl.BB;
+  private readonly token = process.env.BB_TOKEN;
+  private readonly endpoint = ServicesUrl.BB;
 
   async getParcelsInInterval() {
     const url = new URL(this.endpoint);
