@@ -10,6 +10,9 @@ import { MailService } from './mail/mail.service';
 import { reviseOrders } from './utils/reviseOrders';
 import { BxbService } from './bxb/bxb.service';
 import { ParselStatus } from './bxb/dto/bxb.dto';
+import { CashService } from './cash/cash.service';
+import { convertOrderShopToCash } from './utils/convert-order-shop-to-cash';
+import { generateCashInvoiceMessage } from './utils/messages';
 
 @Injectable()
 export class AppService {
@@ -18,6 +21,7 @@ export class AppService {
     private readonly yaService: YaService,
     private readonly mailService: MailService,
     private readonly bxbService: BxbService,
+    private readonly cashService: CashService,
   ) {}
 
   async getHello() {
@@ -25,18 +29,65 @@ export class AppService {
     return `Hello World!`;
   }
 
+  async getOrderBasicInfo(order: string) {
+    const orderDetails = await this.shopService.getOrderInfo(+order);
+    const customerDetails = await this.shopService.getCustomerInfo(
+      +orderDetails.id_customer,
+    );
+    const addressDetails = await this.shopService.getAddressInfo(
+      +orderDetails.id_address_delivery,
+    );
+
+    return {
+      orderDetails,
+      customerDetails,
+      addressDetails,
+    };
+  }
+
+  async createCashInvoice({
+    order,
+  }: Pick<CreateOrderQueries, 'order'>): Promise<TransferInterface> {
+    try {
+      const { addressDetails, customerDetails, orderDetails } =
+        await this.getOrderBasicInfo(order);
+      const cashInvoiceInfo = await this.cashService.createCashInvoice(
+        convertOrderShopToCash(orderDetails),
+      );
+      const message = generateCashInvoiceMessage(
+        orderDetails,
+        customerDetails,
+        cashInvoiceInfo,
+      );
+      await this.mailService.send(
+        'Выставлен счёт на оплату (Магазин MINERAL MAGIC)',
+        message,
+        customerDetails.email,
+      );
+      await this.mailService.sendToAdmin(
+        `Отправить SMS о выставлении счёта ${addressDetails.phone_mobile}`,
+        message,
+      );
+      return {
+        ok: true,
+        data: cashInvoiceInfo.delivery_method,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        data: error,
+      };
+    }
+  }
+
   async createYaOrder({
     order,
     destination,
   }: CreateOrderQueries): Promise<TransferInterface> {
     try {
-      const orderDetails = await this.shopService.getOrderInfo(+order);
-      const addressDetails = await this.shopService.getAddressInfo(
-        +orderDetails.id_address_delivery,
-      );
-      const customerDetails = await this.shopService.getCustomerInfo(
-        +orderDetails.id_customer,
-      );
+      const { addressDetails, customerDetails, orderDetails } =
+        await this.getOrderBasicInfo(order);
+
       const shippingDetails =
         await this.shopService.getOrderCarrierInfo(+order);
 

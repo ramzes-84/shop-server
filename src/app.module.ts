@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { MailService } from './mail/mail.service';
 import { BxbModule } from './bxb/bxb.module';
+import { CashModule } from './cash/cash.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { BxbModule } from './bxb/bxb.module';
     ShopModule,
     AuthModule,
     BxbModule,
+    CashModule,
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
