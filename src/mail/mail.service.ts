@@ -20,4 +20,12 @@ export class MailService {
       text,
     });
   }
+
+  async send(subject: string, text: string, to: string) {
+    await this.mailerService.sendMail({
+      to,
+      subject,
+      text,
+    });
+  }
 }

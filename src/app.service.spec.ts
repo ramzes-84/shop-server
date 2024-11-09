@@ -20,6 +20,7 @@ import { orderConverterResult } from './__test-data__/converter-result';
 import { yaOrderHistory } from './__test-data__/ya-data';
 import { yaOrderInfo } from './__test-data__/ya-order-info';
 import { BxbService } from './bxb/bxb.service';
+import { CashService } from './cash/cash.service';
 
 jest.mock('./utils/convertOrder');
 
@@ -28,8 +29,6 @@ describe('AppService', () => {
   let shopService: ShopService;
   let yaService: YaService;
   let mailService: MailService;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  // let bxbService: BxbService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -61,9 +60,17 @@ describe('AppService', () => {
           },
         },
         {
+          provide: CashService,
+          useValue: {
+            createCashInvoice: jest.fn(),
+          },
+        },
+        {
           provide: MailService,
           useValue: {
             emitHealth: jest.fn(),
+            sendToAdmin: jest.fn(),
+            send: jest.fn(),
           },
         },
       ],
@@ -73,7 +80,6 @@ describe('AppService', () => {
     shopService = module.get<ShopService>(ShopService);
     yaService = module.get<YaService>(YaService);
     mailService = module.get<MailService>(MailService);
-    // bxbService = module.get<BxbService>(BxbService);
   });
 
   it('should be defined', () => {

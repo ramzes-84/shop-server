@@ -19,3 +19,10 @@ export class CreateOrderQueries {
   @IsUUID('4', { message: 'destination is incorrect' })
   destination: string;
 }
+
+export class CreateInvoiceQueries {
+  @IsDefined({ message: 'order is required' })
+  @IsString({ message: 'order must be a string' })
+  @Length(5, 5, { message: 'order is incorrect' })
+  order: string;
+}

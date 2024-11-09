@@ -1,6 +1,6 @@
 import { ParselStatus } from 'src/bxb/dto/bxb.dto';
 import { InTransitOrderItem } from 'src/shop/dto/in-transit-orders.dto';
-import { RecentBxbParcelsType } from 'src/types/bxb-batch';
+import { RecentBxbParcelsType } from 'src/types/common';
 import {
   YaOrderInfoRes,
   YaParcelStatus,

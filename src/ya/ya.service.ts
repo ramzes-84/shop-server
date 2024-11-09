@@ -12,14 +12,8 @@ import { ErrorYaResDTO } from './dto/ya-errors';
 
 @Injectable()
 export class YaService {
-  token =
-    process.env.NODE_ENV === 'production'
-      ? process.env.YAAPI_BEARER_TOKEN
-      : process.env.YAAPI_TEST_BEARER_TOKEN;
-  endpoint =
-    process.env.NODE_ENV === 'production'
-      ? ServicesUrl.YA
-      : ServicesUrl.YA_TEST;
+  private readonly token = process.env.YAAPI_BEARER_TOKEN;
+  private readonly endpoint = ServicesUrl.YA;
 
   async getHistoryById(id: string): Promise<YaOrderHistoryRes> {
     const url = new URL(this.endpoint + '/request/history');

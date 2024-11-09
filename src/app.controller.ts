@@ -1,6 +1,10 @@
 import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { AppService } from './app.service';
-import { CreateOrderQueries, OrderIdParams } from './validation/yandex';
+import {
+  CreateInvoiceQueries,
+  CreateOrderQueries,
+  OrderIdParams,
+} from './validation/yandex';
 import { AuthGuard } from '@nestjs/passport';
 
 @Controller()
@@ -17,6 +21,12 @@ export class AppController {
   @UseGuards(AuthGuard('bearer'))
   yaOrderCreate(@Query() query: CreateOrderQueries) {
     return this.appService.createYaOrder(query);
+  }
+
+  @Post('cash/create')
+  @UseGuards(AuthGuard('bearer'))
+  cashInvoiceCreate(@Query() query: CreateInvoiceQueries) {
+    return this.appService.createCashInvoice(query);
   }
 
   @Get('yandex/tracking/:id')
