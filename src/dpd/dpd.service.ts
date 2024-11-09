@@ -12,7 +12,7 @@ export class DpdService {
     const args = {
       request: {
         auth: { clientNumber: +this.clientNumber, clientKey: this.token },
-        dpdOrderNr: 'RU098687689',
+        dpdOrderNr: 'RU101453860',
         pickupYear: 2024,
       },
     };
