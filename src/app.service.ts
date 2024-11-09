@@ -59,11 +59,6 @@ export class AppService {
         customerDetails,
         cashInvoiceInfo,
       );
-      await this.mailService.send(
-        'Выставлен счёт на оплату (Магазин MINERAL MAGIC)',
-        message,
-        customerDetails.email,
-      );
       await this.mailService.sendToAdmin(
         `Отправить SMS о выставлении счёта ${addressDetails.phone_mobile}`,
         message,
