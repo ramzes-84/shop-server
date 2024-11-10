@@ -13,6 +13,7 @@ import { ParselStatus } from './bxb/dto/bxb.dto';
 import { CashService } from './cash/cash.service';
 import { convertOrderShopToCash } from './utils/convert-order-shop-to-cash';
 import { generateCashInvoiceMessage } from './utils/messages';
+import { BotService } from './bot/bot.service';
 
 @Injectable()
 export class AppService {
@@ -22,6 +23,7 @@ export class AppService {
     private readonly mailService: MailService,
     private readonly bxbService: BxbService,
     private readonly cashService: CashService,
+    private readonly botService: BotService,
   ) {}
 
   async getHello() {

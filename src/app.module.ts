@@ -9,6 +9,7 @@ import { MailerModule } from '@nestjs-modules/mailer';
 import { MailService } from './mail/mail.service';
 import { BxbModule } from './bxb/bxb.module';
 import { CashModule } from './cash/cash.module';
+import { BotModule } from './bot/bot.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { CashModule } from './cash/cash.module';
       }),
       inject: [ConfigService],
     }),
+    BotModule,
   ],
   controllers: [AppController],
   providers: [AppService, MailService],

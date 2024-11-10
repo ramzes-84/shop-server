@@ -21,6 +21,7 @@ import { yaOrderHistory } from './__test-data__/ya-data';
 import { yaOrderInfo } from './__test-data__/ya-order-info';
 import { BxbService } from './bxb/bxb.service';
 import { CashService } from './cash/cash.service';
+import { BotService } from './bot/bot.service';
 
 jest.mock('./utils/convertOrder');
 
@@ -63,6 +64,12 @@ describe('AppService', () => {
           provide: CashService,
           useValue: {
             createCashInvoice: jest.fn(),
+          },
+        },
+        {
+          provide: BotService,
+          useValue: {
+            sendEmployeeMessage: jest.fn(),
           },
         },
         {
