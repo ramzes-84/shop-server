@@ -5,4 +5,5 @@ export enum ServicesUrl {
   BB = 'https://api.boxberry.ru/json.php',
   POST = 'https://otpravka-api.pochta.ru',
   CASH = 'https://api.yookassa.ru/v3/invoices',
+  TELEGRAM = 'https://api.telegram.org/bot',
 }
