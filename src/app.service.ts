@@ -69,7 +69,7 @@ export class AppService {
         cashInvoiceInfo,
         addressDetails,
       );
-      await this.botService.sendEmployeeMessage(message);
+      await this.botService.sendEmployeeMessage(message, true);
       return {
         ok: true,
         data: cashInvoiceInfo.delivery_method,
@@ -208,19 +208,19 @@ export class AppService {
         case order.unifiedShopState === UnifiedOrderState.WAITING &&
           Date.now() - 86400000 * 5 > order.shopStateUpdatedAt:
           warnings.push(
-            `⌛ ${order.reference} ожидает более 5 дней (начиная с ${new Date(order.shopStateUpdatedAt).toDateString()}).`,
+            `⌛ ${order.reference} ожидает более 5 дней, начиная с ${new Date(order.shopStateUpdatedAt).toDateString()}.`,
           );
           break;
 
         case order.unifiedCargoState === UnifiedOrderState.PROBLEM:
           errors.push(
-            `❗ Проверьте заказ ${order.reference} (статус: ${order.actualCargoState}).`,
+            `❗ Проверьте заказ ${order.reference}, статус: ${order.actualCargoState}.`,
           );
           break;
 
         case order.unifiedCargoState === UnifiedOrderState.UNKNOWN:
           errors.push(
-            `❗ Не удалось проверить заказ ${order.reference} (трек: ${order.track}).`,
+            `❗ Не удалось проверить заказ ${order.reference}, трек: ${order.track}.`,
           );
           break;
       }

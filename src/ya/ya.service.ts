@@ -30,7 +30,7 @@ export class YaService {
     };
     const interval = {
       from: new Date(Date.now() - 86400000 * 30).toISOString(),
-      to: new Date(Date.now() - 86400000 * 2).toISOString(),
+      to: new Date(Date.now()).toISOString(),
     };
     const response = await this.fetchData<YaRecentParcelsRes>(
       url,

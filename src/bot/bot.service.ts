@@ -14,11 +14,11 @@ export class BotService {
   private readonly alGroup = process.env.TELEGRAM_GROUP_AL;
   private readonly buGroup = process.env.TELEGRAM_GROUP_BU;
 
-  async sendEmployeeMessage(text: string) {
+  async sendEmployeeMessage(text: string, markdown: boolean = false) {
     const body = JSON.stringify({
       chat_id: this.buGroup,
       text,
-      parse_mode: 'MarkdownV2',
+      parse_mode: markdown ? 'MarkdownV2' : undefined,
     });
 
     return await this.fetchData<SuccessSendMessageResDTO>(
