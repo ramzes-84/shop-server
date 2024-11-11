@@ -44,7 +44,7 @@ export class AppController {
   @Get('revise')
   @UseGuards(AuthGuard('bearer'))
   reviseOrdersStatuses() {
-    return this.appService.reviseOrdersStatuses();
+    return this.appService.reviseOrders();
   }
 
   @Get('test')

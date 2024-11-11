@@ -226,7 +226,7 @@ export class AppService {
       }
     });
 
-    [updates, warnings, errors]
+    [updates, warnings /*errors*/]
       .filter((arr) => arr.length)
       .forEach(async (arr) => {
         try {

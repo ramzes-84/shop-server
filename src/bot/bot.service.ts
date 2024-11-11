@@ -18,6 +18,7 @@ export class BotService {
     const body = JSON.stringify({
       chat_id: this.buGroup,
       text,
+      parse_mode: 'MarkdownV2',
     });
 
     return await this.fetchData<SuccessSendMessageResDTO>(
