@@ -13,13 +13,13 @@ export type OrdersOnBalanceDTO = OneOrderOnBalance[];
 
 export type OneOrderOnBalance = {
   ID: string;
-  Status: ParselStatus;
+  Status: BxbParselStatus;
   Price: string;
   Delivery_sum: string;
   Payment_sum: string;
 };
 
-export enum ParselStatus {
+export enum BxbParselStatus {
   LoadedRegistry = 'Загружен реестр ИМ',
   OrderTransferredForDelivery = 'Заказ передан на доставку',
   SentToSortingTerminal = 'Отправлен на сортировочный терминал',
@@ -41,13 +41,14 @@ export enum ParselStatus {
   ReturnedToReceivingPoint = 'Возвращено в пункт приема',
   ReturnedToIM = 'Возвращено в ИМ',
   CustomProblem = 'Искусственная проблема',
+  Unknown = 'Unknown',
 }
 
 export type ListStatusesDTO = StatusItem[] | ListStatusesError;
 
 export type StatusItem = {
   Date: string;
-  Name: ParselStatus;
+  Name: BxbParselStatus;
 };
 
 export type ListStatusesError = {

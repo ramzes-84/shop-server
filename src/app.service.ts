@@ -5,15 +5,22 @@ import { CreateYaOrderDto } from './ya/dto/ya.dto';
 import { convertOrder } from './utils/convertOrder';
 import { parseYaHistoryToHtml } from './utils/parseYaHistoryToHtml';
 import { CreateOrderQueries } from './validation/yandex';
-import { TransferInterface } from './types/transfer-interface';
 import { MailService } from './mail/mail.service';
 import { reviseOrders } from './utils/reviseOrders';
 import { BxbService } from './bxb/bxb.service';
-import { ParselStatus } from './bxb/dto/bxb.dto';
+import { BxbParselStatus } from './bxb/dto/bxb.dto';
 import { CashService } from './cash/cash.service';
 import { convertOrderShopToCash } from './utils/convert-order-shop-to-cash';
 import { generateCashInvoiceMessage } from './utils/messages';
 import { BotService } from './bot/bot.service';
+import {
+  Cargos,
+  RevisingOrderData,
+  TransferInterface,
+  UnifiedOrderState,
+} from './types/common';
+import { recognizeCargo } from './utils/sort-tracks';
+import { unifyParcelStatus, unifyShopState } from './utils/reviseOrdersV2';
 
 @Injectable()
 export class AppService {
@@ -54,17 +61,15 @@ export class AppService {
       const { addressDetails, customerDetails, orderDetails } =
         await this.getOrderBasicInfo(order);
       const cashInvoiceInfo = await this.cashService.createCashInvoice(
-        convertOrderShopToCash(orderDetails),
+        convertOrderShopToCash(orderDetails, customerDetails),
       );
       const message = generateCashInvoiceMessage(
         orderDetails,
         customerDetails,
         cashInvoiceInfo,
+        addressDetails,
       );
-      await this.mailService.sendToAdmin(
-        `Отправить SMS о выставлении счёта ${addressDetails.phone_mobile}`,
-        message,
-      );
+      await this.botService.sendEmployeeMessage(message);
       return {
         ok: true,
         data: cashInvoiceInfo.delivery_method,
@@ -132,6 +137,109 @@ export class AppService {
     }
   }
 
+  async getDataForRevise(): Promise<RevisingOrderData[]> {
+    const [ordersInTransit, recentYaParcels] = await Promise.all([
+      this.shopService.getInTransitOrders(),
+      this.yaService.getRecentParcels(),
+    ]).catch(async (error) => {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Error in Promise.all while gathering data';
+      await this.mailService.sendToAdmin('Error in Promise.all', message);
+      throw new HttpException(error, HttpStatus.SERVICE_UNAVAILABLE);
+    });
+
+    const revisingOrderData: RevisingOrderData[] = ordersInTransit.map(
+      (order) => {
+        return {
+          id: order.id,
+          reference: order.reference,
+          track: order.shipping_number,
+          cargo: recognizeCargo(order.shipping_number),
+          unifiedShopState: unifyShopState(order.current_state),
+          shopStateUpdatedAt: Date.parse(order.date_upd),
+        };
+      },
+    );
+    await Promise.all(
+      revisingOrderData.map(async (order) => {
+        let currState: string;
+        if (order.cargo === Cargos.YA) {
+          currState = recentYaParcels.requests
+            .filter((parcel) =>
+              parcel.request.info.operator_request_id.includes(order.reference),
+            )
+            .at(-1)?.state.status;
+        } else if (order.cargo === Cargos.BXB) {
+          const statusesList = await this.bxbService.getParcelStatuses(
+            order.track,
+          );
+          if (statusesList instanceof Array) {
+            currState = statusesList.at(-1).Name;
+          } else {
+            currState = BxbParselStatus.CustomProblem;
+          }
+        } else {
+          currState = BxbParselStatus.Unknown;
+        }
+        order.actualCargoState = currState;
+        order.unifiedCargoState = unifyParcelStatus(currState);
+      }),
+    );
+    return revisingOrderData;
+  }
+
+  async reviseOrders() {
+    const updates: string[] = [];
+    const warnings: string[] = [];
+    const errors: string[] = [];
+    const orders = await this.getDataForRevise();
+
+    orders.forEach((order) => {
+      switch (true) {
+        case order.unifiedShopState !== order.unifiedCargoState &&
+          order.unifiedCargoState !== UnifiedOrderState.UNKNOWN:
+          updates.push(
+            `${order.reference}:  ${order.unifiedShopState}  ⏩  ${order.unifiedCargoState}.`,
+          );
+          break;
+
+        case order.unifiedShopState === UnifiedOrderState.WAITING &&
+          Date.now() - 86400000 * 5 > order.shopStateUpdatedAt:
+          warnings.push(
+            `⌛ ${order.reference} ожидает более 5 дней (начиная с ${new Date(order.shopStateUpdatedAt).toDateString()}).`,
+          );
+          break;
+
+        case order.unifiedCargoState === UnifiedOrderState.PROBLEM:
+          errors.push(
+            `❗ Проверьте заказ ${order.reference} (статус: ${order.actualCargoState}).`,
+          );
+          break;
+
+        case order.unifiedCargoState === UnifiedOrderState.UNKNOWN:
+          errors.push(
+            `❗ Не удалось проверить заказ ${order.reference} (трек: ${order.track}).`,
+          );
+          break;
+      }
+    });
+
+    [updates, warnings, errors]
+      .filter((arr) => arr.length)
+      .forEach(async (arr) => {
+        try {
+          await this.botService.sendEmployeeMessage(arr.join('\n'));
+        } catch (error) {
+          throw new Error(error);
+        }
+      });
+
+    return [...updates, ...warnings, ...errors];
+  }
+
+  // deprecated
   async reviseOrdersStatuses(): Promise<string[]> {
     const [inTransitOrders, recentYaParcels, recentBxbRaw] = await Promise.all([
       this.shopService.getInTransitOrders(),
@@ -161,7 +269,7 @@ export class AppService {
         return {
           imId,
           status: {
-            Name: ParselStatus.CustomProblem,
+            Name: BxbParselStatus.CustomProblem,
             Date: new Date().toISOString().split('T')[0].replace(/-/g, ''),
           },
         };
@@ -187,6 +295,6 @@ export class AppService {
   }
 
   async testEndpoint() {
-    return await this.bxbService.getParcelsInInterval();
+    return await this.reviseOrders();
   }
 }

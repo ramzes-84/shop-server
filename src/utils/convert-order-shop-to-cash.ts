@@ -5,9 +5,11 @@ import {
 } from 'src/cash/dto/cash.dto';
 import { OrderInfoResDto } from 'src/shop/dto/order-info.dto';
 import { calcDiscount } from './convertOrder';
+import { CustomerInfoResDto } from 'src/shop/dto/customer-info.dto';
 
 export function convertOrderShopToCash(
   orderDetails: OrderInfoResDto['order'],
+  customerDetails: CustomerInfoResDto['customer'],
 ): CreateCashInvoiceDto {
   const discount = calcDiscount(
     orderDetails.total_products,
@@ -60,6 +62,24 @@ export function convertOrderShopToCash(
       description: `Оплата заказа №${orderDetails.reference}`,
       metadata: {
         order_id: orderDetails.reference,
+      },
+      receipt: {
+        customer: {
+          full_name: `${customerDetails.firstname} ${customerDetails.lastname}`,
+          email: customerDetails.email,
+        },
+        items: goods.map((item) => ({
+          description: item.description,
+          quantity: item.quantity,
+          amount: {
+            currency: CurrenciesTypes.RUB,
+            value: item.discount_price?.value ?? item.price.value,
+          },
+          vat_code: 1,
+          payment_mode: 'full_payment',
+          payment_subject:
+            item.description === 'Доставка' ? 'service' : 'commodity',
+        })),
       },
     },
     cart: goods,

@@ -3,7 +3,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthGuard } from '@nestjs/passport';
 import { CreateOrderQueries, OrderIdParams } from './validation/yandex';
-import { TransferInterface } from './types/transfer-interface';
+import { TransferInterface } from './types/common';
 
 describe('AppController', () => {
   let controller: AppController;
