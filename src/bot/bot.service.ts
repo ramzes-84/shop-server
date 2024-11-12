@@ -1,5 +1,6 @@
 import { Injectable, RequestMethod } from '@nestjs/common';
 import { ServicesUrl } from 'src/types/services-url';
+import fetch from 'node-fetch';
 import {
   BotCommand,
   ErrorTelegramResDTO,
@@ -42,11 +43,6 @@ export class BotService {
       },
       body,
     });
-
-    // if (!response.ok) {
-    //   const errorDetails: ErrorTelegramResDTO = await response.json();
-    //   return errorDetails;
-    // }
 
     const data: T = await response.json();
     return data;
