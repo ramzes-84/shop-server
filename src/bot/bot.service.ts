@@ -1,4 +1,4 @@
-import { HttpException, Injectable, RequestMethod } from '@nestjs/common';
+import { Injectable, RequestMethod } from '@nestjs/common';
 import { ServicesUrl } from 'src/types/services-url';
 import {
   BotCommand,
@@ -45,7 +45,12 @@ export class BotService {
 
     if (!response.ok) {
       const errorDetails: ErrorTelegramResDTO = await response.json();
-      throw new HttpException(errorDetails, response.status);
+      const config = `Token: ${this.token} 
+group: ${this.buGroup} 
+url: ${url} 
+error: ${JSON.stringify(errorDetails)}`;
+      return config;
+      // throw new HttpException(errorDetails, response.status);
     }
 
     const data: T = await response.json();

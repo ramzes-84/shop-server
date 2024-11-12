@@ -80,15 +80,10 @@ export class AppService {
         data: error,
       };
     } finally {
-      try {
-        await this.mailService.sendToAdmin('Invoice info', message);
-        await this.botService.sendEmployeeMessage(message, true);
-      } catch (error) {
-        await this.mailService.sendToAdmin(
-          'Invoice sending error info',
-          JSON.stringify(error),
-        );
-      }
+      await this.mailService.sendToAdmin('Invoice info', message);
+      const result = await this.botService.sendEmployeeMessage(message, true);
+      if (typeof result === 'string')
+        await this.mailService.sendToAdmin('Bot sending result', result);
     }
   }
 
