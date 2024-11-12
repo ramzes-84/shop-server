@@ -229,12 +229,10 @@ export class AppService {
       }
     });
 
-    [updates, warnings /*errors*/]
-      .filter((arr) => arr.length)
-      .forEach(async (arr) => {
-        await this.mailService.sendToAdmin('Status updates', arr.join('\n'));
-        await this.botService.sendEmployeeMessage(arr.join('\n'));
-      });
+    await this.mailService.sendToAdmin(
+      'Status updates',
+      [...updates, ...warnings, ...errors].join('\n'),
+    );
 
     return [...updates, ...warnings, ...errors];
   }
@@ -295,8 +293,6 @@ export class AppService {
   }
 
   async testEndpoint() {
-    const token = process.env.TELEGRAM_TOKEN;
-    const group = process.env.TELEGRAM_GROUP_BU;
-    return `Token: ${token} group: ${group}`;
+    return await this.botService.sendEmployeeMessage('Test text');
   }
 }

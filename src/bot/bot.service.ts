@@ -1,4 +1,4 @@
-import { HttpException, Injectable, RequestMethod } from '@nestjs/common';
+import { Injectable, RequestMethod } from '@nestjs/common';
 import { ServicesUrl } from 'src/types/services-url';
 import {
   BotCommand,
@@ -21,7 +21,7 @@ export class BotService {
       parse_mode: markdown ? 'MarkdownV2' : undefined,
     });
 
-    return await this.fetchData<SuccessSendMessageResDTO>(
+    return await this.fetchData<SuccessSendMessageResDTO | ErrorTelegramResDTO>(
       BotCommand.SEND_MSG,
       RequestMethod.POST,
       body,
@@ -43,10 +43,10 @@ export class BotService {
       body,
     });
 
-    if (!response.ok) {
-      const errorDetails: ErrorTelegramResDTO = await response.json();
-      throw new HttpException(errorDetails, response.status);
-    }
+    // if (!response.ok) {
+    //   const errorDetails: ErrorTelegramResDTO = await response.json();
+    //   return errorDetails;
+    // }
 
     const data: T = await response.json();
     return data;
