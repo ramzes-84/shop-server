@@ -25,11 +25,8 @@ export class DpdService {
 
       client.getStatesByDPDOrder(args, (err, result) => {
         if (err) {
-          console.error('Error making SOAP request:', err);
           return err;
         }
-
-        console.log(result);
         return result;
       });
     });
