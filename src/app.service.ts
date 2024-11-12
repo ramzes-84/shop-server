@@ -233,6 +233,8 @@ export class AppService {
       'Status updates',
       [...updates, ...warnings, ...errors].join('\n'),
     );
+    await this.botService.sendEmployeeMessage(updates.join('\n'));
+    await this.botService.sendEmployeeMessage(warnings.join('\n'));
 
     return [...updates, ...warnings, ...errors];
   }
