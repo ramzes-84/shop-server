@@ -21,6 +21,7 @@ import {
 } from './types/common';
 import { recognizeCargo } from './utils/sort-tracks';
 import { unifyParcelStatus, unifyShopState } from './utils/reviseOrdersV2';
+import { PostService } from './post/post.service';
 
 @Injectable()
 export class AppService {
@@ -31,6 +32,7 @@ export class AppService {
     private readonly bxbService: BxbService,
     private readonly cashService: CashService,
     private readonly botService: BotService,
+    private readonly postService: PostService,
   ) {}
 
   async getHello() {
@@ -295,6 +297,6 @@ export class AppService {
   }
 
   async testEndpoint() {
-    return await this.botService.sendEmployeeMessage('Test text');
+    return await this.postService.getPostParcelData('');
   }
 }
