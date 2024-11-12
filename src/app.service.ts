@@ -81,9 +81,7 @@ export class AppService {
       };
     } finally {
       await this.mailService.sendToAdmin('Invoice info', message);
-      const result = await this.botService.sendEmployeeMessage(message, true);
-      if (typeof result === 'string')
-        await this.mailService.sendToAdmin('Bot sending result', result);
+      await this.botService.sendEmployeeMessage(message, true);
     }
   }
 
@@ -234,11 +232,8 @@ export class AppService {
     [updates, warnings /*errors*/]
       .filter((arr) => arr.length)
       .forEach(async (arr) => {
-        try {
-          await this.botService.sendEmployeeMessage(arr.join('\n'));
-        } catch (error) {
-          throw new Error(error);
-        }
+        await this.mailService.sendToAdmin('Status updates', arr.join('\n'));
+        await this.botService.sendEmployeeMessage(arr.join('\n'));
       });
 
     return [...updates, ...warnings, ...errors];
@@ -300,6 +295,8 @@ export class AppService {
   }
 
   async testEndpoint() {
-    return await this.reviseOrders();
+    const token = process.env.TELEGRAM_TOKEN;
+    const group = process.env.TELEGRAM_GROUP_BU;
+    return `Token: ${token} group: ${group}`;
   }
 }
