@@ -57,19 +57,19 @@ export class AppService {
   async createCashInvoice({
     order,
   }: Pick<CreateOrderQueries, 'order'>): Promise<TransferInterface> {
+    let message: string;
     try {
       const { addressDetails, customerDetails, orderDetails } =
         await this.getOrderBasicInfo(order);
       const cashInvoiceInfo = await this.cashService.createCashInvoice(
         convertOrderShopToCash(orderDetails, customerDetails),
       );
-      const message = generateCashInvoiceMessage(
+      message = generateCashInvoiceMessage(
         orderDetails,
         customerDetails,
         cashInvoiceInfo,
         addressDetails,
       );
-      await this.botService.sendEmployeeMessage(message, true);
       return {
         ok: true,
         data: cashInvoiceInfo.delivery_method,
@@ -79,6 +79,16 @@ export class AppService {
         ok: false,
         data: error,
       };
+    } finally {
+      try {
+        await this.mailService.sendToAdmin('Invoice info', message);
+        await this.botService.sendEmployeeMessage(message, true);
+      } catch (error) {
+        await this.mailService.sendToAdmin(
+          'Invoice sending error info',
+          JSON.stringify(error),
+        );
+      }
     }
   }
 
