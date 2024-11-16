@@ -22,6 +22,7 @@ import { yaOrderInfo } from './__test-data__/ya-order-info';
 import { BxbService } from './bxb/bxb.service';
 import { CashService } from './cash/cash.service';
 import { BotService } from './bot/bot.service';
+import { DpdService } from './dpd/dpd.service';
 import { PostService } from './post/post.service';
 
 jest.mock('./utils/convertOrder');
@@ -78,6 +79,10 @@ describe('AppService', () => {
           useValue: {
             sendEmployeeMessage: jest.fn(),
           },
+        },
+        {
+          provide: DpdService,
+          useValue: {},
         },
         {
           provide: MailService,

@@ -13,6 +13,7 @@ import { CashService } from './cash/cash.service';
 import { convertOrderShopToCash } from './utils/convert-order-shop-to-cash';
 import { generateCashInvoiceMessage } from './utils/messages';
 import { BotService } from './bot/bot.service';
+import { DpdService } from './dpd/dpd.service';
 import {
   Cargos,
   RevisingOrderData,
@@ -32,6 +33,7 @@ export class AppService {
     private readonly bxbService: BxbService,
     private readonly cashService: CashService,
     private readonly botService: BotService,
+    private readonly dpdService: DpdService,
     private readonly postService: PostService,
   ) {}
 
@@ -182,6 +184,15 @@ export class AppService {
           );
           if (statusesList instanceof Array) {
             currState = statusesList.at(-1).Name;
+          } else {
+            currState = BxbParselStatus.CustomProblem;
+          }
+        } else if (order.cargo === Cargos.DPD) {
+          const dpdStateRes = await this.dpdService.getStatesByDPDOrder(
+            order.track,
+          );
+          if ('states' in dpdStateRes.return) {
+            currState = dpdStateRes.return.states.at(-1).newState;
           } else {
             currState = BxbParselStatus.CustomProblem;
           }

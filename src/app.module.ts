@@ -10,6 +10,7 @@ import { MailService } from './mail/mail.service';
 import { BxbModule } from './bxb/bxb.module';
 import { CashModule } from './cash/cash.module';
 import { BotModule } from './bot/bot.module';
+import { DpdModule } from './dpd/dpd.module';
 import { PostModule } from './post/post.module';
 
 @Module({
@@ -22,6 +23,7 @@ import { PostModule } from './post/post.module';
     AuthModule,
     BxbModule,
     CashModule,
+    DpdModule,
     BotModule,
     PostModule,
     MailerModule.forRootAsync({
