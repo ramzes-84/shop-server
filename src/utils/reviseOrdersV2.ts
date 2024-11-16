@@ -1,5 +1,6 @@
 import { BxbParselStatus } from 'src/bxb/dto/bxb.dto';
 import { DpdParselStatus } from 'src/dpd/dto/dpd.dto';
+import { PostParcelStatus } from 'src/post/dto/post-soap.dto';
 import { UnifiedOrderState } from 'src/types/common';
 import { YaParcelStatus } from 'src/ya/dto/ya.dto';
 
@@ -39,6 +40,15 @@ export function unifyParcelStatus(status: string) {
     case DpdParselStatus.OnTerminalPickup:
     case DpdParselStatus.OnRoad:
     case DpdParselStatus.Delivering:
+    case PostParcelStatus.Batch:
+    case PostParcelStatus.ArrivedAtSortingCenter:
+    case PostParcelStatus.AwaitingCourierDelivery:
+    case PostParcelStatus.HandedToCourier:
+    case PostParcelStatus.LeftAcceptancePoint:
+    case PostParcelStatus.LeftSortingCenter:
+    case PostParcelStatus.ParcelLockerReserved:
+    case PostParcelStatus.SentToPickupPoint:
+    case PostParcelStatus.Sorting:
       return UnifiedOrderState.IN_TRANSIT;
 
     case YaParcelStatus.DELIVERY_ARRIVED_PICKUP_POINT:
@@ -46,6 +56,8 @@ export function unifyParcelStatus(status: string) {
     case YaParcelStatus.CONFIRMATION_CODE_RECEIVED:
     case BxbParselStatus.ArrivedAtPickupPoint:
     case DpdParselStatus.OnTerminalDelivery:
+    case PostParcelStatus.ArrivedAtDeliveryPoint:
+    case PostParcelStatus.ArrivedAtParcelLocker:
       return UnifiedOrderState.WAITING;
 
     case YaParcelStatus.DELIVERY_TRANSMITTED_TO_RECIPIENT:
@@ -54,6 +66,8 @@ export function unifyParcelStatus(status: string) {
     case YaParcelStatus.FINISHED:
     case BxbParselStatus.Issued:
     case DpdParselStatus.Delivered:
+    case PostParcelStatus.DeliveredToRecipient:
+    case PostParcelStatus.DeliveredViaParcelLocker:
       return UnifiedOrderState.DELIVERED;
 
     case YaParcelStatus.VALIDATING_ERROR:
@@ -83,6 +97,7 @@ export function unifyParcelStatus(status: string) {
     case DpdParselStatus.NotDone:
     case DpdParselStatus.Lost:
     case DpdParselStatus.Problem:
+    case PostParcelStatus.Undefined:
       return UnifiedOrderState.PROBLEM;
 
     default:

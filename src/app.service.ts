@@ -196,6 +196,17 @@ export class AppService {
           } else {
             currState = BxbParselStatus.CustomProblem;
           }
+        } else if (order.cargo === Cargos.POST) {
+          const postStateRes = await this.postService.getOperationHistory(
+            order.track,
+          );
+          if ('OperationHistoryData' in postStateRes) {
+            currState =
+              postStateRes.OperationHistoryData.historyRecord.at(-1)
+                .OperationParameters.OperAttr.Name;
+          } else {
+            currState = BxbParselStatus.CustomProblem;
+          }
         } else {
           currState = BxbParselStatus.Unknown;
         }
@@ -308,6 +319,10 @@ export class AppService {
   }
 
   async testEndpoint() {
-    return await this.postService.getPostParcelData('');
+    const res = await this.postService.getOperationHistory('80083399169936');
+    res.OperationHistoryData.historyRecord.forEach((record) => {
+      console.log(record.OperationParameters.OperAttr.Name);
+    });
+    return res;
   }
 }
