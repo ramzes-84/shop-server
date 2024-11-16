@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ServicesUrl } from 'src/types/services-url';
 import * as soap from 'soap';
+import { DpdStatesResDTO } from './dto/dpd.dto';
 
 @Injectable()
 export class DpdService {
@@ -8,26 +9,27 @@ export class DpdService {
   endpoint = ServicesUrl.DPD;
   clientNumber = process.env.DPD_CLIENT;
 
-  getStatesByDPDOrder() {
+  async getStatesByDPDOrder(dpdOrderNr: string): Promise<DpdStatesResDTO> {
     const args = {
       request: {
         auth: { clientNumber: +this.clientNumber, clientKey: this.token },
-        dpdOrderNr: 'RU101453860',
-        pickupYear: 2024,
+        dpdOrderNr,
+        // pickupYear: 2024,
       },
     };
 
-    soap.createClient(this.endpoint, (err, client) => {
-      if (err) {
-        console.error('Error creating SOAP client:', err);
-        return;
-      }
-
-      client.getStatesByDPDOrder(args, (err, result) => {
+    return new Promise((resolve, reject) => {
+      soap.createClient(this.endpoint, (err, client) => {
         if (err) {
-          return err;
+          return reject(err);
         }
-        return result;
+
+        client.getStatesByDPDOrder(args, (err, result: DpdStatesResDTO) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve(result);
+        });
       });
     });
   }

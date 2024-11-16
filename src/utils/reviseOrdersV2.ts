@@ -1,4 +1,5 @@
 import { BxbParselStatus } from 'src/bxb/dto/bxb.dto';
+import { DpdParselStatus } from 'src/dpd/dto/dpd.dto';
 import { UnifiedOrderState } from 'src/types/common';
 import { YaParcelStatus } from 'src/ya/dto/ya.dto';
 
@@ -34,12 +35,17 @@ export function unifyParcelStatus(status: string) {
     case BxbParselStatus.AtSenderTerminal:
     case BxbParselStatus.TransferredForCourierDelivery:
     case BxbParselStatus.CourierWillCall:
+    case DpdParselStatus.OnTerminal:
+    case DpdParselStatus.OnTerminalPickup:
+    case DpdParselStatus.OnRoad:
+    case DpdParselStatus.Delivering:
       return UnifiedOrderState.IN_TRANSIT;
 
     case YaParcelStatus.DELIVERY_ARRIVED_PICKUP_POINT:
     case YaParcelStatus.DELIVERY_STORAGE_PERIOD_EXTENDED:
     case YaParcelStatus.CONFIRMATION_CODE_RECEIVED:
     case BxbParselStatus.ArrivedAtPickupPoint:
+    case DpdParselStatus.OnTerminalDelivery:
       return UnifiedOrderState.WAITING;
 
     case YaParcelStatus.DELIVERY_TRANSMITTED_TO_RECIPIENT:
@@ -47,6 +53,7 @@ export function unifyParcelStatus(status: string) {
     case YaParcelStatus.DELIVERY_DELIVERED:
     case YaParcelStatus.FINISHED:
     case BxbParselStatus.Issued:
+    case DpdParselStatus.Delivered:
       return UnifiedOrderState.DELIVERED;
 
     case YaParcelStatus.VALIDATING_ERROR:
@@ -70,6 +77,12 @@ export function unifyParcelStatus(status: string) {
     case BxbParselStatus.ReturnedToReceivingPoint:
     case BxbParselStatus.ReturnedToIM:
     case BxbParselStatus.CustomProblem:
+    case DpdParselStatus.NewOrderByDPD:
+    case DpdParselStatus.NewOrderByClient:
+    case DpdParselStatus.ReturnedFromDelivery:
+    case DpdParselStatus.NotDone:
+    case DpdParselStatus.Lost:
+    case DpdParselStatus.Problem:
       return UnifiedOrderState.PROBLEM;
 
     default:

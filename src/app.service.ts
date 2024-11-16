@@ -185,6 +185,15 @@ export class AppService {
           } else {
             currState = BxbParselStatus.CustomProblem;
           }
+        } else if (order.cargo === Cargos.DPD) {
+          const dpdStateRes = await this.dpdService.getStatesByDPDOrder(
+            order.track,
+          );
+          if ('states' in dpdStateRes.return) {
+            currState = dpdStateRes.return.states.at(-1).newState;
+          } else {
+            currState = BxbParselStatus.CustomProblem;
+          }
         } else {
           currState = BxbParselStatus.Unknown;
         }
@@ -296,7 +305,7 @@ export class AppService {
     return message;
   }
 
-  async testEndpoint() {
-    return await this.botService.sendEmployeeMessage('Test text');
+  testEndpoint() {
+    return this.dpdService.getStatesByDPDOrder('');
   }
 }
