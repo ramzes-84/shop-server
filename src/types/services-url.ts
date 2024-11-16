@@ -5,4 +5,5 @@ export enum ServicesUrl {
   POST = 'https://otpravka-api.pochta.ru',
   CASH = 'https://api.yookassa.ru/v3/invoices',
   TELEGRAM = 'https://api.telegram.org/bot',
+  DPD = 'https://ws.dpd.ru/services/tracing1-1?wsdl',
 }
