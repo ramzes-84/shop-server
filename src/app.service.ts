@@ -6,7 +6,6 @@ import { convertOrder } from './utils/convertOrder';
 import { parseYaHistoryToHtml } from './utils/parseYaHistoryToHtml';
 import { CreateOrderQueries } from './validation/yandex';
 import { MailService } from './mail/mail.service';
-import { reviseOrders } from './utils/reviseOrders';
 import { BxbService } from './bxb/bxb.service';
 import { BxbParselStatus } from './bxb/dto/bxb.dto';
 import { CashService } from './cash/cash.service';
@@ -129,21 +128,6 @@ export class AppService {
     return parseYaHistoryToHtml(response);
   }
 
-  async getOrderInfo(id: string): Promise<TransferInterface> {
-    try {
-      const response = await this.yaService.getOrderInfo(id);
-      return {
-        ok: true,
-        data: { sharing_url: response.sharing_url },
-      };
-    } catch (error) {
-      return {
-        ok: false,
-        data: error,
-      };
-    }
-  }
-
   async fetchBatchOfStatuses(revisingOrderData: RevisingOrderData[]) {
     return await Promise.allSettled(
       revisingOrderData.map((order) => {
@@ -173,7 +157,7 @@ export class AppService {
       throw new HttpException(error, HttpStatus.SERVICE_UNAVAILABLE);
     });
 
-    const revisingOrderData: RevisingOrderData[] = ordersInTransit.map(
+    const revisingOrdersData: RevisingOrderData[] = ordersInTransit.map(
       (order) => {
         return {
           id: order.id,
@@ -185,52 +169,61 @@ export class AppService {
         };
       },
     );
-    await Promise.all(
-      revisingOrderData.map(async (order) => {
-        let currState: string;
-        if (order.cargo === Cargos.YA) {
-          currState = recentYaParcels.requests
-            .filter((parcel) =>
-              parcel.request.info.operator_request_id.includes(order.reference),
-            )
-            .at(-1)?.state.status;
-        } else if (order.cargo === Cargos.BXB) {
-          const statusesList = await this.bxbService.getParcelStatuses(
-            order.track,
-          );
-          if (statusesList instanceof Array) {
-            currState = statusesList.at(-1).Name;
-          } else {
-            currState = BxbParselStatus.CustomProblem;
+
+    const allStatuses = await this.fetchBatchOfStatuses(revisingOrdersData);
+
+    revisingOrdersData.map((order, index) => {
+      let currState: string;
+      if (allStatuses[index].status === 'fulfilled') {
+        switch (order.cargo) {
+          case Cargos.YA: {
+            currState = recentYaParcels.requests
+              .filter((parcel) =>
+                parcel.request.info.operator_request_id.includes(
+                  order.reference,
+                ),
+              )
+              .at(-1)?.state.status;
+            break;
           }
-        } else if (order.cargo === Cargos.DPD) {
-          const dpdStateRes = await this.dpdService.getStatesByDPDOrder(
-            order.track,
-          );
-          if ('states' in dpdStateRes.return) {
-            currState = dpdStateRes.return.states.at(-1).newState;
-          } else {
-            currState = BxbParselStatus.CustomProblem;
+          case Cargos.BXB: {
+            if (
+              allStatuses[index].value instanceof Array &&
+              allStatuses[index].value.length
+            ) {
+              currState = allStatuses[index].value.at(-1).Name;
+            } else {
+              currState = BxbParselStatus.CustomProblem;
+            }
+            break;
           }
-        } else if (order.cargo === Cargos.POST) {
-          const postStateRes = await this.postService.getOperationHistory(
-            order.track,
-          );
-          if ('OperationHistoryData' in postStateRes) {
-            currState =
-              postStateRes.OperationHistoryData.historyRecord.at(-1)
-                .OperationParameters.OperAttr.Name;
-          } else {
-            currState = BxbParselStatus.CustomProblem;
+          case Cargos.DPD: {
+            if ('return' in allStatuses[index].value) {
+              currState =
+                allStatuses[index].value.return.states.at(-1).newState;
+            }
+            break;
           }
-        } else {
-          currState = BxbParselStatus.Unknown;
+          case Cargos.POST: {
+            if ('OperationHistoryData' in allStatuses[index].value) {
+              currState =
+                allStatuses[index].value.OperationHistoryData.historyRecord.at(
+                  -1,
+                ).OperationParameters.OperAttr.Name;
+            }
+            break;
+          }
+          default:
+            break;
         }
-        order.actualCargoState = currState;
-        order.unifiedCargoState = unifyParcelStatus(currState);
-      }),
-    );
-    return revisingOrderData;
+      } else {
+        currState = BxbParselStatus.Unknown;
+      }
+
+      order.actualCargoState = currState;
+      order.unifiedCargoState = unifyParcelStatus(currState);
+    });
+    return revisingOrdersData;
   }
 
   async reviseOrders() {
@@ -251,7 +244,7 @@ export class AppService {
         case order.unifiedShopState === UnifiedOrderState.WAITING &&
           Date.now() - 86400000 * 5 > order.shopStateUpdatedAt:
           warnings.push(
-            `⌛ ${order.reference} ожидает более 5 дней, начиная с ${new Date(order.shopStateUpdatedAt).toDateString()}.`,
+            `⌛ ${order.reference} ожидает более ${Math.floor((Date.now() - order.shopStateUpdatedAt) / 86400000)} дней, начиная с ${new Date(order.shopStateUpdatedAt).toDateString()}. Служба доставки: ${order.cargo}.`,
           );
           break;
 
@@ -269,69 +262,14 @@ export class AppService {
       }
     });
 
-    const msgToEmail = [...updates, ...warnings, ...errors].join('\n');
+    const msgToEmail = [...updates, ...warnings, ...errors];
 
-    await this.mailService.sendToAdmin('Status updates', msgToEmail);
+    await this.mailService.sendToAdmin('Status updates', msgToEmail.join('\n'));
     await this.botService.sendEmployeeMessage(updates.join('\n'));
     await this.botService.sendEmployeeMessage(warnings.join('\n'));
     await this.botService.sendEmployeeMessage(errors.join('\n'));
 
     return msgToEmail;
-  }
-
-  // deprecated
-  async reviseOrdersStatuses(): Promise<string[]> {
-    const [inTransitOrders, recentYaParcels, recentBxbRaw] = await Promise.all([
-      this.shopService.getInTransitOrders(),
-      this.yaService.getRecentParcels(),
-      this.bxbService.getParcelsInInterval(),
-    ]).catch(async (error) => {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Error in Promise.all while gathering data';
-      await this.mailService.sendToAdmin('Error in Promise.all', message);
-      throw new HttpException(error, HttpStatus.SERVICE_UNAVAILABLE);
-    });
-
-    const recentBxbReferences = recentBxbRaw.map((parcel) => parcel.imid);
-    const recentBxbParcelsStats = await Promise.all(
-      recentBxbReferences.map((id) => this.bxbService.getParcelStatuses(id)),
-    );
-
-    const recentBxbParcels = recentBxbReferences.map((imId, index) => {
-      if (Array.isArray(recentBxbParcelsStats[index])) {
-        return {
-          imId,
-          status: recentBxbParcelsStats[index].at(-1),
-        };
-      } else if ('err' in recentBxbParcelsStats[index]) {
-        return {
-          imId,
-          status: {
-            Name: BxbParselStatus.CustomProblem,
-            Date: new Date().toISOString().split('T')[0].replace(/-/g, ''),
-          },
-        };
-      }
-    });
-
-    const message = reviseOrders(
-      inTransitOrders,
-      recentYaParcels,
-      recentBxbParcels,
-    );
-    if (message.length) {
-      try {
-        await this.mailService.sendToAdmin(
-          'Status updates',
-          message.join('\n'),
-        );
-      } catch (error) {
-        throw new Error(error);
-      }
-    }
-    return message;
   }
 
   async testEndpoint() {

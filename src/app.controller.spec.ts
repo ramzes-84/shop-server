@@ -3,7 +3,6 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthGuard } from '@nestjs/passport';
 import { CreateOrderQueries, OrderIdParams } from './validation/yandex';
-import { TransferInterface } from './types/common';
 
 describe('AppController', () => {
   let controller: AppController;
@@ -75,22 +74,6 @@ describe('AppController', () => {
 
       expect(result).toBe(mockResponse);
       expect(service.getYaOrderHistory).toHaveBeenCalledWith('1');
-    });
-  });
-
-  describe('yaOrderInfo', () => {
-    it('should return order info by id', async () => {
-      const mockResponse: TransferInterface = {
-        ok: true,
-        data: { id: '1', info: {} },
-      };
-      jest.spyOn(service, 'getOrderInfo').mockResolvedValue(mockResponse);
-
-      const params: OrderIdParams = { id: '1' };
-      const result = await controller.yaOrderInfo(params);
-
-      expect(result).toBe(mockResponse);
-      expect(service.getOrderInfo).toHaveBeenCalledWith('1');
     });
   });
 });

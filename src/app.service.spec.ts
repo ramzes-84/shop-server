@@ -4,11 +4,7 @@ import { ShopService } from './shop/shop.service';
 import { YaService } from './ya/ya.service';
 import { MailService } from './mail/mail.service';
 import { CreateOrderQueries } from './validation/yandex';
-import {
-  CreateYaOrderDto,
-  YaOrderCreationRes,
-  YaOrderInfoRes,
-} from './ya/dto/ya.dto';
+import { CreateYaOrderDto, YaOrderCreationRes } from './ya/dto/ya.dto';
 import { convertOrder } from './utils/convertOrder';
 import {
   addressDetails,
@@ -18,7 +14,6 @@ import {
 } from 'src/__test-data__/shop-data';
 import { orderConverterResult } from './__test-data__/converter-result';
 import { yaOrderHistory } from './__test-data__/ya-data';
-import { yaOrderInfo } from './__test-data__/ya-order-info';
 import { BxbService } from './bxb/bxb.service';
 import { CashService } from './cash/cash.service';
 import { BotService } from './bot/bot.service';
@@ -196,32 +191,6 @@ describe('AppService', () => {
       jest.spyOn(yaService, 'getHistoryById').mockRejectedValue(mockError);
 
       await expect(service.getYaOrderHistory('1')).rejects.toThrow(mockError);
-    });
-  });
-
-  describe('getOrderInfo', () => {
-    it('should return order info for a given ID', async () => {
-      const mockOrderInfo: YaOrderInfoRes = { ...yaOrderInfo };
-      jest.spyOn(yaService, 'getOrderInfo').mockResolvedValue(mockOrderInfo);
-
-      const result = await service.getOrderInfo('1');
-      expect(result).toEqual({
-        ok: true,
-        data: { sharing_url: yaOrderInfo.sharing_url },
-      });
-      expect(yaService.getOrderInfo).toHaveBeenCalledWith('1');
-    });
-
-    it('should throw an error if fetching order info fails', async () => {
-      const mockError = new Error('Something went wrong');
-      jest.spyOn(yaService, 'getOrderInfo').mockRejectedValue(mockError);
-
-      const result = await service.getOrderInfo('1');
-
-      expect(result).toEqual({
-        ok: false,
-        data: mockError,
-      });
     });
   });
 });
