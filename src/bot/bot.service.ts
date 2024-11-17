@@ -16,6 +16,15 @@ export class BotService {
   private readonly buGroup = process.env.TELEGRAM_GROUP_BU;
 
   async sendEmployeeMessage(text: string, markdown: boolean = false) {
+    if (!text) {
+      const errorRes: ErrorTelegramResDTO = {
+        ok: false,
+        error_code: 400,
+        description: 'Empty message',
+      };
+      return errorRes;
+    }
+
     const body = JSON.stringify({
       chat_id: this.buGroup,
       text,

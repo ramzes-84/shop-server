@@ -69,7 +69,7 @@ export function convertOrderShopToCash(
           email: customerDetails.email,
         },
         items: goods.map((item) => ({
-          description: item.description,
+          description: item.description.slice(0, 128),
           quantity: item.quantity,
           amount: {
             currency: CurrenciesTypes.RUB,

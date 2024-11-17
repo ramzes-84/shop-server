@@ -144,6 +144,22 @@ export class AppService {
     }
   }
 
+  async fetchBatchOfStatuses(revisingOrderData: RevisingOrderData[]) {
+    return await Promise.allSettled(
+      revisingOrderData.map((order) => {
+        if (order.cargo === Cargos.YA) {
+          return undefined;
+        } else if (order.cargo === Cargos.BXB) {
+          return this.bxbService.getParcelStatuses(order.track);
+        } else if (order.cargo === Cargos.DPD) {
+          return this.dpdService.getStatesByDPDOrder(order.track);
+        } else if (order.cargo === Cargos.POST) {
+          return this.postService.getOperationHistory(order.track);
+        }
+      }),
+    );
+  }
+
   async getDataForRevise(): Promise<RevisingOrderData[]> {
     const [ordersInTransit, recentYaParcels] = await Promise.all([
       this.shopService.getInTransitOrders(),
@@ -253,14 +269,14 @@ export class AppService {
       }
     });
 
-    await this.mailService.sendToAdmin(
-      'Status updates',
-      [...updates, ...warnings, ...errors].join('\n'),
-    );
+    const msgToEmail = [...updates, ...warnings, ...errors].join('\n');
+
+    await this.mailService.sendToAdmin('Status updates', msgToEmail);
     await this.botService.sendEmployeeMessage(updates.join('\n'));
     await this.botService.sendEmployeeMessage(warnings.join('\n'));
+    await this.botService.sendEmployeeMessage(errors.join('\n'));
 
-    return [...updates, ...warnings, ...errors];
+    return msgToEmail;
   }
 
   // deprecated
@@ -319,10 +335,7 @@ export class AppService {
   }
 
   async testEndpoint() {
-    const res = await this.postService.getOperationHistory('80083399169936');
-    res.OperationHistoryData.historyRecord.forEach((record) => {
-      console.log(record.OperationParameters.OperAttr.Name);
-    });
-    return res;
+    const orders = await this.getDataForRevise();
+    return await this.fetchBatchOfStatuses(orders);
   }
 }
