@@ -35,6 +35,12 @@ export class AppController {
     return this.appService.getYaOrderHistory(params.id);
   }
 
+  @Get('yandex/info/:id')
+  @UseGuards(AuthGuard('bearer'))
+  yaOrderInfo(@Param() params: OrderIdParams) {
+    return this.appService.getOrderInfo(params.id);
+  }
+
   @Get('revise')
   @UseGuards(AuthGuard('bearer'))
   reviseOrdersStatuses() {

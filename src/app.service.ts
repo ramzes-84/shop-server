@@ -41,6 +41,21 @@ export class AppService {
     return `Hello World!`;
   }
 
+  async getOrderInfo(id: string): Promise<TransferInterface> {
+    try {
+      const response = await this.yaService.getOrderInfo(id);
+      return {
+        ok: true,
+        data: { sharing_url: response.sharing_url },
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        data: error,
+      };
+    }
+  }
+
   async getOrderBasicInfo(order: string) {
     const orderDetails = await this.shopService.getOrderInfo(+order);
     const customerDetails = await this.shopService.getCustomerInfo(
