@@ -68,6 +68,7 @@ export function unifyParcelStatus(status: string) {
     case DpdParselStatus.Delivered:
     case PostParcelStatus.DeliveredToRecipient:
     case PostParcelStatus.DeliveredViaParcelLocker:
+    case PostParcelStatus.DeliveredToRecipientByPEP:
       return UnifiedOrderState.DELIVERED;
 
     case YaParcelStatus.VALIDATING_ERROR:

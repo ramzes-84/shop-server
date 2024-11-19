@@ -137,5 +137,6 @@ export enum PostParcelStatus {
   ArrivedAtParcelLocker = 'Прибыло в почтомат',
   DeliveredToRecipient = 'Вручение адресату',
   DeliveredViaParcelLocker = 'Выдано адресату через почтомат',
+  DeliveredToRecipientByPEP = 'Вручение адресату по ПЭП',
   Undefined = 'undefined',
 }

@@ -288,7 +288,6 @@ export class AppService {
   }
 
   async testEndpoint() {
-    const orders = await this.getDataForRevise();
-    return await this.fetchBatchOfStatuses(orders);
+    return await this.postService.getOperationHistory('');
   }
 }
