@@ -136,6 +136,7 @@ export enum PostParcelStatus {
   ArrivedAtDeliveryPoint = 'Прибыло в место вручения',
   ArrivedAtParcelLocker = 'Прибыло в почтомат',
   DeliveredToRecipient = 'Вручение адресату',
+  DeliveredViaQr = 'Адресату по QR коду',
   DeliveredViaParcelLocker = 'Выдано адресату через почтомат',
   DeliveredToRecipientByPEP = 'Вручение адресату по ПЭП',
   Undefined = 'undefined',
