@@ -52,8 +52,8 @@ export class CreateYaOrderDto {
 }
 
 export enum PlatformStation {
-  // RND = 'af1356a6-5b4e-42e2-b85d-2c67a11a1a7c', //Rostov
-  RND = 'd871c4cd-bf4f-4002-ac63-bd15de3d685b', //Aksay
+  RND = 'af1356a6-5b4e-42e2-b85d-2c67a11a1a7c', //Suzd
+  // RND = '3a9bea08-e463-49fb-93af-fad094ff3db9', //Selmash
   TUL = '8c78c9db-dd0f-45c4-851a-7df333b8c089',
   TEST = 'fbed3aa1-2cc6-4370-ab4d-59c5cc9bb924',
 }
