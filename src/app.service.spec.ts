@@ -14,6 +14,7 @@ import {
   addressDetails,
   customerDetails,
   orderDetails,
+  orderMessages,
   shippingDetails,
 } from 'src/__test-data__/shop-data';
 import { orderConverterResult } from './__test-data__/converter-result';
@@ -44,6 +45,8 @@ describe('AppService', () => {
             getAddressInfo: jest.fn(),
             getCustomerInfo: jest.fn(),
             getOrderCarrierInfo: jest.fn(),
+            getMessagesThread: jest.fn(),
+            getOrderMessages: jest.fn(),
           },
         },
         {
@@ -137,12 +140,16 @@ describe('AppService', () => {
       jest
         .spyOn(shopService, 'getOrderCarrierInfo')
         .mockResolvedValue(mockShippingDetails.order_carriers[0]);
+      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(5);
+      jest
+        .spyOn(shopService, 'getOrderMessages')
+        .mockResolvedValue(orderMessages);
       jest.spyOn(yaService, 'createYaOrder').mockResolvedValue(mockYaOrderId);
       (convertOrder as jest.Mock).mockReturnValue(mockYaOrderData);
 
       const createOrderQueries: CreateOrderQueries = {
         order: '1',
-        destination: 'destination',
+        // destination: 'destination',
       };
 
       const result = await service.createYaOrder(createOrderQueries);
@@ -151,6 +158,8 @@ describe('AppService', () => {
       expect(shopService.getAddressInfo).toHaveBeenCalledWith(111005);
       expect(shopService.getCustomerInfo).toHaveBeenCalledWith(6190);
       expect(shopService.getOrderCarrierInfo).toHaveBeenCalledWith(1);
+      expect(shopService.getMessagesThread).toHaveBeenCalledWith(1);
+      expect(shopService.getOrderMessages).toHaveBeenCalledWith(5);
       expect(convertOrder).toHaveBeenCalledWith(
         mockOrderDetails,
         mockAddressDetails,
@@ -168,7 +177,7 @@ describe('AppService', () => {
 
       const createOrderQueries: CreateOrderQueries = {
         order: '1',
-        destination: 'destination',
+        // destination: 'destination',
       };
 
       const result = await service.createYaOrder(createOrderQueries);

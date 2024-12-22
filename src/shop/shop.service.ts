@@ -1,7 +1,11 @@
 import { HttpException, Injectable, RequestMethod } from '@nestjs/common';
 import { ServicesUrl } from 'src/types/services-url';
 import fetch from 'node-fetch';
-import { OrderInfoResDto } from './dto/order-info.dto';
+import {
+  CustomerMessagesResDto,
+  OrderInfoResDto,
+  OrderMessagesThreadResDto,
+} from './dto/order-info.dto';
 import { AddressInfoResDto } from './dto/address-info.dto';
 import { CustomerInfoResDto } from './dto/customer-info.dto';
 import { StatusesInfoResDto } from './dto/statuses-info.dto';
@@ -59,6 +63,23 @@ export class ShopService {
     url.searchParams.append('sort', '[id_DESC]');
     const data = await this.fetchData<StatusesInfoResDto>(url);
     return data.order_histories;
+  }
+
+  async getMessagesThread(id: number) {
+    const url = new URL(this.endpoint + '/customer_threads');
+    url.searchParams.append('filter[id_order]', `[${id}]`);
+    url.searchParams.append('display', '[id]');
+    const data = await this.fetchData<OrderMessagesThreadResDto>(url);
+    return data.customer_threads[0].id;
+  }
+
+  async getOrderMessages(id: number) {
+    const url = new URL(this.endpoint + '/customer_messages');
+    url.searchParams.append('filter[id_customer_thread]', `[${id}]`);
+    url.searchParams.append('display', 'full');
+    url.searchParams.append('sort', '[id_DESC]');
+    const data = await this.fetchData<CustomerMessagesResDto>(url);
+    return data.customer_messages;
   }
 
   async getInTransitOrders() {

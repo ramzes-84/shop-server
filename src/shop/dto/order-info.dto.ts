@@ -63,3 +63,27 @@ class ShopOrderInfoRow {
   unit_price_tax_incl: string;
   unit_price_tax_excl: string;
 }
+
+export class OrderMessagesThreadResDto {
+  customer_threads: {
+    id: number;
+  }[];
+}
+
+export class CustomerMessagesResDto {
+  customer_messages: CustomerMessage[];
+}
+
+class CustomerMessage {
+  id: number;
+  id_employee: string;
+  id_customer_thread: string;
+  ip_address: string;
+  message: string;
+  file_name: string;
+  user_agent: string;
+  private: string;
+  date_add: string;
+  date_upd: string;
+  read: string;
+}

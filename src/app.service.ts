@@ -22,6 +22,7 @@ import {
 import { recognizeCargo } from './utils/sort-tracks';
 import { unifyParcelStatus, unifyShopState } from './utils/reviseOrdersV2';
 import { PostService } from './post/post.service';
+import { findPointId } from './utils/find-point-from-messages';
 
 @Injectable()
 export class AppService {
@@ -105,14 +106,20 @@ export class AppService {
 
   async createYaOrder({
     order,
-    destination,
+    // destination,
   }: CreateOrderQueries): Promise<TransferInterface> {
     try {
       const { addressDetails, customerDetails, orderDetails } =
         await this.getOrderBasicInfo(order);
 
-      const shippingDetails =
-        await this.shopService.getOrderCarrierInfo(+order);
+      const [shippingDetails, threadId] = await Promise.all([
+        this.shopService.getOrderCarrierInfo(+order),
+        this.shopService.getMessagesThread(+order),
+      ]);
+
+      const destination = findPointId(
+        await this.shopService.getOrderMessages(threadId),
+      );
 
       const yaOrderData: CreateYaOrderDto = convertOrder(
         orderDetails,
@@ -194,11 +201,11 @@ export class AppService {
           case Cargos.YA: {
             currState = recentYaParcels.requests
               .filter((parcel) =>
-                parcel.request.info.operator_request_id.includes(
+                parcel.request.info.operator_request_id.startsWith(
                   order.reference,
                 ),
               )
-              .at(-1)?.state.status;
+              .at(0)?.state.status;
             break;
           }
           case Cargos.BXB: {
@@ -289,5 +296,6 @@ export class AppService {
 
   async testEndpoint() {
     return await this.postService.getOperationHistory('');
+    // return await this.dpdService.getStatesByDPDOrder('');
   }
 }

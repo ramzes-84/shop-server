@@ -1,4 +1,7 @@
-import { OrderInfoResDto } from 'src/shop/dto/order-info.dto';
+import {
+  CustomerMessagesResDto,
+  OrderInfoResDto,
+} from 'src/shop/dto/order-info.dto';
 import { AddressInfoResDto } from 'src/shop/dto/address-info.dto';
 import { CustomerInfoResDto } from 'src/shop/dto/customer-info.dto';
 import { OrderCarrierInfoResDto } from 'src/shop/dto/order-carrier-info.dto';
@@ -208,5 +211,21 @@ export const inTransitOrders: InTransitOrders['orders'] = [
     reference: '0004',
     date_upd: '2024-10-26 17:36:28',
     shipping_number: '00000000-0000-48ba-b85f-17db26a69905',
+  },
+];
+
+export const orderMessages: CustomerMessagesResDto['customer_messages'] = [
+  {
+    id: 26985,
+    id_employee: '1',
+    id_customer_thread: '19827',
+    ip_address: '',
+    message: 'Test message [ID: destination]',
+    file_name: '',
+    user_agent: '',
+    private: '0',
+    date_add: '2024-12-21 08:11:53',
+    date_upd: '2024-12-21 08:11:53',
+    read: '0',
   },
 ];

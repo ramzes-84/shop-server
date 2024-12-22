@@ -1,4 +1,4 @@
-import { IsDefined, IsString, IsUUID, Length, Matches } from 'class-validator';
+import { IsDefined, IsString, Length, Matches } from 'class-validator';
 
 export class OrderIdParams {
   @IsDefined({ message: 'id is required' })
@@ -14,10 +14,10 @@ export class CreateOrderQueries {
   @Length(5, 5, { message: 'order is incorrect' })
   order: string;
 
-  @IsDefined({ message: 'destination is required' })
-  @IsString({ message: 'destination must be a string' })
-  @IsUUID('4', { message: 'destination is incorrect' })
-  destination: string;
+  // @IsDefined({ message: 'destination is required' })
+  // @IsString({ message: 'destination must be a string' })
+  // @IsUUID('4', { message: 'destination is incorrect' })
+  // destination: string;
 }
 
 export class CreateInvoiceQueries {

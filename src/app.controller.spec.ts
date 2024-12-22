@@ -55,7 +55,7 @@ describe('AppController', () => {
 
       const query: CreateOrderQueries = {
         order: '1',
-        destination: 'destination',
+        // destination: 'destination',
       };
 
       const result = await controller.yaOrderCreate(query);
