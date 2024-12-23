@@ -120,7 +120,7 @@ describe('AppService', () => {
   });
 
   describe('createYaOrder', () => {
-    it('should create a new Ya order and return the order ID', async () => {
+    it('should create a new Ya order and return the order sharing_url', async () => {
       const mockOrderDetails = { ...orderDetails };
       const mockAddressDetails = { ...addressDetails };
       const mockCustomerDetails = { ...customerDetails };
@@ -174,7 +174,7 @@ describe('AppService', () => {
         ok: true,
         data: { sharing_url: mockOrderInfo.sharing_url },
       });
-    });
+    }, 10000);
 
     it('should return an error if something goes wrong', async () => {
       const mockError = new Error('Something went wrong');

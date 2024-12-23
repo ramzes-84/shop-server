@@ -136,10 +136,11 @@ export class AppService {
       );
 
       const { request_id } = await this.yaService.createYaOrder(yaOrderData);
-      const { sharing_url } = await this.yaService.getOrderInfo(request_id);
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      const orderInfo = await this.yaService.getOrderInfo(request_id);
       return {
         ok: true,
-        data: { sharing_url },
+        data: { sharing_url: orderInfo.sharing_url },
       };
     } catch (error) {
       return {
