@@ -106,7 +106,6 @@ export class AppService {
 
   async createYaOrder({
     order,
-    // destination,
   }: CreateOrderQueries): Promise<TransferInterface> {
     try {
       const { addressDetails, customerDetails, orderDetails } =
@@ -121,6 +120,13 @@ export class AppService {
         await this.shopService.getOrderMessages(threadId),
       );
 
+      if (!destination) {
+        return {
+          ok: false,
+          data: 'Error: destination point not found',
+        };
+      }
+
       const yaOrderData: CreateYaOrderDto = convertOrder(
         orderDetails,
         addressDetails,
@@ -129,10 +135,11 @@ export class AppService {
         destination,
       );
 
-      const yaOrderId = await this.yaService.createYaOrder(yaOrderData);
+      const { request_id } = await this.yaService.createYaOrder(yaOrderData);
+      const { sharing_url } = await this.yaService.getOrderInfo(request_id);
       return {
         ok: true,
-        data: yaOrderId,
+        data: { sharing_url },
       };
     } catch (error) {
       return {

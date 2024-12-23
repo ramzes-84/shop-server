@@ -13,11 +13,6 @@ export class CreateOrderQueries {
   @IsString({ message: 'order must be a string' })
   @Length(5, 5, { message: 'order is incorrect' })
   order: string;
-
-  // @IsDefined({ message: 'destination is required' })
-  // @IsString({ message: 'destination must be a string' })
-  // @IsUUID('4', { message: 'destination is incorrect' })
-  // destination: string;
 }
 
 export class CreateInvoiceQueries {

@@ -127,6 +127,7 @@ describe('AppService', () => {
       const mockShippingDetails = { ...shippingDetails };
       const mockYaOrderData: CreateYaOrderDto = { ...orderConverterResult };
       const mockYaOrderId: YaOrderCreationRes = { request_id: '123' };
+      const mockOrderInfo: YaOrderInfoRes = { ...yaOrderInfo };
 
       jest
         .spyOn(shopService, 'getOrderInfo')
@@ -146,10 +147,11 @@ describe('AppService', () => {
         .mockResolvedValue(orderMessages);
       jest.spyOn(yaService, 'createYaOrder').mockResolvedValue(mockYaOrderId);
       (convertOrder as jest.Mock).mockReturnValue(mockYaOrderData);
+      jest.spyOn(yaService, 'getOrderInfo').mockResolvedValue(mockOrderInfo);
+      (convertOrder as jest.Mock).mockReturnValue(mockYaOrderData);
 
       const createOrderQueries: CreateOrderQueries = {
         order: '1',
-        // destination: 'destination',
       };
 
       const result = await service.createYaOrder(createOrderQueries);
@@ -168,7 +170,10 @@ describe('AppService', () => {
         'destination',
       );
       expect(yaService.createYaOrder).toHaveBeenCalledWith(mockYaOrderData);
-      expect(result).toEqual({ ok: true, data: mockYaOrderId });
+      expect(result).toEqual({
+        ok: true,
+        data: { sharing_url: mockOrderInfo.sharing_url },
+      });
     });
 
     it('should return an error if something goes wrong', async () => {
@@ -177,7 +182,6 @@ describe('AppService', () => {
 
       const createOrderQueries: CreateOrderQueries = {
         order: '1',
-        // destination: 'destination',
       };
 
       const result = await service.createYaOrder(createOrderQueries);

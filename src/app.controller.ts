@@ -52,9 +52,4 @@ export class AppController {
   testEndpoint() {
     return this.appService.testEndpoint();
   }
-  // @Get('test/:order')
-  // @UseGuards(AuthGuard('bearer'))
-  // testEndpoint(@Param() params: Pick<CreateOrderQueries, 'order'>) {
-  //   return this.appService.testEndpoint(params.order);
-  // }
 }
