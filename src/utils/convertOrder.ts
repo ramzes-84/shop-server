@@ -1,3 +1,4 @@
+import { BoxberrySourceStation, CreateBxbParcelDto } from 'src/bxb/dto/bxb.dto';
 import { AddressInfoResDto } from 'src/shop/dto/address-info.dto';
 import { CustomerInfoResDto } from 'src/shop/dto/customer-info.dto';
 import { OrderCarrierInfo } from 'src/shop/dto/order-carrier-info.dto';
@@ -99,6 +100,65 @@ export function convertOrder(
     },
     last_mile_policy: 'self_pickup',
     particular_items_refuse: false,
+  };
+}
+
+export function convertOrderToBxb(
+  orderDetails: OrderInfoResDto['order'],
+  addressDetails: AddressInfoResDto['address'],
+  customerDetails: CustomerInfoResDto['customer'],
+  shippingDetails: OrderCarrierInfo,
+  destination: string,
+): CreateBxbParcelDto['sdata'] {
+  const discount = calcDiscount(
+    orderDetails.total_products,
+    orderDetails.total_discounts,
+  );
+
+  const sumToPay =
+    parseFloat(orderDetails.total_paid) -
+    parseFloat(orderDetails.total_paid_real);
+
+  const goods: CreateBxbParcelDto['sdata']['items'] =
+    orderDetails.associations.order_rows.map((row) => ({
+      id: row.product_reference,
+      name: row.product_name,
+      nds: '0',
+      price: Math.round(
+        (parseFloat(row.unit_price_tax_excl) -
+          parseFloat(row.unit_price_tax_excl) * discount) *
+          100,
+      ).toString(),
+      quantity: parseInt(row.product_quantity).toString(),
+    }));
+
+  return {
+    items: goods,
+    weights: {
+      weight: (parseFloat(shippingDetails.weight) * 1000 + 80).toString(),
+      x: '5',
+      y: '10',
+      z: '15',
+    },
+    customer: {
+      fio: addressDetails.firstname + ' ' + addressDetails.lastname,
+      phone: addressDetails.phone_mobile,
+      email: customerDetails.email,
+    },
+    issue: 0,
+    order_id: orderDetails.reference,
+    delivery_sum: orderDetails.total_shipping,
+    sender_name: 'Mineral Magic',
+    shop: {
+      name: destination,
+      name1:
+        orderDetails.current_state === '12'
+          ? BoxberrySourceStation.RND
+          : BoxberrySourceStation.TUL,
+    },
+    vid: '1',
+    payment_sum: sumToPay.toString(),
+    price: orderDetails.total_paid,
   };
 }
 

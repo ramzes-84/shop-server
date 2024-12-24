@@ -54,3 +54,66 @@ export type StatusItem = {
 export type ListStatusesError = {
   err: string;
 };
+
+export type CreateBxbParcelDto = {
+  token: string;
+  method: 'ParselCreate';
+  sdata: ParcelInfo;
+};
+
+type ParcelInfo = {
+  order_id: string;
+  price: string; //ОЦЕНОЧНАЯ СТОИМОСТЬ
+  payment_sum: string;
+  delivery_sum: string;
+  vid: '1';
+  shop: PointsInfo;
+  customer: RecipientInfo;
+  items: ParcelItem[];
+  weights: ParcelWeight;
+  issue: 0;
+  sender_name: 'Mineral Magic';
+};
+
+export enum BoxberrySourceStation {
+  RND = '03560',
+  TUL = '03233',
+}
+
+type PointsInfo = {
+  name: string;
+  name1: BoxberrySourceStation;
+};
+
+type RecipientInfo = {
+  fio: string;
+  phone: string;
+  email: string;
+};
+
+type ParcelItem = {
+  id: string;
+  name: string;
+  nds: '0';
+  price: string;
+  quantity: string;
+};
+
+type ParcelWeight = {
+  weight: string;
+  x: string;
+  y: string;
+  z: string;
+};
+
+export type BxbOrderCreationRes = {
+  track: string;
+  label: string;
+};
+
+export type ParcelCostResDTO = {
+  price: string;
+  price_base: string;
+  price_service: string;
+  delivery_period: number;
+};

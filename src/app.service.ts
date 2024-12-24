@@ -2,7 +2,7 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ShopService } from './shop/shop.service';
 import { YaService } from './ya/ya.service';
 import { CreateYaOrderDto } from './ya/dto/ya.dto';
-import { convertOrder } from './utils/convertOrder';
+import { convertOrder, convertOrderToBxb } from './utils/convertOrder';
 import { parseYaHistoryToHtml } from './utils/parseYaHistoryToHtml';
 import { CreateOrderQueries } from './validation/yandex';
 import { MailService } from './mail/mail.service';
@@ -99,8 +99,53 @@ export class AppService {
         data: error,
       };
     } finally {
-      await this.mailService.sendToAdmin('Invoice info', message);
       await this.botService.sendEmployeeMessage(message, true);
+      await this.mailService.sendToAdmin('Invoice info', message);
+    }
+  }
+
+  async createBxbOrder({
+    order,
+  }: CreateOrderQueries): Promise<TransferInterface> {
+    try {
+      const { addressDetails, customerDetails, orderDetails } =
+        await this.getOrderBasicInfo(order);
+
+      const [shippingDetails, threadId] = await Promise.all([
+        this.shopService.getOrderCarrierInfo(+order),
+        this.shopService.getMessagesThread(+order),
+      ]);
+
+      const destination = findPointId(
+        await this.shopService.getOrderMessages(threadId),
+      );
+
+      if (!destination) {
+        return {
+          ok: false,
+          data: 'Error: destination point not found',
+        };
+      }
+
+      const bxbOrderData = convertOrderToBxb(
+        orderDetails,
+        addressDetails,
+        customerDetails,
+        shippingDetails,
+        destination,
+      );
+
+      const { track } =
+        await this.bxbService.createBoxberryParcel(bxbOrderData);
+      return {
+        ok: true,
+        data: { track },
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        data: error,
+      };
     }
   }
 
@@ -303,7 +348,9 @@ export class AppService {
   }
 
   async testEndpoint() {
-    return await this.postService.getOperationHistory('');
+    return await this.shopService.getOrderInfo(1);
+    // return await this.bxbService.getParcelCost();
+    // return await this.postService.getOperationHistory('');
     // return await this.dpdService.getStatesByDPDOrder('');
   }
 }
