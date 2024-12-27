@@ -125,9 +125,8 @@ export function convertOrderToBxb(
       name: row.product_name,
       nds: '0',
       price: Math.round(
-        (parseFloat(row.unit_price_tax_excl) -
-          parseFloat(row.unit_price_tax_excl) * discount) *
-          100,
+        parseFloat(row.unit_price_tax_excl) -
+          parseFloat(row.unit_price_tax_excl) * discount,
       ).toString(),
       quantity: parseInt(row.product_quantity).toString(),
     }));
