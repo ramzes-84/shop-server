@@ -135,8 +135,17 @@ export class AppService {
         destination,
       );
 
-      const { track } =
-        await this.bxbService.createBoxberryParcel(bxbOrderData);
+      const [{ track }, { price }] = await Promise.all([
+        await this.bxbService.createBoxberryParcel(bxbOrderData),
+        await this.bxbService.getParcelCost(bxbOrderData),
+      ]);
+
+      this.compareDeliveryCost(
+        orderDetails.total_shipping,
+        price,
+        bxbOrderData.order_id,
+      );
+
       return {
         ok: true,
         data: { track },
@@ -146,6 +155,18 @@ export class AppService {
         ok: false,
         data: error,
       };
+    }
+  }
+
+  async compareDeliveryCost(
+    orderCost: string,
+    realCost: string,
+    order: string,
+  ) {
+    if (parseFloat(realCost) - parseFloat(orderCost) > 30) {
+      await this.botService.sendEmployeeMessage(
+        `❗ ${order}: стоимость доставки ${orderCost} вместо ${realCost}.`,
+      );
     }
   }
 
@@ -310,7 +331,8 @@ export class AppService {
     orders.forEach((order) => {
       switch (true) {
         case order.unifiedShopState !== order.unifiedCargoState &&
-          order.unifiedCargoState !== UnifiedOrderState.UNKNOWN:
+          order.unifiedCargoState !== UnifiedOrderState.UNKNOWN &&
+          order.cargo !== Cargos.DPD:
           updates.push(
             `${order.reference}:  ${order.unifiedShopState}  ⏩  ${order.unifiedCargoState}.`,
           );
