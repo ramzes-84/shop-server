@@ -42,7 +42,7 @@ export class AppService {
   ) {}
 
   async getHello() {
-    await this.mailService.emitHealth();
+    // await this.mailService.emitHealth();
     return `Hello World!`;
   }
 
@@ -168,7 +168,7 @@ export class AppService {
     order: string,
   ) {
     await this.botService.sendEmployeeMessage(
-      `${order}: стоимость доставки ${orderCost} вместо ${realCost}.`,
+      `${order}: стоимость доставки ${parseFloat(orderCost)} вместо ${parseFloat(realCost)}.`,
     );
 
     // if (parseFloat(realCost) - parseFloat(orderCost) > 30) {

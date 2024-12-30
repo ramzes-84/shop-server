@@ -26,7 +26,7 @@ export class BotService {
     }
 
     const body = JSON.stringify({
-      chat_id: this.buGroup,
+      chat_id: this.alGroup,
       text,
       parse_mode: markdown ? 'MarkdownV2' : undefined,
     });
