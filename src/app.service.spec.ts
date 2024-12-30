@@ -147,9 +147,7 @@ describe('AppService', () => {
         .spyOn(shopService, 'getOrderMessages')
         .mockResolvedValue(orderMessages);
       jest.spyOn(yaService, 'createYaOrder').mockResolvedValue(mockYaOrderId);
-      (convertOrder as jest.Mock).mockReturnValue(mockYaOrderData);
       jest.spyOn(yaService, 'getOrderInfo').mockResolvedValue(mockOrderInfo);
-      (convertOrder as jest.Mock).mockReturnValue(mockYaOrderData);
       jest
         .spyOn(yaService, 'getParcelCost')
         .mockResolvedValue({ pricing_total: '123.17 RUB' });
