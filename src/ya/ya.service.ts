@@ -3,6 +3,8 @@ import fetch from 'node-fetch';
 import { ServicesUrl } from 'src/types/services-url';
 import {
   CreateYaOrderDto,
+  YaCostCalculationReqDto,
+  YaCostResDto,
   YaOrderCreationRes,
   YaOrderHistoryRes,
   YaOrderInfoRes,
@@ -51,6 +53,22 @@ export class YaService {
       'Accept-Language': 'ru',
     };
     const response = await this.fetchData<YaOrderCreationRes>(
+      url,
+      RequestMethod.POST,
+      headers,
+      body,
+    );
+    return response;
+  }
+
+  async getParcelCost(order: YaCostCalculationReqDto) {
+    const url = new URL(this.endpoint + '/pricing-calculator');
+    const body = JSON.stringify(order);
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept-Language': 'ru',
+    };
+    const response = await this.fetchData<YaCostResDto>(
       url,
       RequestMethod.POST,
       headers,

@@ -2,7 +2,11 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ShopService } from './shop/shop.service';
 import { YaService } from './ya/ya.service';
 import { CreateYaOrderDto } from './ya/dto/ya.dto';
-import { convertOrder, convertOrderToBxb } from './utils/convertOrder';
+import {
+  convertOrder,
+  convertOrderToBxb,
+  convertYaOrderToCostReq,
+} from './utils/convertOrder';
 import { parseYaHistoryToHtml } from './utils/parseYaHistoryToHtml';
 import { CreateOrderQueries } from './validation/yandex';
 import { MailService } from './mail/mail.service';
@@ -163,11 +167,15 @@ export class AppService {
     realCost: string,
     order: string,
   ) {
-    if (parseFloat(realCost) - parseFloat(orderCost) > 30) {
-      await this.botService.sendEmployeeMessage(
-        `❗ ${order}: стоимость доставки ${orderCost} вместо ${realCost}.`,
-      );
-    }
+    await this.botService.sendEmployeeMessage(
+      `${order}: стоимость доставки ${orderCost} вместо ${realCost}.`,
+    );
+
+    // if (parseFloat(realCost) - parseFloat(orderCost) > 30) {
+    //   await this.botService.sendEmployeeMessage(
+    //     `❗ ${order}: стоимость доставки ${orderCost} вместо ${realCost}.`,
+    //   );
+    // }
   }
 
   async createYaOrder({
@@ -201,7 +209,19 @@ export class AppService {
         destination,
       );
 
-      const { request_id } = await this.yaService.createYaOrder(yaOrderData);
+      const [{ request_id }, { pricing_total }] = await Promise.all([
+        await this.yaService.createYaOrder(yaOrderData),
+        await this.yaService.getParcelCost(
+          convertYaOrderToCostReq(yaOrderData),
+        ),
+      ]);
+
+      this.compareDeliveryCost(
+        orderDetails.total_shipping,
+        pricing_total,
+        yaOrderData.info.operator_request_id,
+      );
+
       await new Promise((resolve) => setTimeout(resolve, 5000));
       const orderInfo = await this.yaService.getOrderInfo(request_id);
       return {

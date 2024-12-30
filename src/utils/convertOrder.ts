@@ -4,7 +4,11 @@ import { CustomerInfoResDto } from 'src/shop/dto/customer-info.dto';
 import { OrderCarrierInfo } from 'src/shop/dto/order-carrier-info.dto';
 import { OrderInfoResDto } from 'src/shop/dto/order-info.dto';
 import { StatusesInfoResDto } from 'src/shop/dto/statuses-info.dto';
-import { CreateYaOrderDto, PlatformStation } from 'src/ya/dto/ya.dto';
+import {
+  CreateYaOrderDto,
+  PlatformStation,
+  YaCostCalculationReqDto,
+} from 'src/ya/dto/ya.dto';
 
 export function convertOrder(
   orderDetails: OrderInfoResDto['order'],
@@ -177,4 +181,23 @@ export function getSourcePlatform(
   } else {
     throw new Error(`Unknown last order's status: ${lastStatus}`);
   }
+}
+
+export function convertYaOrderToCostReq(
+  order: CreateYaOrderDto,
+): YaCostCalculationReqDto {
+  return {
+    client_price: 0,
+    destination: {
+      platform_station_id: order.destination.platform_station.platform_id,
+    },
+    source: { platform_station_id: order.source.platform_station.platform_id },
+    payment_method: order.billing_info.payment_method,
+    tariff: order.last_mile_policy,
+    total_weight: order.places[0].physical_dims.weight_gross,
+    total_assessed_price: order.items.reduce((acc, item) => {
+      return acc + item.billing_details.assessed_unit_price;
+    }, 0),
+    places: order.places,
+  };
 }

@@ -55,6 +55,7 @@ describe('AppService', () => {
             getHistoryById: jest.fn(),
             createYaOrder: jest.fn(),
             getOrderInfo: jest.fn(),
+            getParcelCost: jest.fn(),
           },
         },
         {
@@ -148,6 +149,10 @@ describe('AppService', () => {
       jest.spyOn(yaService, 'createYaOrder').mockResolvedValue(mockYaOrderId);
       (convertOrder as jest.Mock).mockReturnValue(mockYaOrderData);
       jest.spyOn(yaService, 'getOrderInfo').mockResolvedValue(mockOrderInfo);
+      (convertOrder as jest.Mock).mockReturnValue(mockYaOrderData);
+      jest
+        .spyOn(yaService, 'getParcelCost')
+        .mockResolvedValue({ pricing_total: '123.17 RUB' });
       (convertOrder as jest.Mock).mockReturnValue(mockYaOrderData);
 
       const createOrderQueries: CreateOrderQueries = {

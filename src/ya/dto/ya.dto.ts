@@ -29,17 +29,9 @@ export class CreateYaOrderDto {
     };
     place_barcode: string;
   }>;
-  places: Array<{
-    physical_dims: {
-      weight_gross: number;
-      dx: 5;
-      dy: 10;
-      dz: 15;
-    };
-    barcode: string;
-  }>;
+  places: Place[];
   billing_info: {
-    payment_method: 'already_paid';
+    payment_method: PaymentMethod;
   };
   recipient_info: {
     first_name: string;
@@ -47,9 +39,22 @@ export class CreateYaOrderDto {
     phone: string;
     email: string;
   };
-  last_mile_policy: 'self_pickup';
+  last_mile_policy: DeliveryType;
   particular_items_refuse: false;
 }
+
+type PaymentMethod = 'already_paid';
+type DeliveryType = 'self_pickup';
+type PhysicalDims = {
+  weight_gross: number;
+  dx: 5;
+  dy: 10;
+  dz: 15;
+};
+type Place = {
+  physical_dims: PhysicalDims;
+  barcode: string;
+};
 
 export enum PlatformStation {
   RND = 'af1356a6-5b4e-42e2-b85d-2c67a11a1a7c', //Suzd
@@ -227,3 +232,18 @@ export enum YaParcelStatus {
   RETURN_READY_FOR_PICKUP = 'RETURN_READY_FOR_PICKUP',
   RETURN_RETURNED = 'RETURN_RETURNED',
 }
+
+export type YaCostCalculationReqDto = {
+  source: { platform_station_id: string };
+  destination: { platform_station_id: string };
+  tariff: DeliveryType;
+  total_weight: number;
+  total_assessed_price: number;
+  client_price: number;
+  payment_method: PaymentMethod;
+  places: Pick<Place, 'physical_dims'>[];
+};
+
+export type YaCostResDto = {
+  pricing_total: string;
+};
