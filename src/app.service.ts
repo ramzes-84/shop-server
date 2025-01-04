@@ -5,6 +5,7 @@ import { CreateYaOrderDto } from './ya/dto/ya.dto';
 import {
   convertOrder,
   convertOrderToBxb,
+  convertOrderToDpd,
   convertYaOrderToCostReq,
 } from './utils/convertOrder';
 import { parseYaHistoryToHtml } from './utils/parseYaHistoryToHtml';
@@ -27,6 +28,7 @@ import { recognizeCargo } from './utils/sort-tracks';
 import { unifyParcelStatus, unifyShopState } from './utils/reviseOrdersV2';
 import { PostService } from './post/post.service';
 import { findPointId } from './utils/find-point-from-messages';
+import { checkDeliveryCost } from './utils/check-delivery-cost';
 
 @Injectable()
 export class AppService {
@@ -170,15 +172,63 @@ export class AppService {
     realCost: string,
     order: string,
   ) {
-    await this.botService.sendEmployeeMessage(
-      `${order}: стоимость доставки ${parseFloat(orderCost)} вместо ${parseFloat(realCost)}.`,
-    );
+    if (checkDeliveryCost(orderCost, realCost)) {
+      await this.botService.sendEmployeeMessage(
+        `❗ ${order}: стоимость доставки ${orderCost} вместо ${realCost}.`,
+      );
+    }
+  }
 
-    // if (parseFloat(realCost) - parseFloat(orderCost) > 30) {
-    //   await this.botService.sendEmployeeMessage(
-    //     `❗ ${order}: стоимость доставки ${orderCost} вместо ${realCost}.`,
-    //   );
-    // }
+  async createDpdOrder({
+    order,
+  }: CreateOrderQueries): Promise<TransferInterface> {
+    try {
+      const { addressDetails, customerDetails, orderDetails } =
+        await this.getOrderBasicInfo(order);
+
+      const [shippingDetails, threadId] = await Promise.all([
+        this.shopService.getOrderCarrierInfo(+order),
+        this.shopService.getMessagesThread(+order),
+      ]);
+
+      const destination = findPointId(
+        await this.shopService.getOrderMessages(threadId),
+      );
+
+      if (!destination) {
+        return {
+          ok: false,
+          data: 'Error: destination point not found',
+        };
+      }
+
+      const dpdOrderData = convertOrderToDpd(
+        orderDetails,
+        addressDetails,
+        customerDetails,
+        shippingDetails,
+        destination,
+      );
+
+      const orderInfo = await this.dpdService.createOrder(dpdOrderData);
+
+      if ('orderNum' in orderInfo.return) {
+        return {
+          ok: true,
+          data: { track: orderInfo.return.orderNum },
+        };
+      } else {
+        return {
+          ok: false,
+          data: orderInfo.return.errorMessage,
+        };
+      }
+    } catch (error) {
+      return {
+        ok: false,
+        data: error,
+      };
+    }
   }
 
   async createYaOrder({

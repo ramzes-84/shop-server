@@ -72,7 +72,7 @@ type ParcelInfo = {
   items: ParcelItem[];
   weights: ParcelWeight;
   issue: 0;
-  sender_name: 'Mineral Magic';
+  sender_name: string;
 };
 
 export enum BoxberrySourceStation {

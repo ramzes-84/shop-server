@@ -1,4 +1,5 @@
 import { BoxberrySourceStation, CreateBxbParcelDto } from 'src/bxb/dto/bxb.dto';
+import { CreatingOrderRequest, DpdSourceTerminal } from 'src/dpd/dto/dpd.dto';
 import { AddressInfoResDto } from 'src/shop/dto/address-info.dto';
 import { CustomerInfoResDto } from 'src/shop/dto/customer-info.dto';
 import { OrderCarrierInfo } from 'src/shop/dto/order-carrier-info.dto';
@@ -199,5 +200,67 @@ export function convertYaOrderToCostReq(
       return acc + item.billing_details.assessed_unit_price;
     }, 0),
     places: order.places,
+  };
+}
+
+export function convertOrderToDpd(
+  orderDetails: OrderInfoResDto['order'],
+  addressDetails: AddressInfoResDto['address'],
+  customerDetails: CustomerInfoResDto['customer'],
+  shippingDetails: OrderCarrierInfo,
+  destination: string,
+): Pick<CreatingOrderRequest, 'header' | 'order'> {
+  return {
+    header: {
+      datePickup: new Date().toISOString().split('T')[0],
+      senderAddress: {
+        name: process.env.SHOP_NAME,
+        terminalCode:
+          orderDetails.current_state === '12'
+            ? DpdSourceTerminal.RND
+            : DpdSourceTerminal.TUL,
+        contactFio: process.env.SHOP_OWNER,
+        contactPhone: process.env.SHOP_PHONE,
+        contactEmail: process.env.MAIL_ADMIN,
+        instructions: '',
+        needPass: '0',
+      },
+      pickupTimePeriod: '9-18',
+    },
+    order: [
+      {
+        orderNumberInternal: orderDetails.reference,
+        serviceCode: 'PCL',
+        serviceVariant: 'ТТ',
+        cargoNumPack: 1,
+        cargoWeight: (parseFloat(shippingDetails.weight) + 0.08).toString(),
+        cargoVolume: '0.01',
+        cargoRegistered: false,
+        cargoCategory: 'Минеральная пудра',
+        receiverAddress: {
+          name: addressDetails.firstname + ' ' + addressDetails.lastname,
+          terminalCode: destination,
+          contactFio: addressDetails.firstname + ' ' + addressDetails.lastname,
+          contactPhone: addressDetails.phone_mobile,
+          contactEmail: customerDetails.email,
+          instructions: '',
+          needPass: '0',
+        },
+        extraService: [
+          // { ЭСД: { email: process.env.MAIL_ADMIN } },
+          // { SMS: { phone: addressDetails.phone_mobile } },
+          // { EML: { email: customerDetails.email } },
+          // { ЭСЗ: { email: customerDetails.email } },
+          // {
+          //   НПП: {
+          //     sum_npp: (
+          //       parseFloat(orderDetails.total_paid) -
+          //       parseFloat(orderDetails.total_paid_real)
+          //     ).toString(),
+          //   },
+          // },
+        ],
+      },
+    ],
   };
 }

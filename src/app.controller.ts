@@ -29,6 +29,12 @@ export class AppController {
     return this.appService.createBxbOrder(query);
   }
 
+  @Post('dpd/create')
+  @UseGuards(AuthGuard('bearer'))
+  dpdOrderCreate(@Query() query: CreateOrderQueries) {
+    return this.appService.createDpdOrder(query);
+  }
+
   @Post('cash/create')
   @UseGuards(AuthGuard('bearer'))
   cashInvoiceCreate(@Query() query: CreateInvoiceQueries) {
