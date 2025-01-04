@@ -12,10 +12,14 @@ export class BotService {
   private readonly token = process.env.TELEGRAM_TOKEN;
   private readonly endpoint = ServicesUrl.TELEGRAM;
   private readonly url = `${this.endpoint}${this.token}`;
-  private readonly alGroup = process.env.TELEGRAM_GROUP_AL;
-  private readonly buGroup = process.env.TELEGRAM_GROUP_BU;
+  readonly alGroup = process.env.TELEGRAM_GROUP_AL;
+  readonly buGroup = process.env.TELEGRAM_GROUP_BU;
 
-  async sendEmployeeMessage(text: string, markdown: boolean = false) {
+  async sendEmployeeMessage(
+    text: string,
+    markdown: boolean = false,
+    group: string = this.alGroup,
+  ) {
     if (!text) {
       const errorRes: ErrorTelegramResDTO = {
         ok: false,
@@ -26,7 +30,7 @@ export class BotService {
     }
 
     const body = JSON.stringify({
-      chat_id: this.alGroup,
+      chat_id: group,
       text,
       parse_mode: markdown ? 'MarkdownV2' : undefined,
     });

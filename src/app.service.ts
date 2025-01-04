@@ -103,8 +103,11 @@ export class AppService {
         data: error,
       };
     } finally {
-      await this.botService.sendEmployeeMessage(message, true);
-      await this.mailService.sendToAdmin('Invoice info', message);
+      await this.botService.sendEmployeeMessage(
+        message,
+        true,
+        this.botService.buGroup,
+      );
     }
   }
 
@@ -383,8 +386,16 @@ export class AppService {
 
     await this.mailService.sendToAdmin('Status updates', msgToEmail.join('\n'));
     await this.botService.sendEmployeeMessage(updates.join('\n'));
-    await this.botService.sendEmployeeMessage(warnings.join('\n'));
-    await this.botService.sendEmployeeMessage(errors.join('\n'));
+    await this.botService.sendEmployeeMessage(
+      warnings.join('\n'),
+      false,
+      this.botService.buGroup,
+    );
+    await this.botService.sendEmployeeMessage(
+      errors.join('\n'),
+      false,
+      this.botService.buGroup,
+    );
 
     return msgToEmail;
   }
