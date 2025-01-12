@@ -58,6 +58,8 @@ export function unifyParcelStatus(status: string) {
     case DpdParselStatus.OnTerminalDelivery:
     case PostParcelStatus.ArrivedAtDeliveryPoint:
     case PostParcelStatus.ArrivedAtParcelLocker:
+    case PostParcelStatus.NoticeSent:
+    case PostParcelStatus.NoticeDelivered:
       return UnifiedOrderState.WAITING;
 
     case YaParcelStatus.DELIVERY_TRANSMITTED_TO_RECIPIENT:

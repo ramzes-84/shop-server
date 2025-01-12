@@ -139,5 +139,7 @@ export enum PostParcelStatus {
   DeliveredViaQr = 'Адресату по QR коду',
   DeliveredViaParcelLocker = 'Выдано адресату через почтомат',
   DeliveredToRecipientByPEP = 'Вручение адресату по ПЭП',
+  NoticeSent = 'Направлено извещение',
+  NoticeDelivered = 'Доставлено извещение',
   Undefined = 'undefined',
 }
