@@ -452,8 +452,8 @@ export class AppService {
 
   async testEndpoint() {
     // return await this.shopService.getOrderInfo(1);
-    return await this.bxbService.getParcelStatuses('PUXQMWBBU');
-    // return await this.postService.getPostParcelData('80082713220575');
+    // return await this.bxbService.getParcelStatuses('PUXQMWBBU');
+    return await this.postService.getPostParcelData('80082713220575');
     // return await this.dpdService.getStatesByDPDOrder('');
   }
 }
