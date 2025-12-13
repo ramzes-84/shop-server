@@ -30,9 +30,12 @@ export class BotController {
     try {
       const trackInfo =
         await this.yaService.findTrackByOrderReference(reference);
+      const routeId = trackInfo.sharingUrl?.split('/').at(-1);
+      const trackDisplay = routeId ?? trackInfo.trackNumber;
+      const trackLine = `Трек: ${trackDisplay}`;
       const responseLines = [
         `Заказ: ${trackInfo.reference}`,
-        `Трек: ${trackInfo.trackNumber}`,
+        trackLine,
         `Статус: ${trackInfo.status}`,
         trackInfo.sharingUrl ? `Ссылка: ${trackInfo.sharingUrl}` : undefined,
       ].filter(Boolean);

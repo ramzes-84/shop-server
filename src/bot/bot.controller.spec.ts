@@ -52,7 +52,7 @@ describe('BotController', () => {
       reference: '0001',
       requestId: 'req-1',
       trackNumber: 'TRACK-0001',
-      sharingUrl: 'https://example.com',
+      sharingUrl: 'https://dostavka.yandex.ru/route/EXAMPLE123',
       status: YaParcelStatus.CREATED,
     });
 
@@ -60,7 +60,7 @@ describe('BotController', () => {
 
     expect(yaService.findTrackByOrderReference).toHaveBeenCalledWith('0001');
     expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
-      expect.stringContaining('TRACK-0001'),
+      expect.stringContaining('EXAMPLE123'),
       false,
       '123',
     );
