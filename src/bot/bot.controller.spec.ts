@@ -61,7 +61,7 @@ describe('BotController', () => {
     expect(yaService.findTrackByOrderReference).toHaveBeenCalledWith('0001');
     expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
       expect.stringContaining('EXAMPLE123'),
-      true,
+      false,
       '123',
     );
   });

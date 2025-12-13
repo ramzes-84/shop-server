@@ -32,10 +32,7 @@ export class BotController {
         await this.yaService.findTrackByOrderReference(reference);
       const routeId = trackInfo.sharingUrl?.split('/').at(-1);
       const trackDisplay = routeId ?? trackInfo.trackNumber;
-      const trackLine = `Трек:
-      \`\`\`
-      ${trackDisplay}
-      \`\`\``;
+      const trackLine = `Трек: ${trackDisplay}`;
       const responseLines = [
         `Заказ: ${trackInfo.reference}`,
         trackLine,
@@ -45,7 +42,7 @@ export class BotController {
 
       await this.botService.sendEmployeeMessage(
         responseLines.join('\n'),
-        true,
+        false,
         chatId,
       );
     } catch (error) {
