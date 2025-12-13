@@ -11,32 +11,44 @@ export function convertOrderShopToCash(
   orderDetails: OrderInfoResDto['order'],
   customerDetails: CustomerInfoResDto['customer'],
 ): CreateCashInvoiceDto {
-  const discount = calcDiscount(
-    orderDetails.total_products,
-    orderDetails.total_discounts,
-  );
+  const discount =
+    calcDiscount(orderDetails.total_products, orderDetails.total_discounts) ||
+    0;
 
-  const goods = orderDetails.associations.order_rows.map((row) => {
-    const item: CartItem = {
-      description: `${row.product_reference} - ${row.product_name}`,
-      quantity: parseInt(row.product_quantity),
-      price: {
-        currency: CurrenciesTypes.RUB,
-        value: parseFloat(row.unit_price_tax_excl).toFixed(2),
-      },
-    };
-    if (discount) {
-      item.discount_price = {
-        value: (
-          parseFloat(row.unit_price_tax_excl) -
-          parseFloat(row.unit_price_tax_excl) * discount
-        ).toFixed(2),
-        currency: CurrenciesTypes.RUB,
+  const goods = orderDetails.associations.order_rows.reduce<CartItem[]>(
+    (items, row) => {
+      const basePrice = parseFloat(row.unit_price_tax_excl);
+      const quantity = parseInt(row.product_quantity);
+
+      if (basePrice <= 0) {
+        // Cash API rejects positions with non-positive prices (e.g. gift items).
+        return items;
+      }
+
+      const item: CartItem = {
+        description: `${row.product_reference} - ${row.product_name}`,
+        quantity,
+        price: {
+          currency: CurrenciesTypes.RUB,
+          value: basePrice.toFixed(2),
+        },
       };
-    }
 
-    return item;
-  });
+      if (discount > 0) {
+        const discountedValue = basePrice - basePrice * discount;
+        if (discountedValue > 0) {
+          item.discount_price = {
+            value: discountedValue.toFixed(2),
+            currency: CurrenciesTypes.RUB,
+          };
+        }
+      }
+
+      items.push(item);
+      return items;
+    },
+    [],
+  );
 
   goods.push({
     description: 'Доставка',
