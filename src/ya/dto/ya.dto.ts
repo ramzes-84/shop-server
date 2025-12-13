@@ -192,6 +192,14 @@ export type YaRecentParcelsRes = {
   requests: YaOrderInfoRes[];
 };
 
+export type YaTrackInfo = {
+  reference: string;
+  requestId: string;
+  trackNumber: string;
+  sharingUrl: string;
+  status: YaParcelStatus;
+};
+
 export enum YaParcelStatus {
   DRAFT = 'DRAFT',
   VALIDATING = 'VALIDATING',

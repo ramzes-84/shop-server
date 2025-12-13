@@ -298,75 +298,29 @@ export class AppService {
   }
 
   async fetchBatchOfStatuses(revisingOrderData: RevisingOrderData[]) {
-    console.log(
-      '[reviseOrders][fetchBatchOfStatuses] Start. Orders:',
-      revisingOrderData.length,
-    );
     return await Promise.allSettled(
-      revisingOrderData.map((order, idx) => {
-        console.log(
-          `[reviseOrders][fetchBatchOfStatuses] (${idx}) cargo=${order.cargo} track=${order.track}`,
-        );
+      revisingOrderData.map((order) => {
         if (order.cargo === Cargos.YA) {
-          console.log(
-            `[reviseOrders][fetchBatchOfStatuses] (${idx}) YA cargo - skipped (recent parcels used).`,
-          );
           return undefined;
         } else if (order.cargo === Cargos.BXB) {
-          console.log(
-            `[reviseOrders][fetchBatchOfStatuses] (${idx}) Calling bxbService.getParcelStatuses`,
-          );
           return this.bxbService
             .getParcelStatuses(order.track)
-            .then((r) => {
-              console.log(
-                `[reviseOrders][fetchBatchOfStatuses] (${idx}) bxbService success.`,
-              );
-              return r;
-            })
+            .then((r) => r)
             .catch((e) => {
-              console.error(
-                `[reviseOrders][fetchBatchOfStatuses] (${idx}) bxbService error:`,
-                e?.message || e,
-              );
               throw e;
             });
         } else if (order.cargo === Cargos.DPD) {
-          console.log(
-            `[reviseOrders][fetchBatchOfStatuses] (${idx}) Calling dpdService.getStatesByDPDOrder`,
-          );
           return this.dpdService
             .getStatesByDPDOrder(order.track)
-            .then((r) => {
-              console.log(
-                `[reviseOrders][fetchBatchOfStatuses] (${idx}) dpdService success.`,
-              );
-              return r;
-            })
+            .then((r) => r)
             .catch((e) => {
-              console.error(
-                `[reviseOrders][fetchBatchOfStatuses] (${idx}) dpdService error:`,
-                e?.message || e,
-              );
               throw e;
             });
         } else if (order.cargo === Cargos.POST) {
-          console.log(
-            `[reviseOrders][fetchBatchOfStatuses] (${idx}) Calling postService.getOperationHistory`,
-          );
           return this.postService
             .getOperationHistory(order.track)
-            .then((r) => {
-              console.log(
-                `[reviseOrders][fetchBatchOfStatuses] (${idx}) postService success.`,
-              );
-              return r;
-            })
+            .then((r) => r)
             .catch((e) => {
-              console.error(
-                `[reviseOrders][fetchBatchOfStatuses] (${idx}) postService error:`,
-                e?.message || e,
-              );
               throw e;
             });
         }
@@ -375,15 +329,10 @@ export class AppService {
   }
 
   async getDataForRevise(): Promise<RevisingOrderData[]> {
-    console.log('[reviseOrders][getDataForRevise] START');
     const [ordersInTransit, recentYaParcels] = await Promise.all([
       this.shopService.getInTransitOrders(),
       this.yaService.getRecentParcels(),
     ]).catch(async (error) => {
-      console.error(
-        '[reviseOrders][getDataForRevise] Error in Promise.all:',
-        error?.message || error,
-      );
       const message =
         error instanceof Error
           ? error.message
@@ -392,20 +341,10 @@ export class AppService {
       throw new HttpException(error, HttpStatus.SERVICE_UNAVAILABLE);
     });
 
-    console.log(
-      '[reviseOrders][getDataForRevise] Data fetched. inTransit:',
-      ordersInTransit.length,
-      'recentYaParcels:',
-      recentYaParcels?.requests?.length,
-    );
-
     const revisingOrdersData: RevisingOrderData[] = ordersInTransit.map(
-      (order, idx) => {
+      (order) => {
         const cargo = recognizeCargo(order.shipping_number);
         const unifiedState = unifyShopState(order.current_state);
-        console.log(
-          `[reviseOrders][getDataForRevise] Map (${idx}) ref=${order.reference} track=${order.shipping_number} cargo=${cargo} shopState=${order.current_state} unified=${unifiedState}`,
-        );
         return {
           id: order.id,
           reference: order.reference,
@@ -417,29 +356,11 @@ export class AppService {
       },
     );
 
-    console.log(
-      '[reviseOrders][getDataForRevise] Fetching batch statuses for',
-      revisingOrdersData.length,
-      'orders',
-    );
-
     const allStatuses = await this.fetchBatchOfStatuses(revisingOrdersData);
-
-    console.log(
-      '[reviseOrders][getDataForRevise] Status batch resolved. Results:',
-      allStatuses.map((r, i) => ({
-        i,
-        status: r.status,
-        cargo: revisingOrdersData[i].cargo,
-      })),
-    );
 
     revisingOrdersData.map((order, index) => {
       let currState: string;
       const settled = allStatuses[index];
-      console.log(
-        `[reviseOrders][getDataForRevise] Processing (${index}) ref=${order.reference} cargo=${order.cargo} settledStatus=${settled.status}`,
-      );
       if (settled.status === 'fulfilled') {
         switch (order.cargo) {
           case Cargos.YA: {
@@ -450,9 +371,6 @@ export class AppService {
                 ),
               )
               .at(0)?.state.status;
-            console.log(
-              `[reviseOrders][getDataForRevise] YA (${index}) resolved state=${currState}`,
-            );
             break;
           }
           case Cargos.BXB: {
@@ -461,18 +379,12 @@ export class AppService {
             } else {
               currState = BxbParselStatus.CustomProblem;
             }
-            console.log(
-              `[reviseOrders][getDataForRevise] BXB (${index}) resolved state=${currState}`,
-            );
             break;
           }
           case Cargos.DPD: {
             if ('return' in settled.value) {
               currState = settled.value.return.states.at(-1).newState;
             }
-            console.log(
-              `[reviseOrders][getDataForRevise] DPD (${index}) resolved state=${currState}`,
-            );
             break;
           }
           case Cargos.POST: {
@@ -481,9 +393,6 @@ export class AppService {
                 settled.value.OperationHistoryData.historyRecord.at(-1)
                   .OperationParameters.OperAttr.Name;
             }
-            console.log(
-              `[reviseOrders][getDataForRevise] POST (${index}) resolved state=${currState}`,
-            );
             break;
           }
           default:
@@ -491,41 +400,27 @@ export class AppService {
         }
       } else {
         currState = BxbParselStatus.Unknown;
-        console.warn(
-          `[reviseOrders][getDataForRevise] (${index}) Promise rejected for cargo=${order.cargo}`,
-          (settled as any).reason?.message || (settled as any).reason,
-        );
       }
 
       order.actualCargoState = currState;
       order.unifiedCargoState = unifyParcelStatus(currState);
-      console.log(
-        `[reviseOrders][getDataForRevise] (${index}) unifiedCargoState=${order.unifiedCargoState}`,
-      );
     });
-    console.log('[reviseOrders][getDataForRevise] DONE');
     return revisingOrdersData;
   }
 
   async reviseOrders() {
-    console.log('[reviseOrders] ================= START =================');
     let orders: RevisingOrderData[];
     try {
       orders = await this.getDataForRevise();
     } catch (e) {
-      console.error('[reviseOrders] getDataForRevise failed:', e?.message || e);
       throw e;
     }
-    console.log('[reviseOrders] Orders to process:', orders.length);
 
     const updates: string[] = [];
     const warnings: string[] = [];
     const errors: string[] = [];
 
-    orders.forEach((order, idx) => {
-      console.log(
-        `[reviseOrders] (${idx}) ref=${order.reference} cargo=${order.cargo} shop=${order.unifiedShopState} cargo=${order.unifiedCargoState}`,
-      );
+    orders.forEach((order) => {
       switch (true) {
         case order.unifiedShopState !== order.unifiedCargoState &&
           order.unifiedCargoState !== UnifiedOrderState.UNKNOWN &&
@@ -556,61 +451,26 @@ export class AppService {
       }
     });
 
-    console.log(
-      '[reviseOrders] Aggregation done. updates:',
-      updates.length,
-      'warnings:',
-      warnings.length,
-      'errors:',
-      errors.length,
-    );
-
     const msgToEmail = [...updates, ...warnings, ...errors];
-
-    console.log(
-      '[reviseOrders] Sending email to admin. Lines:',
-      msgToEmail.length,
-    );
     await this.mailService
       .sendToAdmin('Status updates', msgToEmail.join('\n'))
-      .catch((e) =>
-        console.error(
-          '[reviseOrders] mailService.sendToAdmin error:',
-          e?.message || e,
-        ),
-      );
-
-    console.log('[reviseOrders] Sending bot updates');
+      .catch((e) => e);
     await this.botService
       .sendEmployeeMessage(updates.join('\n'))
-      .catch((e) =>
-        console.error(
-          '[reviseOrders] bot updates send error:',
-          e?.message || e,
-        ),
-      );
+      .catch((e) => e);
 
     await this.botService
       .sendEmployeeMessage(warnings.join('\n'), false, this.botService.buGroup)
-      .catch((e) =>
-        console.error(
-          '[reviseOrders] bot warnings send error:',
-          e?.message || e,
-        ),
-      );
+      .catch((e) => e);
 
     await this.botService
       .sendEmployeeMessage(errors.join('\n'), false, this.botService.buGroup)
-      .catch((e) =>
-        console.error('[reviseOrders] bot errors send error:', e?.message || e),
-      );
-
-    console.log('[reviseOrders] =================  END  =================');
+      .catch((e) => e);
     return msgToEmail;
   }
 
   async testEndpoint() {
-    return await this.yaService.getRecentParcels();
+    return await this.yaService.findTrackByOrderReference('WHDDRZOCX');
     // return await this.shopService.getOrderInfo(1);
     // return await this.bxbService.getParcelStatuses('PUXQMWBBU');
     // return await this.postService.getPostParcelData('80082713220575');

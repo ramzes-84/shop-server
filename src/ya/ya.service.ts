@@ -1,4 +1,9 @@
-import { HttpException, Injectable, RequestMethod } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  RequestMethod,
+} from '@nestjs/common';
 import fetch from 'node-fetch';
 import { ServicesUrl } from 'src/types/services-url';
 import {
@@ -9,6 +14,7 @@ import {
   YaOrderHistoryRes,
   YaOrderInfoRes,
   YaRecentParcelsRes,
+  YaTrackInfo,
 } from './dto/ya.dto';
 import { ErrorYaResDTO } from './dto/ya-errors';
 
@@ -41,6 +47,33 @@ export class YaService {
       JSON.stringify(interval),
     );
     return response;
+  }
+
+  async findTrackByOrderReference(reference: string): Promise<YaTrackInfo> {
+    const parcels = await this.getRecentParcels();
+    const matchedParcel = parcels.requests.find((parcel) =>
+      parcel.request.info.operator_request_id.startsWith(reference),
+    );
+
+    if (!matchedParcel) {
+      throw new HttpException(
+        `Yandex order with reference ${reference} not found`,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    const orderInfo = await this.getOrderInfo(matchedParcel.request_id);
+
+    const trackNumber =
+      orderInfo.request.items?.[0]?.place_barcode ?? matchedParcel.request_id;
+
+    return {
+      reference: orderInfo.request.info.operator_request_id,
+      requestId: orderInfo.request_id,
+      trackNumber,
+      sharingUrl: orderInfo.sharing_url,
+      status: orderInfo.state.status,
+    };
   }
 
   async createYaOrder(

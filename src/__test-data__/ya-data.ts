@@ -1,4 +1,10 @@
-import { YaCostCalculationReqDto, YaOrderHistoryRes } from 'src/ya/dto/ya.dto';
+import {
+  YaCostCalculationReqDto,
+  YaOrderHistoryRes,
+  YaRecentParcelsRes,
+  YaParcelStatus,
+} from 'src/ya/dto/ya.dto';
+import { yaOrderInfo } from './ya-order-info';
 
 export const yaOrderHistory: YaOrderHistoryRes = {
   state_history: [
@@ -30,4 +36,30 @@ export const yaCostReq: YaCostCalculationReqDto = {
   total_assessed_price: 1000,
   total_weight: 300,
   places: [{ physical_dims: { weight_gross: 300, dx: 5, dy: 10, dz: 15 } }],
+};
+
+export const yaRecentParcels: YaRecentParcelsRes = {
+  requests: [
+    {
+      ...yaOrderInfo,
+      request: {
+        ...yaOrderInfo.request,
+        info: {
+          ...yaOrderInfo.request.info,
+          operator_request_id: '0001',
+        },
+        items: [
+          {
+            ...yaOrderInfo.request.items[0],
+            place_barcode: 'TRACK-0001',
+          },
+        ],
+      },
+      state: {
+        status: YaParcelStatus.DELIVERY_TRACK_RECEIVED,
+        description: 'Track received',
+        reason: '',
+      },
+    },
+  ],
 };

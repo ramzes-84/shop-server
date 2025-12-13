@@ -12,6 +12,11 @@ export class YaController {
     return this.yaService.getHistoryById(params.id);
   }
 
+  @Get('track/:id')
+  getTrackByOrder(@Param() params: OrderIdParams) {
+    return this.yaService.findTrackByOrderReference(params.id);
+  }
+
   @Post('create')
   createYaOrder(@Body() createYaOrderDto: CreateYaOrderDto) {
     return this.yaService.createYaOrder(createYaOrderDto);
