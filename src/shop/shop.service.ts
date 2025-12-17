@@ -97,9 +97,11 @@ export class ShopService {
     url: URL,
     method: RequestMethod = RequestMethod.GET,
     inXML = false,
+    body?: string,
+    additionalHeaders: Record<string, string> = {},
   ): Promise<T> {
     let data: T;
-    if (!inXML) {
+    if (!inXML && method === RequestMethod.GET) {
       url.searchParams.append('output_format', 'JSON');
     }
 
@@ -107,7 +109,9 @@ export class ShopService {
       method: RequestMethod[method],
       headers: {
         Authorization: `Basic ${this.tokenBase64}`,
+        ...additionalHeaders,
       },
+      body,
     });
 
     if (!response.ok) {
@@ -120,12 +124,64 @@ export class ShopService {
 
     const resType = response.headers.get('content-type');
 
-    if (resType.includes('text/xml')) {
+    if (resType && resType.includes('text/xml')) {
       data = (await response.text()) as unknown as T;
     } else {
       data = await response.json();
     }
 
     return data;
+  }
+
+  async updateOrderStatus(orderId: number, orderStateId: number) {
+    const url = new URL(this.endpoint + '/order_histories');
+    const payload = `<?xml version="1.0" encoding="UTF-8"?>
+<prestashop xmlns:xlink="http://www.w3.org/1999/xlink">
+  <order_history>
+    <id_order_state>${orderStateId}</id_order_state>
+    <id_order>${orderId}</id_order>
+  </order_history>
+</prestashop>`;
+
+    await this.fetchData<string>(url, RequestMethod.POST, true, payload, {
+      'Content-Type': 'application/xml',
+    });
+  }
+
+  async addMessageToThread(
+    threadId: number,
+    message: string,
+    isPrivate = false,
+    employeeId?: number,
+  ) {
+    const url = new URL(this.endpoint + '/customer_messages');
+    const employeeBlock = employeeId
+      ? `    <id_employee>${employeeId}</id_employee>\n`
+      : '';
+    const payload = `<?xml version="1.0" encoding="UTF-8"?>
+<prestashop xmlns:xlink="http://www.w3.org/1999/xlink">
+  <customer_message>
+    <id_customer_thread>${threadId}</id_customer_thread>
+${employeeBlock}    <message>${this.escapeXml(message)}</message>
+    <private>${isPrivate ? 1 : 0}</private>
+  </customer_message>
+</prestashop>`;
+
+    await this.fetchData<string>(url, RequestMethod.POST, true, payload, {
+      'Content-Type': 'application/xml',
+    });
+  }
+
+  private escapeXml(value: string) {
+    if (!value) {
+      return '';
+    }
+
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
   }
 }

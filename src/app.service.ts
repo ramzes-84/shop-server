@@ -32,6 +32,29 @@ import { checkDeliveryCost } from './utils/check-delivery-cost';
 
 @Injectable()
 export class AppService {
+  private readonly unifiedStateTargetMap: Partial<
+    Record<UnifiedOrderState, number>
+  >;
+  private readonly allowedTransitions: Partial<
+    Record<UnifiedOrderState, Set<UnifiedOrderState>>
+  > = {
+    [UnifiedOrderState.IN_TRANSIT]: new Set([
+      UnifiedOrderState.WAITING,
+      UnifiedOrderState.DELIVERED,
+    ]),
+    [UnifiedOrderState.WAITING]: new Set([UnifiedOrderState.DELIVERED]),
+  };
+  private readonly customerStatusMessages: Partial<
+    Record<UnifiedOrderState, string>
+  > = {
+    [UnifiedOrderState.WAITING]:
+      'Рады сообщить, что судя по информации, полученной от службы доставки, Ваш заказ благополучно прибыл в место вручения.\nИнформацию (памятку) о статусах заказов можно получить здесь: https://mineralmagic.ru/content/8-how-to-order#status',
+    [UnifiedOrderState.DELIVERED]:
+      'Вам начислены баллы за заказ.\nИнформация о доступных баллах хранится в личном кабинете. Конвертировать баллы в купон можно в любое время там же. С подробными условиями, инструкциями и ограничениями можно ознакомиться здесь: https://mineralmagic.ru/blog/103_bonus.html.\n\nПожалуйста, помогите нам сделать магазин лучше, оцените степень удовлетворённости полученным заказом: https://forms.yandex.ru/u/5e1e2772b7ccf30c3b02e3d4/',
+  };
+  private readonly employeeIdForMessages =
+    this.resolveStateIdFromEnv('SHOP_EMPLOYEE_ID') ?? 5;
+
   constructor(
     private readonly shopService: ShopService,
     private readonly yaService: YaService,
@@ -41,7 +64,22 @@ export class AppService {
     private readonly botService: BotService,
     private readonly dpdService: DpdService,
     private readonly postService: PostService,
-  ) {}
+  ) {
+    this.unifiedStateTargetMap = {
+      [UnifiedOrderState.IN_TRANSIT]:
+        this.resolveStateIdFromEnv('SHOP_STATUS_IN_TRANSIT') ?? 4,
+      [UnifiedOrderState.WAITING]:
+        this.resolveStateIdFromEnv('SHOP_STATUS_WAITING') ?? 908,
+      [UnifiedOrderState.DELIVERED]:
+        this.resolveStateIdFromEnv('SHOP_STATUS_DELIVERED') ?? 5,
+      [UnifiedOrderState.PROBLEM]: this.resolveStateIdFromEnv(
+        'SHOP_STATUS_PROBLEM',
+      ),
+      [UnifiedOrderState.RETURNING]: this.resolveStateIdFromEnv(
+        'SHOP_STATUS_RETURNING',
+      ),
+    };
+  }
 
   async getHello() {
     // await this.mailService.emitHealth();
@@ -420,36 +458,56 @@ export class AppService {
     const warnings: string[] = [];
     const errors: string[] = [];
 
-    orders.forEach((order) => {
-      switch (true) {
-        case order.unifiedShopState !== order.unifiedCargoState &&
-          order.unifiedCargoState !== UnifiedOrderState.UNKNOWN &&
-          order.cargo !== Cargos.DPD:
-          updates.push(
-            `${order.reference}:  ${order.unifiedShopState}  ⏩  ${order.unifiedCargoState}.`,
-          );
-          break;
+    const now = Date.now();
 
-        case order.unifiedShopState === UnifiedOrderState.WAITING &&
-          Date.now() - 86400000 * 5 > order.shopStateUpdatedAt:
-          warnings.push(
-            `⌛ ${order.reference} ожидает более ${Math.floor((Date.now() - order.shopStateUpdatedAt) / 86400000)} дней, начиная с ${new Date(order.shopStateUpdatedAt).toDateString()}. Служба доставки: ${order.cargo}.`,
-          );
-          break;
+    for (const order of orders) {
+      const cargoState = order.unifiedCargoState;
+      const shopState = order.unifiedShopState;
 
-        case order.unifiedCargoState === UnifiedOrderState.PROBLEM:
-          errors.push(
-            `❗ Проверьте заказ ${order.reference}, статус: ${order.actualCargoState}.`,
-          );
-          break;
-
-        case order.unifiedCargoState === UnifiedOrderState.UNKNOWN:
-          errors.push(
-            `❗ Не удалось проверить заказ ${order.reference}, трек: ${order.track}.`,
-          );
-          break;
+      if (
+        cargoState &&
+        (cargoState === UnifiedOrderState.PROBLEM ||
+          cargoState === UnifiedOrderState.RETURNING)
+      ) {
+        errors.push(
+          `❗ ${order.reference}: доставка сообщает статус "${order.actualCargoState}", магазин не поддерживает автоматический переход ${shopState} → ${cargoState}. Проверьте вручную.`,
+        );
+        continue;
       }
-    });
+
+      if (
+        cargoState &&
+        shopState !== cargoState &&
+        cargoState !== UnifiedOrderState.UNKNOWN &&
+        order.cargo !== Cargos.DPD
+      ) {
+        if (!this.canAutoTransition(shopState, cargoState)) {
+          errors.push(
+            `❗ ${order.reference}: переход ${shopState} → ${cargoState} запрещен. Проверьте заказ вручную.`,
+          );
+          continue;
+        }
+
+        await this.syncOrderStateWithCargo(order, updates, errors);
+        continue;
+      }
+
+      if (
+        shopState === UnifiedOrderState.WAITING &&
+        now - 86400000 * 5 > order.shopStateUpdatedAt
+      ) {
+        warnings.push(
+          `⌛ ${order.reference} ожидает более ${Math.floor((now - order.shopStateUpdatedAt) / 86400000)} дней, начиная с ${new Date(order.shopStateUpdatedAt).toDateString()}. Служба доставки: ${order.cargo}.`,
+        );
+        continue;
+      }
+
+      if (cargoState === UnifiedOrderState.UNKNOWN) {
+        errors.push(
+          `❗ Не удалось проверить заказ ${order.reference}, трек: ${order.track}.`,
+        );
+      }
+    }
 
     const msgToEmail = [...updates, ...warnings, ...errors];
     await this.mailService
@@ -467,6 +525,112 @@ export class AppService {
       .sendEmployeeMessage(errors.join('\n'), false, this.botService.buGroup)
       .catch((e) => e);
     return msgToEmail;
+  }
+
+  private resolveStateIdFromEnv(envKey: string): number | undefined {
+    const rawValue = process.env[envKey];
+    if (!rawValue) {
+      return undefined;
+    }
+    const parsed = Number(rawValue);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  private getTargetShopStateId(state: UnifiedOrderState) {
+    return this.unifiedStateTargetMap[state];
+  }
+
+  private canAutoTransition(
+    fromState: UnifiedOrderState,
+    toState: UnifiedOrderState,
+  ) {
+    return this.allowedTransitions[fromState]?.has(toState) ?? false;
+  }
+
+  private async syncOrderStateWithCargo(
+    order: RevisingOrderData,
+    updates: string[],
+    errors: string[],
+  ) {
+    if (!order.unifiedCargoState) {
+      return;
+    }
+
+    const statusMessage = `${order.reference}:  ${order.unifiedShopState}  ⏩  ${order.unifiedCargoState}.`;
+    const targetStateId = this.getTargetShopStateId(order.unifiedCargoState);
+
+    if (!targetStateId) {
+      updates.push(
+        `${statusMessage} ⚠️ отсутствует сопоставление статуса магазина, обновите вручную.`,
+      );
+      return;
+    }
+
+    try {
+      await this.shopService.updateOrderStatus(order.id, targetStateId);
+      updates.push(`${statusMessage} ✅ обновлен автоматически.`);
+      await this.notifyCustomerAboutStatus(order, errors);
+    } catch (error) {
+      const reason =
+        error instanceof Error ? error.message : String(error ?? 'Unknown');
+      errors.push(
+        `❗ ${order.reference}: не удалось обновить статус до ${order.unifiedCargoState} — ${reason}.`,
+      );
+    }
+  }
+
+  private formatCustomerStatusMessage(
+    reference: string,
+    state: UnifiedOrderState,
+  ) {
+    const message = this.customerStatusMessages[state];
+    if (!message) {
+      return undefined;
+    }
+
+    return message.replace('{reference}', reference);
+  }
+
+  private async notifyCustomerAboutStatus(
+    order: RevisingOrderData,
+    errors: string[],
+  ) {
+    const newState = order.unifiedCargoState;
+    if (!newState) {
+      return;
+    }
+
+    try {
+      const threadId = await this.shopService.getMessagesThread(order.id);
+      if (!threadId) {
+        errors.push(
+          `❗ ${order.reference}: не найдена ветка сообщений для уведомления клиента.`,
+        );
+        return;
+      }
+
+      const customerMessage = this.formatCustomerStatusMessage(
+        order.reference,
+        newState,
+      );
+
+      if (!customerMessage) {
+        return;
+      }
+
+      await this.shopService.addMessageToThread(
+        threadId,
+        customerMessage,
+        false,
+        this.employeeIdForMessages,
+      );
+    } catch (error) {
+      const reason =
+        error instanceof Error ? error.message : String(error ?? 'Unknown');
+      errors.push(
+        `❗ ${order.reference}: не удалось отправить уведомление клиенту — ${reason}.`,
+      );
+    }
   }
 
   async testEndpoint() {

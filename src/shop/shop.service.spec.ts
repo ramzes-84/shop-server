@@ -10,6 +10,7 @@ describe('ShopService', () => {
   let service: ShopService;
 
   beforeEach(async () => {
+    process.env.SHOP_TOKEN = 'test-token';
     const module: TestingModule = await Test.createTestingModule({
       providers: [ShopService],
     }).compile();
@@ -163,6 +164,74 @@ describe('ShopService', () => {
 
       const url = new URL('https://example.com/api');
       await expect(service.fetchData(url)).rejects.toThrow(HttpException);
+    });
+  });
+
+  describe('updateOrderStatus', () => {
+    it('should send POST request with XML payload', async () => {
+      (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+        new Response('<prestashop></prestashop>', {
+          headers: { 'content-type': 'text/xml' },
+        }),
+      );
+
+      await service.updateOrderStatus(10, 5);
+
+      expect(fetch).toHaveBeenCalledWith(
+        'https://mineralmagic.ru/api/order_histories',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            Authorization: `Basic ${Buffer.from('test-token:').toString('base64')}`,
+            'Content-Type': 'application/xml',
+          }),
+          body: expect.stringContaining('<id_order>10</id_order>'),
+        }),
+      );
+    });
+
+    it('should throw an error if update fails', async () => {
+      (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+        new Response('Bad Request', { status: 400 }),
+      );
+
+      await expect(service.updateOrderStatus(10, 5)).rejects.toThrow(
+        HttpException,
+      );
+    });
+  });
+
+  describe('addMessageToThread', () => {
+    it('should send escaped XML payload to customer_messages', async () => {
+      (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+        new Response('<prestashop></prestashop>', {
+          headers: { 'content-type': 'text/xml' },
+        }),
+      );
+
+      await service.addMessageToThread(777, 'Статус: & готово <ok>');
+
+      expect(fetch).toHaveBeenCalledWith(
+        'https://mineralmagic.ru/api/customer_messages',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            Authorization: `Basic ${Buffer.from('test-token:').toString('base64')}`,
+            'Content-Type': 'application/xml',
+          }),
+          body: expect.stringContaining('&amp; готово &lt;ok&gt;'),
+        }),
+      );
+    });
+
+    it('should throw an error if request fails', async () => {
+      (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+        new Response('Bad Request', { status: 400 }),
+      );
+
+      await expect(
+        service.addMessageToThread(1, 'message', false),
+      ).rejects.toThrow(HttpException);
     });
   });
 });
