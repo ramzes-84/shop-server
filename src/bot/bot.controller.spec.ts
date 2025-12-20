@@ -2,7 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BotController } from './bot.controller';
 import { BotService } from './bot.service';
 import { YaService } from 'src/ya/ya.service';
-import { TelegramUpdate } from './dto/telegram-update.dto';
+import {
+  TelegramMessageEntity,
+  TelegramUpdate,
+} from './dto/telegram-update.dto';
 import { YaParcelStatus } from 'src/ya/dto/ya.dto';
 
 describe('BotController', () => {
@@ -47,6 +50,12 @@ describe('BotController', () => {
     },
   };
 
+  const yaCommandEntity: TelegramMessageEntity = {
+    offset: 0,
+    length: 3,
+    type: 'bot_command',
+  };
+
   it('should request YA track and send response after prompt', async () => {
     jest.spyOn(yaService, 'findTrackByOrderReference').mockResolvedValue({
       reference: '0001',
@@ -61,6 +70,7 @@ describe('BotController', () => {
       message: {
         ...baseUpdate.message!,
         text: '/ya',
+        entities: [yaCommandEntity],
       },
     };
 
@@ -83,6 +93,53 @@ describe('BotController', () => {
       message: {
         ...baseUpdate.message!,
         text: '/ya',
+        entities: [yaCommandEntity],
+      },
+    };
+
+    await controller.handleWebhook(update);
+
+    expect(yaService.findTrackByOrderReference).not.toHaveBeenCalled();
+    expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Введите код заказа'),
+      false,
+      '123',
+    );
+  });
+
+  it('should fallback to regex when command entity is missing', async () => {
+    const update: TelegramUpdate = {
+      ...baseUpdate,
+      message: {
+        ...baseUpdate.message!,
+        text: '/ya',
+        entities: undefined,
+      },
+    };
+
+    await controller.handleWebhook(update);
+
+    expect(yaService.findTrackByOrderReference).not.toHaveBeenCalled();
+    expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Введите код заказа'),
+      false,
+      '123',
+    );
+  });
+
+  it('should accept /ya mentions used in group chats', async () => {
+    const update: TelegramUpdate = {
+      ...baseUpdate,
+      message: {
+        ...baseUpdate.message!,
+        text: '/ya@ShopHelperBot',
+        entities: [
+          {
+            offset: 0,
+            length: '/ya@ShopHelperBot'.length,
+            type: 'bot_command',
+          },
+        ],
       },
     };
 
@@ -102,6 +159,7 @@ describe('BotController', () => {
       message: {
         ...baseUpdate.message!,
         text: '/ya',
+        entities: [yaCommandEntity],
       },
     };
 
@@ -155,6 +213,7 @@ describe('BotController', () => {
       message: {
         ...baseUpdate.message!,
         text: '/ya',
+        entities: [yaCommandEntity],
       },
     };
 

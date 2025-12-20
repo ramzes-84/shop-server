@@ -22,4 +22,11 @@ export type TelegramMessage = {
     username?: string;
     language_code?: string;
   };
+  entities?: TelegramMessageEntity[];
+};
+
+export type TelegramMessageEntity = {
+  offset: number;
+  length: number;
+  type: string;
 };
