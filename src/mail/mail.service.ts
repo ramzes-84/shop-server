@@ -14,11 +14,13 @@ export class MailService {
   }
 
   async sendToAdmin(subject: string, text: string) {
-    await this.mailerService.sendMail({
-      to: process.env.MAIL_ADMIN,
-      subject,
-      text,
-    });
+    if (text) {
+      await this.mailerService.sendMail({
+        to: process.env.MAIL_ADMIN,
+        subject,
+        text,
+      });
+    }
   }
 
   async send(subject: string, text: string, to: string) {

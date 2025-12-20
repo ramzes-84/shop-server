@@ -9,6 +9,9 @@ import { AuthModule } from './auth/auth.module';
 import { MailService } from './mail/mail.service';
 import { BxbModule } from './bxb/bxb.module';
 import { CashModule } from './cash/cash.module';
+import { BotModule } from './bot/bot.module';
+import { DpdModule } from './dpd/dpd.module';
+import { PostModule } from './post/post.module';
 
 describe('AppModule', () => {
   let module: TestingModule;
@@ -24,6 +27,9 @@ describe('AppModule', () => {
         AuthModule,
         BxbModule,
         CashModule,
+        BotModule,
+        DpdModule,
+        PostModule,
         MailerModule.forRootAsync({
           imports: [ConfigModule],
           useFactory: async (configService: ConfigService) => ({
@@ -85,6 +91,21 @@ describe('AppModule', () => {
   it('should import CashModule', () => {
     const cashModule = module.get<CashModule>(CashModule);
     expect(cashModule).toBeDefined();
+  });
+
+  it('should import BotModule', () => {
+    const botModule = module.get<BotModule>(BotModule);
+    expect(botModule).toBeDefined();
+  });
+
+  it('should import DpdModule', () => {
+    const dpdModule = module.get<DpdModule>(DpdModule);
+    expect(dpdModule).toBeDefined();
+  });
+
+  it('should import PostModule', () => {
+    const postModule = module.get<PostModule>(PostModule);
+    expect(postModule).toBeDefined();
   });
 
   it('should import AuthModule', () => {

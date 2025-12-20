@@ -12,7 +12,7 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
 
   @Get()
-  @UseGuards(AuthGuard('bearer'))
+  // @UseGuards(AuthGuard('bearer'))
   getHello() {
     return this.appService.getHello();
   }
@@ -21,6 +21,18 @@ export class AppController {
   @UseGuards(AuthGuard('bearer'))
   yaOrderCreate(@Query() query: CreateOrderQueries) {
     return this.appService.createYaOrder(query);
+  }
+
+  @Post('boxberry/create')
+  @UseGuards(AuthGuard('bearer'))
+  bxbOrderCreate(@Query() query: CreateOrderQueries) {
+    return this.appService.createBxbOrder(query);
+  }
+
+  @Post('dpd/create')
+  @UseGuards(AuthGuard('bearer'))
+  dpdOrderCreate(@Query() query: CreateOrderQueries) {
+    return this.appService.createDpdOrder(query);
   }
 
   @Post('cash/create')
@@ -44,7 +56,7 @@ export class AppController {
   @Get('revise')
   @UseGuards(AuthGuard('bearer'))
   reviseOrdersStatuses() {
-    return this.appService.reviseOrdersStatuses();
+    return this.appService.reviseOrders();
   }
 
   @Get('test')
@@ -52,9 +64,4 @@ export class AppController {
   testEndpoint() {
     return this.appService.testEndpoint();
   }
-  // @Get('test/:order')
-  // @UseGuards(AuthGuard('bearer'))
-  // testEndpoint(@Param() params: Pick<CreateOrderQueries, 'order'>) {
-  //   return this.appService.testEndpoint(params.order);
-  // }
 }

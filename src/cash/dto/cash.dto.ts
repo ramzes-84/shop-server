@@ -9,6 +9,13 @@ export class CreateCashInvoiceDto {
     metadata: {
       order_id: string;
     };
+    receipt: {
+      customer: {
+        full_name: string;
+        email: string;
+      };
+      items: ReceiptItem[];
+    };
   };
   cart: CartItem[];
   delivery_method_data: {
@@ -33,6 +40,18 @@ export class CartItem {
     currency: CurrenciesTypes.RUB;
   };
   quantity: number;
+}
+
+export class ReceiptItem {
+  description: string;
+  quantity: number;
+  amount: {
+    value: string;
+    currency: 'RUB';
+  };
+  vat_code: 1;
+  payment_mode: 'full_payment';
+  payment_subject: 'commodity' | 'service';
 }
 
 export class CashInvoiceInfoDto extends CreateCashInvoiceDto {

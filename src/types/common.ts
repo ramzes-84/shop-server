@@ -5,16 +5,39 @@ export type RecentBxbParcelsType = {
   status: StatusItem;
 };
 
-export class SortedTracks {
-  bxb: string[];
-  dpd: string[];
-  ya: string[];
-  post: string[];
+export class TransferInterface {
+  ok: boolean;
+  data: any;
+}
 
-  constructor() {
-    this.bxb = [];
-    this.dpd = [];
-    this.ya = [];
-    this.post = [];
-  }
+export class RevisingOrderData {
+  id: number;
+  reference: string;
+  track: string;
+  cargo: Cargos;
+  unifiedShopState: UnifiedOrderState;
+  shopStateUpdatedAt: number;
+  unifiedCargoState?: UnifiedOrderState;
+  actualCargoState?: string;
+  client?: {
+    name: string;
+    phone: number;
+    email: string;
+  };
+}
+
+export enum UnifiedOrderState {
+  DELIVERED = 'DELIVERED',
+  WAITING = 'WAITING',
+  IN_TRANSIT = 'IN_TRANSIT',
+  PROBLEM = 'PROBLEM',
+  RETURNING = 'RETURNING',
+  UNKNOWN = 'UNKNOWN',
+}
+
+export enum Cargos {
+  YA = 'YA',
+  POST = 'POST',
+  BXB = 'BXB',
+  DPD = 'DPD',
 }

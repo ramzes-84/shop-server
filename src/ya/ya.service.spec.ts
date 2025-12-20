@@ -10,6 +10,7 @@ import {
 import { ErrorYaResDTO } from './dto/ya-errors';
 import { yaOrderInfo } from 'src/__test-data__/ya-order-info';
 import { orderConverterResult } from 'src/__test-data__/converter-result';
+import { yaRecentParcels } from 'src/__test-data__/ya-data';
 
 jest.mock('node-fetch');
 const { Response } = jest.requireActual('node-fetch');
@@ -158,6 +159,37 @@ describe('YaService', () => {
       };
 
       await expect(service.createYaOrder(createYaOrderDto)).rejects.toThrow();
+    });
+  });
+
+  describe('findTrackByOrderReference', () => {
+    it('should return track info when parcel is found', async () => {
+      jest
+        .spyOn(service, 'getRecentParcels')
+        .mockResolvedValue({ ...yaRecentParcels });
+      jest
+        .spyOn(service, 'getOrderInfo')
+        .mockResolvedValue(yaRecentParcels.requests[0]);
+
+      const result = await service.findTrackByOrderReference('0001');
+
+      expect(result).toEqual({
+        reference: '0001',
+        requestId: yaRecentParcels.requests[0].request_id,
+        trackNumber: 'TRACK-0001',
+        sharingUrl: yaRecentParcels.requests[0].sharing_url,
+        status: yaRecentParcels.requests[0].state.status,
+      });
+    });
+
+    it('should throw if parcel is not found', async () => {
+      jest
+        .spyOn(service, 'getRecentParcels')
+        .mockResolvedValue({ requests: [] });
+
+      await expect(
+        service.findTrackByOrderReference('unknown'),
+      ).rejects.toThrow(HttpException);
     });
   });
 });

@@ -7,7 +7,7 @@ import {
   YaOrderHistoryRes,
 } from './dto/ya.dto';
 import { OrderIdParams } from 'src/validation/yandex';
-import { yaOrderHistory } from 'src/__test-data__/ya-data';
+import { yaOrderHistory, yaRecentParcels } from 'src/__test-data__/ya-data';
 import { orderConverterResult } from 'src/__test-data__/converter-result';
 
 describe('YaController', () => {
@@ -23,6 +23,7 @@ describe('YaController', () => {
           useValue: {
             getHistoryById: jest.fn(),
             createYaOrder: jest.fn(),
+            findTrackByOrderReference: jest.fn(),
           },
         },
       ],
@@ -61,6 +62,28 @@ describe('YaController', () => {
 
       expect(result).toEqual(mockOrder);
       expect(service.createYaOrder).toHaveBeenCalledWith(createYaOrderDto);
+    });
+  });
+
+  describe('getTrackByOrder', () => {
+    it('should return YA track info by order reference', async () => {
+      const mockTrackInfo = {
+        reference: '0001',
+        requestId: yaRecentParcels.requests[0].request_id,
+        trackNumber: 'TRACK-0001',
+        sharingUrl: yaRecentParcels.requests[0].sharing_url,
+        status: yaRecentParcels.requests[0].state.status,
+      };
+
+      jest
+        .spyOn(service, 'findTrackByOrderReference')
+        .mockResolvedValue(mockTrackInfo);
+
+      const params: OrderIdParams = { id: '0001' };
+      const result = await controller.getTrackByOrder(params);
+
+      expect(result).toEqual(mockTrackInfo);
+      expect(service.findTrackByOrderReference).toHaveBeenCalledWith('0001');
     });
   });
 });

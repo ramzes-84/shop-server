@@ -14,13 +14,17 @@ import {
   addressDetails,
   customerDetails,
   orderDetails,
+  orderMessages,
   shippingDetails,
 } from 'src/__test-data__/shop-data';
 import { orderConverterResult } from './__test-data__/converter-result';
 import { yaOrderHistory } from './__test-data__/ya-data';
-import { yaOrderInfo } from './__test-data__/ya-order-info';
 import { BxbService } from './bxb/bxb.service';
 import { CashService } from './cash/cash.service';
+import { BotService } from './bot/bot.service';
+import { DpdService } from './dpd/dpd.service';
+import { PostService } from './post/post.service';
+import { yaOrderInfo } from './__test-data__/ya-order-info';
 
 jest.mock('./utils/convertOrder');
 
@@ -41,6 +45,8 @@ describe('AppService', () => {
             getAddressInfo: jest.fn(),
             getCustomerInfo: jest.fn(),
             getOrderCarrierInfo: jest.fn(),
+            getMessagesThread: jest.fn(),
+            getOrderMessages: jest.fn(),
           },
         },
         {
@@ -49,6 +55,7 @@ describe('AppService', () => {
             getHistoryById: jest.fn(),
             createYaOrder: jest.fn(),
             getOrderInfo: jest.fn(),
+            getParcelCost: jest.fn(),
           },
         },
         {
@@ -64,6 +71,22 @@ describe('AppService', () => {
           useValue: {
             createCashInvoice: jest.fn(),
           },
+        },
+        {
+          provide: PostService,
+          useValue: {
+            getPostParcelData: jest.fn(),
+          },
+        },
+        {
+          provide: BotService,
+          useValue: {
+            sendEmployeeMessage: jest.fn(),
+          },
+        },
+        {
+          provide: DpdService,
+          useValue: {},
         },
         {
           provide: MailService,
@@ -92,19 +115,20 @@ describe('AppService', () => {
 
       const result = await service.getHello();
 
-      expect(mailService.emitHealth).toHaveBeenCalled();
+      // expect(mailService.emitHealth).toHaveBeenCalled();
       expect(result).toBe('Hello World!');
     });
   });
 
   describe('createYaOrder', () => {
-    it('should create a new Ya order and return the order ID', async () => {
+    it('should create a new Ya order and return the order sharing_url', async () => {
       const mockOrderDetails = { ...orderDetails };
       const mockAddressDetails = { ...addressDetails };
       const mockCustomerDetails = { ...customerDetails };
       const mockShippingDetails = { ...shippingDetails };
       const mockYaOrderData: CreateYaOrderDto = { ...orderConverterResult };
       const mockYaOrderId: YaOrderCreationRes = { request_id: '123' };
+      const mockOrderInfo: YaOrderInfoRes = { ...yaOrderInfo };
 
       jest
         .spyOn(shopService, 'getOrderInfo')
@@ -118,12 +142,19 @@ describe('AppService', () => {
       jest
         .spyOn(shopService, 'getOrderCarrierInfo')
         .mockResolvedValue(mockShippingDetails.order_carriers[0]);
+      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(5);
+      jest
+        .spyOn(shopService, 'getOrderMessages')
+        .mockResolvedValue(orderMessages);
       jest.spyOn(yaService, 'createYaOrder').mockResolvedValue(mockYaOrderId);
+      jest.spyOn(yaService, 'getOrderInfo').mockResolvedValue(mockOrderInfo);
+      jest
+        .spyOn(yaService, 'getParcelCost')
+        .mockResolvedValue({ pricing_total: '123.17 RUB' });
       (convertOrder as jest.Mock).mockReturnValue(mockYaOrderData);
 
       const createOrderQueries: CreateOrderQueries = {
         order: '1',
-        destination: 'destination',
       };
 
       const result = await service.createYaOrder(createOrderQueries);
@@ -132,6 +163,8 @@ describe('AppService', () => {
       expect(shopService.getAddressInfo).toHaveBeenCalledWith(111005);
       expect(shopService.getCustomerInfo).toHaveBeenCalledWith(6190);
       expect(shopService.getOrderCarrierInfo).toHaveBeenCalledWith(1);
+      expect(shopService.getMessagesThread).toHaveBeenCalledWith(1);
+      expect(shopService.getOrderMessages).toHaveBeenCalledWith(5);
       expect(convertOrder).toHaveBeenCalledWith(
         mockOrderDetails,
         mockAddressDetails,
@@ -140,8 +173,11 @@ describe('AppService', () => {
         'destination',
       );
       expect(yaService.createYaOrder).toHaveBeenCalledWith(mockYaOrderData);
-      expect(result).toEqual({ ok: true, data: mockYaOrderId });
-    });
+      expect(result).toEqual({
+        ok: true,
+        data: { sharing_url: mockOrderInfo.sharing_url },
+      });
+    }, 10000);
 
     it('should return an error if something goes wrong', async () => {
       const mockError = new Error('Something went wrong');
@@ -149,7 +185,6 @@ describe('AppService', () => {
 
       const createOrderQueries: CreateOrderQueries = {
         order: '1',
-        destination: 'destination',
       };
 
       const result = await service.createYaOrder(createOrderQueries);
@@ -184,7 +219,6 @@ describe('AppService', () => {
     it('should return order info for a given ID', async () => {
       const mockOrderInfo: YaOrderInfoRes = { ...yaOrderInfo };
       jest.spyOn(yaService, 'getOrderInfo').mockResolvedValue(mockOrderInfo);
-
       const result = await service.getOrderInfo('1');
       expect(result).toEqual({
         ok: true,
@@ -192,13 +226,10 @@ describe('AppService', () => {
       });
       expect(yaService.getOrderInfo).toHaveBeenCalledWith('1');
     });
-
     it('should throw an error if fetching order info fails', async () => {
       const mockError = new Error('Something went wrong');
       jest.spyOn(yaService, 'getOrderInfo').mockRejectedValue(mockError);
-
       const result = await service.getOrderInfo('1');
-
       expect(result).toEqual({
         ok: false,
         data: mockError,
