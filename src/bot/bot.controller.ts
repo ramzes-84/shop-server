@@ -1,7 +1,10 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { BotService } from './bot.service';
 import { YaService } from 'src/ya/ya.service';
+import { YaTrackInfo } from 'src/ya/dto/ya.dto';
 import { TelegramUpdate } from './dto/telegram-update.dto';
+
+const YA_COMMAND_ONLY_RE = /^\/?ya\s*$/i;
 
 @Controller('bot')
 export class BotController {
@@ -9,6 +12,47 @@ export class BotController {
     private readonly botService: BotService,
     private readonly yaService: YaService,
   ) {}
+
+  private readonly pendingYaReferences = new Set<string>();
+
+  private buildTrackResponse(trackInfo: YaTrackInfo): string {
+    const routeId = trackInfo.sharingUrl?.split('/').at(-1);
+    const trackDisplay = routeId ?? trackInfo.trackNumber;
+    const responseLines = [
+      `Заказ: ${trackInfo.reference}`,
+      `Трек: ${trackDisplay}`,
+      `Статус: ${trackInfo.status}`,
+      trackInfo.sharingUrl ? `Ссылка: ${trackInfo.sharingUrl}` : undefined,
+    ].filter(Boolean);
+
+    return responseLines.join('\n');
+  }
+
+  private async sendTrackInfo(
+    reference: string,
+    chatId: string,
+    originalText: string,
+  ) {
+    try {
+      const trackInfo =
+        await this.yaService.findTrackByOrderReference(reference);
+
+      await this.botService.sendEmployeeMessage(
+        this.buildTrackResponse(trackInfo),
+        false,
+        chatId,
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Неизвестная ошибка';
+
+      await this.botService.sendEmployeeMessage(
+        `Не удалось получить трек по заказу ${reference}: ${errorMessage}\nКоманда: ${originalText}`,
+        false,
+        chatId,
+      );
+    }
+  }
 
   @Post('webhook')
   async handleWebhook(@Body() update: TelegramUpdate) {
@@ -19,41 +63,22 @@ export class BotController {
 
     const chatId = message.chat.id.toString();
     const text = message.text.trim();
+    const awaitingReference = this.pendingYaReferences.has(chatId);
 
-    const yaMatch = text.match(/^\/?(?:ya(?:_track)?)\s+(\S+)/i);
-    if (!yaMatch) {
+    if (YA_COMMAND_ONLY_RE.test(text)) {
+      this.pendingYaReferences.add(chatId);
+      await this.botService.sendEmployeeMessage(
+        'Введите код заказа, и я найду информацию.',
+        false,
+        chatId,
+      );
       return { ok: true };
     }
 
-    const reference = yaMatch[1];
-
-    try {
-      const trackInfo =
-        await this.yaService.findTrackByOrderReference(reference);
-      const routeId = trackInfo.sharingUrl?.split('/').at(-1);
-      const trackDisplay = routeId ?? trackInfo.trackNumber;
-      const trackLine = `Трек: ${trackDisplay}`;
-      const responseLines = [
-        `Заказ: ${trackInfo.reference}`,
-        trackLine,
-        `Статус: ${trackInfo.status}`,
-        trackInfo.sharingUrl ? `Ссылка: ${trackInfo.sharingUrl}` : undefined,
-      ].filter(Boolean);
-
-      await this.botService.sendEmployeeMessage(
-        responseLines.join('\n'),
-        false,
-        chatId,
-      );
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Неизвестная ошибка';
-
-      await this.botService.sendEmployeeMessage(
-        `Не удалось получить трек по заказу ${reference}: ${errorMessage}`,
-        false,
-        chatId,
-      );
+    if (awaitingReference) {
+      this.pendingYaReferences.delete(chatId);
+      await this.sendTrackInfo(text, chatId, text);
+      return { ok: true };
     }
 
     return { ok: true };

@@ -40,4 +40,5 @@ export enum Cargos {
   POST = 'POST',
   BXB = 'BXB',
   DPD = 'DPD',
+  UNKNOWN = 'UNKNOWN',
 }

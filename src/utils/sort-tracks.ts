@@ -52,6 +52,6 @@ export function recognizeCargo(track: string): Cargos {
     case Number.isInteger(+track):
       return Cargos.POST;
     default:
-      return;
+      return Cargos.UNKNOWN;
   }
 }

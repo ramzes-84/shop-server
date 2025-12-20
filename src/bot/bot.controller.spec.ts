@@ -39,7 +39,7 @@ describe('BotController', () => {
     message: {
       message_id: 10,
       date: Date.now(),
-      text: '/ya 0001',
+      text: '0001',
       chat: {
         id: 123,
         type: 'private',
@@ -47,7 +47,7 @@ describe('BotController', () => {
     },
   };
 
-  it('should request YA track and send response', async () => {
+  it('should request YA track and send response after prompt', async () => {
     jest.spyOn(yaService, 'findTrackByOrderReference').mockResolvedValue({
       reference: '0001',
       requestId: 'req-1',
@@ -56,11 +56,79 @@ describe('BotController', () => {
       status: YaParcelStatus.CREATED,
     });
 
+    const promptUpdate: TelegramUpdate = {
+      ...baseUpdate,
+      message: {
+        ...baseUpdate.message!,
+        text: '/ya',
+      },
+    };
+
+    await controller.handleWebhook(promptUpdate);
+    jest.clearAllMocks();
+
     await controller.handleWebhook(baseUpdate);
 
     expect(yaService.findTrackByOrderReference).toHaveBeenCalledWith('0001');
     expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
       expect.stringContaining('EXAMPLE123'),
+      false,
+      '123',
+    );
+  });
+
+  it('should prompt for order code when /ya has no reference', async () => {
+    const update: TelegramUpdate = {
+      ...baseUpdate,
+      message: {
+        ...baseUpdate.message!,
+        text: '/ya',
+      },
+    };
+
+    await controller.handleWebhook(update);
+
+    expect(yaService.findTrackByOrderReference).not.toHaveBeenCalled();
+    expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Введите код заказа'),
+      false,
+      '123',
+    );
+  });
+
+  it('should use next message as reference after prompt', async () => {
+    const activationUpdate: TelegramUpdate = {
+      ...baseUpdate,
+      message: {
+        ...baseUpdate.message!,
+        text: '/ya',
+      },
+    };
+
+    await controller.handleWebhook(activationUpdate);
+    jest.clearAllMocks();
+
+    jest.spyOn(yaService, 'findTrackByOrderReference').mockResolvedValue({
+      reference: '0002',
+      requestId: 'req-2',
+      trackNumber: 'TRACK-0002',
+      sharingUrl: undefined,
+      status: YaParcelStatus.CREATED,
+    });
+
+    const codeUpdate: TelegramUpdate = {
+      ...baseUpdate,
+      message: {
+        ...baseUpdate.message!,
+        text: '0002',
+      },
+    };
+
+    await controller.handleWebhook(codeUpdate);
+
+    expect(yaService.findTrackByOrderReference).toHaveBeenCalledWith('0002');
+    expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Заказ: 0002'),
       false,
       '123',
     );
@@ -82,6 +150,17 @@ describe('BotController', () => {
   });
 
   it('should notify about errors when YA lookup fails', async () => {
+    const promptUpdate: TelegramUpdate = {
+      ...baseUpdate,
+      message: {
+        ...baseUpdate.message!,
+        text: '/ya',
+      },
+    };
+
+    await controller.handleWebhook(promptUpdate);
+    jest.clearAllMocks();
+
     jest
       .spyOn(yaService, 'findTrackByOrderReference')
       .mockRejectedValue(new Error('not found'));
