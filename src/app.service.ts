@@ -634,7 +634,10 @@ export class AppService {
   }
 
   async testEndpoint() {
-    return await this.yaService.findTrackByOrderReference('WHDDRZOCX');
+    return await this.mailService.sendToAdmin(
+      'Test email from shop-server',
+      'If you see this, email sending works fine.',
+    );
     // return await this.shopService.getOrderInfo(1);
     // return await this.bxbService.getParcelStatuses('PUXQMWBBU');
     // return await this.postService.getPostParcelData('80082713220575');
