@@ -659,7 +659,7 @@ describe('AppService', () => {
       expect(shopService.getMessagesThread).toHaveBeenCalledWith(10);
       expect(shopService.addMessageToThread).toHaveBeenCalledWith(
         99,
-        expect.stringContaining('Рады сообщить'),
+        expect.stringContaining('Ваш заказ благополучно'),
         false,
         5,
       );

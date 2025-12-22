@@ -48,9 +48,9 @@ export class AppService {
     Record<UnifiedOrderState, string>
   > = {
     [UnifiedOrderState.WAITING]:
-      'Рады сообщить, что судя по информации, полученной от службы доставки, Ваш заказ благополучно прибыл в место вручения.\nИнформацию (памятку) о статусах заказов можно получить здесь: https://mineralmagic.ru/content/8-how-to-order#status',
+      'Ваш заказ благополучно прибыл в место вручения.\nИнформацию (памятку) о статусах заказов можно получить здесь: https://mineralmagic.ru/content/8-how-to-order#status',
     [UnifiedOrderState.DELIVERED]:
-      'Вам начислены баллы за заказ.\nИнформация о доступных баллах хранится в личном кабинете. Конвертировать баллы в купон можно в любое время там же. С подробными условиями, инструкциями и ограничениями можно ознакомиться здесь: https://mineralmagic.ru/blog/103_bonus.html.\n\nПожалуйста, помогите нам сделать магазин лучше, оцените степень удовлетворённости полученным заказом: https://forms.yandex.ru/u/5e1e2772b7ccf30c3b02e3d4/',
+      'Вам начислены баллы за заказ.\nИнформация о доступных баллах хранится в личном кабинете. Подробности здесь: https://mineralmagic.ru/blog/103_bonus.html.\n\nПожалуйста, оцените степень удовлетворённости полученным заказом: https://forms.yandex.ru/u/5e1e2772b7ccf30c3b02e3d4/',
   };
   private readonly employeeIdForMessages =
     this.resolveStateIdFromEnv('SHOP_EMPLOYEE_ID') ?? 5;
@@ -470,7 +470,7 @@ export class AppService {
           cargoState === UnifiedOrderState.RETURNING)
       ) {
         errors.push(
-          `❗ ${order.reference}: доставка сообщает статус "${order.actualCargoState}", магазин не поддерживает автоматический переход ${shopState} → ${cargoState}. Проверьте вручную.`,
+          `❗ ${order.reference}: ship status "${order.actualCargoState}", but it's not allowed ${shopState} → ${cargoState}. Check manually.`,
         );
         continue;
       }
@@ -483,7 +483,7 @@ export class AppService {
       ) {
         if (!this.canAutoTransition(shopState, cargoState)) {
           errors.push(
-            `❗ ${order.reference}: переход ${shopState} → ${cargoState} запрещен. Проверьте заказ вручную.`,
+            `❗ ${order.reference}: it's not allowed ${shopState} → ${cargoState}. Check manually.`,
           );
           continue;
         }
@@ -561,20 +561,20 @@ export class AppService {
 
     if (!targetStateId) {
       updates.push(
-        `${statusMessage} ⚠️ отсутствует сопоставление статуса магазина, обновите вручную.`,
+        `${statusMessage} ⚠️ missing shop status mapping, please update manually.`,
       );
       return;
     }
 
     try {
       await this.shopService.updateOrderStatus(order.id, targetStateId);
-      updates.push(`${statusMessage} ✅ обновлен автоматически.`);
+      updates.push(`${statusMessage} ✅ Updated.`);
       await this.notifyCustomerAboutStatus(order, errors);
     } catch (error) {
       const reason =
         error instanceof Error ? error.message : String(error ?? 'Unknown');
       errors.push(
-        `❗ ${order.reference}: не удалось обновить статус до ${order.unifiedCargoState} — ${reason}.`,
+        `❗ ${order.reference}: failed to update status to ${order.unifiedCargoState} — ${reason}.`,
       );
     }
   }
@@ -604,7 +604,7 @@ export class AppService {
       const threadId = await this.shopService.getMessagesThread(order.id);
       if (!threadId) {
         errors.push(
-          `❗ ${order.reference}: не найдена ветка сообщений для уведомления клиента.`,
+          `❗ ${order.reference}: message thread not found for customer notification.`,
         );
         return;
       }
@@ -628,7 +628,7 @@ export class AppService {
       const reason =
         error instanceof Error ? error.message : String(error ?? 'Unknown');
       errors.push(
-        `❗ ${order.reference}: не удалось отправить уведомление клиенту — ${reason}.`,
+        `❗ ${order.reference}: failed to send thread message to customer — ${reason}.`,
       );
     }
   }
