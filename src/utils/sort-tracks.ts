@@ -1,41 +1,6 @@
 import { Cargos } from 'src/types/common';
 
-// deprecated
-export function sortTracks(tracks: string[]): SortedTracks {
-  const sortedTracks = new SortedTracks();
-
-  tracks.forEach((track) => {
-    if (!track) return;
-    if (track.startsWith('RU')) {
-      sortedTracks.dpd.push(track);
-    } else if (
-      track.match(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-      )
-    ) {
-      sortedTracks.ya.push(track);
-    } else if (Number.isInteger(+track)) {
-      sortedTracks.post.push(track);
-    }
-  });
-
-  return sortedTracks;
-}
-
-// deprecated
-class SortedTracks {
-  dpd: string[];
-  ya: string[];
-  post: string[];
-
-  constructor() {
-    this.dpd = [];
-    this.ya = [];
-    this.post = [];
-  }
-}
-
-export function recognizeCargo(track: string): Cargos {
+export function recognizeCargo(track: string, reference: string): Cargos {
   switch (true) {
     case track.startsWith('RU'):
       return Cargos.DPD;
@@ -45,6 +10,8 @@ export function recognizeCargo(track: string): Cargos {
       return Cargos.YA;
     case Number.isInteger(+track):
       return Cargos.POST;
+    case track.startsWith(reference):
+      return Cargos.FIVE_POST;
     default:
       return Cargos.UNKNOWN;
   }

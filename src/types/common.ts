@@ -32,5 +32,6 @@ export enum Cargos {
   YA = 'YA',
   POST = 'POST',
   DPD = 'DPD',
+  FIVE_POST = 'FIVE_POST',
   UNKNOWN = 'UNKNOWN',
 }

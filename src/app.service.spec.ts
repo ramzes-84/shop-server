@@ -90,6 +90,8 @@ describe('AppService', () => {
   let botService: BotService;
   let cashService: CashService;
   let dpdService: DpdService;
+  let fiveService: any;
+  let postService: any;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -169,6 +171,8 @@ describe('AppService', () => {
     botService = module.get<BotService>(BotService);
     cashService = module.get<CashService>(CashService);
     dpdService = module.get<DpdService>(DpdService);
+    fiveService = module.get<any>(FiveService);
+    postService = module.get<any>(PostService);
   });
 
   afterEach(() => {
@@ -187,6 +191,132 @@ describe('AppService', () => {
 
       // expect(mailService.emitHealth).toHaveBeenCalled();
       expect(result).toBe('Hello World!');
+    });
+  });
+
+  describe('fetchBatchOfStatuses batching for FIVE_POST', () => {
+    it('calls fiveService.getOrderStatus once with all references and resolves per-order', async () => {
+      const five = fiveService;
+
+      const revising = [
+        {
+          id: 1,
+          reference: 'R1',
+          track: 'R1-1',
+          cargo: 'FIVE_POST',
+          unifiedShopState: 'IN_TRANSIT',
+          shopStateUpdatedAt: Date.now(),
+        },
+        {
+          id: 2,
+          reference: 'R2',
+          track: 'R2-1',
+          cargo: 'FIVE_POST',
+          unifiedShopState: 'IN_TRANSIT',
+          shopStateUpdatedAt: Date.now(),
+        },
+        {
+          id: 3,
+          reference: 'R3',
+          track: 'R3-1',
+          cargo: 'POST',
+          unifiedShopState: 'IN_TRANSIT',
+          shopStateUpdatedAt: Date.now(),
+        },
+      ];
+
+      // Mock POST service for the non-five item
+      postService.getOperationHistory = jest
+        .fn()
+        .mockResolvedValue({ OperationHistoryData: { historyRecord: [] } });
+
+      // Mock fiveService to return results only for R1 and R2
+      const resp = [
+        { senderOrderId: 'R1', executionStatus: 'PICKED_UP', status: 'DONE' },
+        {
+          senderOrderId: 'R2',
+          executionStatus: 'SHIPPED',
+          status: 'IN_PROCESS',
+        },
+      ];
+      five.getOrderStatus.mockResolvedValue(resp);
+
+      const serviceInstance = service;
+      const results = await serviceInstance.fetchBatchOfStatuses(
+        revising as any,
+      );
+
+      // should call fiveService once with both R1 and R2
+      expect(five.getOrderStatus).toHaveBeenCalledTimes(1);
+      expect(five.getOrderStatus).toHaveBeenCalledWith(
+        expect.arrayContaining(['R1', 'R2']),
+      );
+
+      // results is an array of settled promises
+      expect(results).toHaveLength(3);
+      // first two should be fulfilled
+      expect((results[0] as any).status).toBe('fulfilled');
+      expect((results[1] as any).status).toBe('fulfilled');
+    });
+
+    it('resolves null for missing five items when API does not return them', async () => {
+      const five = fiveService;
+
+      const revising = [
+        {
+          id: 1,
+          reference: 'R1',
+          track: 'R1-1',
+          cargo: 'FIVE_POST',
+          unifiedShopState: 'IN_TRANSIT',
+          shopStateUpdatedAt: Date.now(),
+        },
+      ];
+
+      five.getOrderStatus.mockResolvedValue([]); // no results
+
+      const serviceInstance = service;
+      const results = await serviceInstance.fetchBatchOfStatuses(
+        revising as any,
+      );
+
+      expect(five.getOrderStatus).toHaveBeenCalledTimes(1);
+      expect((results[0] as any).status).toBe('fulfilled');
+      expect((results[0] as any).value).toBeNull();
+    });
+
+    it('rejects per-order promises when fiveService fails', async () => {
+      const five = fiveService;
+
+      const revising = [
+        {
+          id: 1,
+          reference: 'R1',
+          track: 'R1-1',
+          cargo: 'FIVE_POST',
+          unifiedShopState: 'IN_TRANSIT',
+          shopStateUpdatedAt: Date.now(),
+        },
+        {
+          id: 2,
+          reference: 'R2',
+          track: 'R2-1',
+          cargo: 'FIVE_POST',
+          unifiedShopState: 'IN_TRANSIT',
+          shopStateUpdatedAt: Date.now(),
+        },
+      ];
+
+      five.getOrderStatus.mockRejectedValue(new Error('service down'));
+
+      const serviceInstance = service;
+      const results = await serviceInstance.fetchBatchOfStatuses(
+        revising as any,
+      );
+
+      // both should be rejected
+      expect((results[0] as any).status).toBe('rejected');
+      expect((results[1] as any).status).toBe('rejected');
     });
   });
 

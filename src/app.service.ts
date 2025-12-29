@@ -280,27 +280,68 @@ export class AppService {
   }
 
   async fetchBatchOfStatuses(revisingOrderData: RevisingOrderData[]) {
-    return await Promise.allSettled(
-      revisingOrderData.map((order) => {
-        if (order.cargo === Cargos.YA) {
-          return undefined;
-        } else if (order.cargo === Cargos.DPD) {
-          return this.dpdService
-            .getStatesByDPDOrder(order.track)
-            .then((r) => r)
-            .catch((e) => {
-              throw e;
-            });
-        } else if (order.cargo === Cargos.POST) {
-          return this.postService
-            .getOperationHistory(order.track)
-            .then((r) => r)
-            .catch((e) => {
-              throw e;
-            });
-        }
-      }),
+    // We'll build per-order promises, but batch FIVE_POST requests to a single call
+    const promises: Array<Promise<any> | undefined> = new Array(
+      revisingOrderData.length,
     );
+
+    const fiveRefs: string[] = [];
+    const fiveIndices: number[] = [];
+    const fiveResolvers: Array<{
+      resolve: (v: any) => void;
+      reject: (e: any) => void;
+    }> = [];
+
+    revisingOrderData.forEach((order, idx) => {
+      if (order.cargo === Cargos.YA) {
+        promises[idx] = Promise.resolve(undefined);
+      } else if (order.cargo === Cargos.DPD) {
+        promises[idx] = this.dpdService
+          .getStatesByDPDOrder(order.track)
+          .then((r) => r)
+          .catch((e) => {
+            throw e;
+          });
+      } else if (order.cargo === Cargos.POST) {
+        promises[idx] = this.postService
+          .getOperationHistory(order.track)
+          .then((r) => r)
+          .catch((e) => {
+            throw e;
+          });
+      } else if (order.cargo === Cargos.FIVE_POST) {
+        // placeholder promise to be resolved when batch result returns
+        fiveRefs.push(order.reference);
+        fiveIndices.push(idx);
+        promises[idx] = new Promise((resolve, reject) => {
+          fiveResolvers.push({ resolve, reject });
+        });
+      } else {
+        promises[idx] = Promise.resolve(undefined);
+      }
+    });
+
+    // If we have any FIVE_POST refs, fetch them in a single call and resolve placeholders
+    if (fiveRefs.length > 0) {
+      this.fiveService
+        .getOrderStatus(fiveRefs)
+        .then((results) => {
+          const map = new Map<string, any>();
+          for (const item of results || [])
+            if (item && item.senderOrderId) map.set(item.senderOrderId, item);
+          for (let i = 0; i < fiveRefs.length; i++) {
+            const ref = fiveRefs[i];
+            const resolver = fiveResolvers[i];
+            const val = map.get(ref) ?? null;
+            resolver.resolve(val);
+          }
+        })
+        .catch((err) => {
+          for (const r of fiveResolvers) r.reject(err);
+        });
+    }
+
+    return await Promise.allSettled(promises);
   }
 
   async getDataForRevise(): Promise<RevisingOrderData[]> {
@@ -312,13 +353,13 @@ export class AppService {
         error instanceof Error
           ? error.message
           : 'Error in Promise.all while gathering data';
-      await this.mailService.sendToAdmin('Error in Promise.all', message);
+      await this.botService.sendEmployeeMessage(`Promise.all: ${message}`);
       throw new HttpException(error, HttpStatus.SERVICE_UNAVAILABLE);
     });
 
     const revisingOrdersData: RevisingOrderData[] = ordersInTransit.map(
       (order) => {
-        const cargo = recognizeCargo(order.shipping_number);
+        const cargo = recognizeCargo(order.shipping_number, order.reference);
         const unifiedState = unifyShopState(order.current_state);
         return {
           id: order.id,
@@ -359,6 +400,14 @@ export class AppService {
               currState =
                 settled.value.OperationHistoryData.historyRecord.at(-1)
                   .OperationParameters.OperAttr.Name;
+            }
+            break;
+          }
+          case Cargos.FIVE_POST: {
+            // After batching, settled.value is the single GetOrderStatusResponseItem or null
+            if (settled.value) {
+              const item = settled.value as any;
+              currState = item.executionStatus;
             }
             break;
           }

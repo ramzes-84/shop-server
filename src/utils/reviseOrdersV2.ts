@@ -1,4 +1,5 @@
 import { DpdParselStatus } from 'src/dpd/dto/dpd.dto';
+import { FivePostParcelStatus } from 'src/five/dto/five.dto';
 import { PostParcelStatus } from 'src/post/dto/post-soap.dto';
 import { UnifiedOrderState } from 'src/types/common';
 import { YaParcelStatus } from 'src/ya/dto/ya.dto';
@@ -34,6 +35,27 @@ export function unifyParcelStatus(status: string) {
     case PostParcelStatus.ParcelLockerReserved:
     case PostParcelStatus.SentToPickupPoint:
     case PostParcelStatus.Sorting:
+    case FivePostParcelStatus.CREATED:
+    case FivePostParcelStatus.APPROVED:
+    case FivePostParcelStatus.RECEIVED_IN_WAREHOUSE_BY_PLACES:
+    case FivePostParcelStatus.PRESORTED:
+    case FivePostParcelStatus.RECEIVED_IN_WAREHOUSE_IN_DETAILS:
+    case FivePostParcelStatus.RECEIVED_IN_TRANSIT_WAREHOUSE:
+    case FivePostParcelStatus.SORTED_IN_WAREHOUSE:
+    case FivePostParcelStatus.PLACED_IN_CONSOLIDATION_CELL_IN_WAREHOUSE:
+    case FivePostParcelStatus.COMPLECTED_IN_WAREHOUSE:
+    case FivePostParcelStatus.READY_TO_BE_SHIPPED_FROM_WAREHOUSE:
+    case FivePostParcelStatus.SHIPPED:
+    case FivePostParcelStatus.RECEIVED_IN_STORE:
+    case FivePostParcelStatus.RECEIVED_IN_COURIER_WAREHOUSE:
+    case FivePostParcelStatus.READY_TO_BE_SHIPPED_FROM_COURIER_WAREHOUSE:
+    case FivePostParcelStatus.SHIPPED_FROM_COURIER_WAREHOUSE:
+    case FivePostParcelStatus.RECEIVED_BY_COURIER:
+    case FivePostParcelStatus.RECEIVED_IN_DROP:
+    case FivePostParcelStatus.READY_FOR_WITHDRAW_FROM_PICKUP_POINT:
+    case FivePostParcelStatus.RETURNED_TO_PARTNER:
+    case FivePostParcelStatus.RETURNING_BY_COURIER:
+    case FivePostParcelStatus.WAITING_FOR_REPICKUP:
       return UnifiedOrderState.IN_TRANSIT;
 
     case YaParcelStatus.DELIVERY_ARRIVED_PICKUP_POINT:
@@ -44,6 +66,7 @@ export function unifyParcelStatus(status: string) {
     case PostParcelStatus.ArrivedAtParcelLocker:
     case PostParcelStatus.NoticeSent:
     case PostParcelStatus.NoticeDelivered:
+    case FivePostParcelStatus.PLACED_IN_POSTAMAT:
       return UnifiedOrderState.WAITING;
 
     case YaParcelStatus.DELIVERY_TRANSMITTED_TO_RECIPIENT:
@@ -55,6 +78,7 @@ export function unifyParcelStatus(status: string) {
     case PostParcelStatus.DeliveredViaParcelLocker:
     case PostParcelStatus.DeliveredToRecipientByPEP:
     case PostParcelStatus.DeliveredViaQr:
+    case FivePostParcelStatus.PICKED_UP:
       return UnifiedOrderState.DELIVERED;
 
     case YaParcelStatus.VALIDATING_ERROR:
@@ -80,6 +104,14 @@ export function unifyParcelStatus(status: string) {
     case DpdParselStatus.Lost:
     case DpdParselStatus.Problem:
     case PostParcelStatus.Undefined:
+    case FivePostParcelStatus.REJECTED:
+    case FivePostParcelStatus.WITHDRAWN_FROM_PICKUP_POINT:
+    case FivePostParcelStatus.LOST:
+    case FivePostParcelStatus.READY_FOR_UTILIZE:
+    case FivePostParcelStatus.UTILIZED:
+    case FivePostParcelStatus.READY_FOR_RETURN:
+    case FivePostParcelStatus.PROBLEM:
+    case FivePostParcelStatus.CANCELLED:
       return UnifiedOrderState.PROBLEM;
 
     default:
