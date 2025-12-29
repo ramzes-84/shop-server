@@ -1,4 +1,3 @@
-import { BoxberrySourceStation, CreateBxbParcelDto } from 'src/bxb/dto/bxb.dto';
 import { CreateYaOrderDto, PlatformStation } from 'src/ya/dto/ya.dto';
 
 export const orderConverterResult: CreateYaOrderDto = {
@@ -104,52 +103,4 @@ export const orderConverterResult: CreateYaOrderDto = {
   },
   last_mile_policy: 'self_pickup',
   particular_items_refuse: false,
-};
-
-export const bxbOrderConverterResult: CreateBxbParcelDto['sdata'] = {
-  items: [
-    {
-      id: '000001',
-      name: 'Основа',
-      nds: '0',
-      price: '1189',
-      quantity: '1',
-    },
-    {
-      id: '000002',
-      name: 'Румяна',
-      nds: '0',
-      price: '511',
-      quantity: '1',
-    },
-    {
-      id: '000003',
-      name: 'Пудра',
-      nds: '0',
-      price: '704',
-      quantity: '1',
-    },
-  ],
-  weights: {
-    weight: '153',
-    x: '5',
-    y: '10',
-    z: '15',
-  },
-  customer: {
-    fio: 'Doe John',
-    phone: '00000000000',
-    email: 'test@test.com',
-  },
-  issue: 0,
-  order_id: 'TESTREFERENCE',
-  delivery_sum: '200.000000',
-  sender_name: 'Mineral Magic',
-  shop: {
-    name: 'destination123',
-    name1: BoxberrySourceStation.TUL,
-  },
-  vid: '1',
-  payment_sum: '0',
-  price: '2603.470000',
 };

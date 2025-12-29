@@ -1,4 +1,4 @@
-import { calcDiscount, convertOrder, convertOrderToBxb } from './convertOrder';
+import { calcDiscount, convertOrder } from './convertOrder';
 import { CreateYaOrderDto, PlatformStation } from 'src/ya/dto/ya.dto';
 import {
   addressDetails,
@@ -6,11 +6,7 @@ import {
   orderDetails,
   shippingDetails,
 } from 'src/__test-data__/shop-data';
-import {
-  bxbOrderConverterResult,
-  orderConverterResult,
-} from 'src/__test-data__/converter-result';
-import { CreateBxbParcelDto } from 'src/bxb/dto/bxb.dto';
+import { orderConverterResult } from 'src/__test-data__/converter-result';
 
 const destination = 'destination123';
 
@@ -110,25 +106,5 @@ describe('calcDiscount', () => {
     const discount = '0.005';
     const result = calcDiscount(total, discount);
     expect(result).toBe(0.5);
-  });
-});
-
-describe('convertOrderToBxb', () => {
-  it('should convert order and customer details to CreateBxbParcelDto', () => {
-    const newOrderDetails = { ...orderDetails };
-
-    const expected: CreateBxbParcelDto['sdata'] = {
-      ...bxbOrderConverterResult,
-    };
-
-    const result = convertOrderToBxb(
-      newOrderDetails,
-      addressDetails,
-      customerDetails,
-      shippingDetails.order_carriers[0],
-      destination,
-    );
-
-    expect(result).toEqual(expected);
   });
 });

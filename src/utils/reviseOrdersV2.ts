@@ -1,4 +1,3 @@
-import { BxbParselStatus } from 'src/bxb/dto/bxb.dto';
 import { DpdParselStatus } from 'src/dpd/dto/dpd.dto';
 import { PostParcelStatus } from 'src/post/dto/post-soap.dto';
 import { UnifiedOrderState } from 'src/types/common';
@@ -22,20 +21,6 @@ export function unifyParcelStatus(status: string) {
     case YaParcelStatus.DELIVERY_AT_START:
     case YaParcelStatus.DELIVERY_AT_START_SORT:
     case YaParcelStatus.DELIVERY_TRANSPORTATION:
-    case BxbParselStatus.LoadedRegistry:
-    case BxbParselStatus.OrderTransferredForDelivery:
-    case BxbParselStatus.SentToSortingTerminal:
-    case BxbParselStatus.TransferredForSorting:
-    case BxbParselStatus.SentToDestinationCity:
-    case BxbParselStatus.AcceptedForDelivery:
-    case BxbParselStatus.TransferredForDeliveryToPickupPoint:
-    case BxbParselStatus.InRecipientCity:
-    case BxbParselStatus.AtRecipientBranch:
-    case BxbParselStatus.EnRouteFromBranchToTerminal:
-    case BxbParselStatus.EnRouteToTerminal:
-    case BxbParselStatus.AtSenderTerminal:
-    case BxbParselStatus.TransferredForCourierDelivery:
-    case BxbParselStatus.CourierWillCall:
     case DpdParselStatus.OnTerminal:
     case DpdParselStatus.OnTerminalPickup:
     case DpdParselStatus.OnRoad:
@@ -54,7 +39,6 @@ export function unifyParcelStatus(status: string) {
     case YaParcelStatus.DELIVERY_ARRIVED_PICKUP_POINT:
     case YaParcelStatus.DELIVERY_STORAGE_PERIOD_EXTENDED:
     case YaParcelStatus.CONFIRMATION_CODE_RECEIVED:
-    case BxbParselStatus.ArrivedAtPickupPoint:
     case DpdParselStatus.OnTerminalDelivery:
     case PostParcelStatus.ArrivedAtDeliveryPoint:
     case PostParcelStatus.ArrivedAtParcelLocker:
@@ -66,7 +50,6 @@ export function unifyParcelStatus(status: string) {
     case YaParcelStatus.PARTICULARLY_DELIVERED:
     case YaParcelStatus.DELIVERY_DELIVERED:
     case YaParcelStatus.FINISHED:
-    case BxbParselStatus.Issued:
     case DpdParselStatus.Delivered:
     case PostParcelStatus.DeliveredToRecipient:
     case PostParcelStatus.DeliveredViaParcelLocker:
@@ -90,11 +73,6 @@ export function unifyParcelStatus(status: string) {
     case YaParcelStatus.RETURN_ARRIVED_DELIVERY:
     case YaParcelStatus.RETURN_READY_FOR_PICKUP:
     case YaParcelStatus.RETURN_RETURNED:
-    case BxbParselStatus.PreparingForReturn:
-    case BxbParselStatus.SentToReceivingPoint:
-    case BxbParselStatus.ReturnedToReceivingPoint:
-    case BxbParselStatus.ReturnedToIM:
-    case BxbParselStatus.CustomProblem:
     case DpdParselStatus.NewOrderByDPD:
     case DpdParselStatus.NewOrderByClient:
     case DpdParselStatus.ReturnedFromDelivery:

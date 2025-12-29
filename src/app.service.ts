@@ -4,15 +4,12 @@ import { YaService } from './ya/ya.service';
 import { CreateYaOrderDto } from './ya/dto/ya.dto';
 import {
   convertOrder,
-  convertOrderToBxb,
   convertOrderToDpd,
   convertYaOrderToCostReq,
 } from './utils/convertOrder';
 import { parseYaHistoryToHtml } from './utils/parseYaHistoryToHtml';
 import { CreateOrderQueries } from './validation/yandex';
 import { MailService } from './mail/mail.service';
-import { BxbService } from './bxb/bxb.service';
-import { BxbParselStatus } from './bxb/dto/bxb.dto';
 import { CashService } from './cash/cash.service';
 import { convertOrderShopToCash } from './utils/convert-order-shop-to-cash';
 import { generateCashInvoiceMessage } from './utils/messages';
@@ -29,6 +26,7 @@ import { unifyParcelStatus, unifyShopState } from './utils/reviseOrdersV2';
 import { PostService } from './post/post.service';
 import { findPointId } from './utils/find-point-from-messages';
 import { checkDeliveryCost } from './utils/check-delivery-cost';
+import { FiveService } from './five/five.service';
 
 @Injectable()
 export class AppService {
@@ -59,11 +57,11 @@ export class AppService {
     private readonly shopService: ShopService,
     private readonly yaService: YaService,
     private readonly mailService: MailService,
-    private readonly bxbService: BxbService,
     private readonly cashService: CashService,
     private readonly botService: BotService,
     private readonly dpdService: DpdService,
     private readonly postService: PostService,
+    private readonly fiveService: FiveService,
   ) {
     this.unifiedStateTargetMap = {
       [UnifiedOrderState.IN_TRANSIT]:
@@ -148,60 +146,6 @@ export class AppService {
         true,
         this.botService.buGroup,
       );
-    }
-  }
-
-  async createBxbOrder({
-    order,
-  }: CreateOrderQueries): Promise<TransferInterface> {
-    try {
-      const { addressDetails, customerDetails, orderDetails } =
-        await this.getOrderBasicInfo(order);
-
-      const [shippingDetails, threadId] = await Promise.all([
-        this.shopService.getOrderCarrierInfo(+order),
-        this.shopService.getMessagesThread(+order),
-      ]);
-
-      const destination = findPointId(
-        await this.shopService.getOrderMessages(threadId),
-      );
-
-      if (!destination) {
-        return {
-          ok: false,
-          data: 'Error: destination point not found',
-        };
-      }
-
-      const bxbOrderData = convertOrderToBxb(
-        orderDetails,
-        addressDetails,
-        customerDetails,
-        shippingDetails,
-        destination,
-      );
-
-      const [{ track }, { price }] = await Promise.all([
-        await this.bxbService.createBoxberryParcel(bxbOrderData),
-        await this.bxbService.getParcelCost(bxbOrderData),
-      ]);
-
-      this.compareDeliveryCost(
-        orderDetails.total_shipping,
-        price,
-        bxbOrderData.order_id,
-      );
-
-      return {
-        ok: true,
-        data: { track },
-      };
-    } catch (error) {
-      return {
-        ok: false,
-        data: error,
-      };
     }
   }
 
@@ -340,13 +284,6 @@ export class AppService {
       revisingOrderData.map((order) => {
         if (order.cargo === Cargos.YA) {
           return undefined;
-        } else if (order.cargo === Cargos.BXB) {
-          return this.bxbService
-            .getParcelStatuses(order.track)
-            .then((r) => r)
-            .catch((e) => {
-              throw e;
-            });
         } else if (order.cargo === Cargos.DPD) {
           return this.dpdService
             .getStatesByDPDOrder(order.track)
@@ -411,14 +348,6 @@ export class AppService {
               .at(0)?.state.status;
             break;
           }
-          case Cargos.BXB: {
-            if (settled.value instanceof Array && settled.value.length) {
-              currState = settled.value.at(-1).Name;
-            } else {
-              currState = BxbParselStatus.CustomProblem;
-            }
-            break;
-          }
           case Cargos.DPD: {
             if ('return' in settled.value) {
               currState = settled.value.return.states.at(-1).newState;
@@ -436,8 +365,6 @@ export class AppService {
           default:
             break;
         }
-      } else {
-        currState = BxbParselStatus.Unknown;
       }
 
       order.actualCargoState = currState;
@@ -634,12 +561,12 @@ export class AppService {
   }
 
   async testEndpoint() {
-    return await this.mailService.sendToAdmin(
-      'Test email from shop-server',
-      'If you see this, email sending works fine.',
-    );
+    return await this.fiveService.getOrderStatus(['1', '2']);
+    // return await this.mailService.sendToAdmin(
+    //   'Test email from shop-server',
+    //   'If you see this, email sending works fine.',
+    // );
     // return await this.shopService.getOrderInfo(1);
-    // return await this.bxbService.getParcelStatuses('PUXQMWBBU');
     // return await this.postService.getPostParcelData('80082713220575');
     // return await this.dpdService.getStatesByDPDOrder('');
   }

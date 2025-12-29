@@ -23,12 +23,6 @@ export class AppController {
     return this.appService.createYaOrder(query);
   }
 
-  @Post('boxberry/create')
-  @UseGuards(AuthGuard('bearer'))
-  bxbOrderCreate(@Query() query: CreateOrderQueries) {
-    return this.appService.createBxbOrder(query);
-  }
-
   @Post('dpd/create')
   @UseGuards(AuthGuard('bearer'))
   dpdOrderCreate(@Query() query: CreateOrderQueries) {

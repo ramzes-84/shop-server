@@ -9,11 +9,7 @@ import {
   YaOrderCreationRes,
   YaOrderInfoRes,
 } from './ya/dto/ya.dto';
-import {
-  convertOrder,
-  convertOrderToBxb,
-  convertOrderToDpd,
-} from './utils/convertOrder';
+import { convertOrder, convertOrderToDpd } from './utils/convertOrder';
 import {
   addressDetails,
   customerDetails,
@@ -23,11 +19,11 @@ import {
 } from 'src/__test-data__/shop-data';
 import { orderConverterResult } from './__test-data__/converter-result';
 import { yaOrderHistory } from './__test-data__/ya-data';
-import { BxbService } from './bxb/bxb.service';
 import { CashService } from './cash/cash.service';
 import { BotService } from './bot/bot.service';
 import { DpdService } from './dpd/dpd.service';
 import { PostService } from './post/post.service';
+import { FiveService } from './five/five.service';
 import { yaOrderInfo } from './__test-data__/ya-order-info';
 import { checkDeliveryCost } from './utils/check-delivery-cost';
 import { Cargos, RevisingOrderData, UnifiedOrderState } from './types/common';
@@ -54,9 +50,6 @@ const checkDeliveryCostMock = checkDeliveryCost as jest.MockedFunction<
 >;
 const convertOrderMock = convertOrder as jest.MockedFunction<
   typeof convertOrder
->;
-const convertOrderToBxbMock = convertOrderToBxb as jest.MockedFunction<
-  typeof convertOrderToBxb
 >;
 const convertOrderToDpdMock = convertOrderToDpd as jest.MockedFunction<
   typeof convertOrderToDpd
@@ -95,7 +88,6 @@ describe('AppService', () => {
   let yaService: YaService;
   let mailService: MailService;
   let botService: BotService;
-  let bxbService: BxbService;
   let cashService: CashService;
   let dpdService: DpdService;
 
@@ -123,16 +115,6 @@ describe('AppService', () => {
             getHistoryById: jest.fn(),
             createYaOrder: jest.fn(),
             getOrderInfo: jest.fn(),
-            getParcelCost: jest.fn(),
-          },
-        },
-        {
-          provide: BxbService,
-          useValue: {
-            getParcelsInInterval: jest.fn(),
-            getInProgressParcels: jest.fn(),
-            getParcelStatuses: jest.fn(),
-            createBoxberryParcel: jest.fn(),
             getParcelCost: jest.fn(),
           },
         },
@@ -169,6 +151,14 @@ describe('AppService', () => {
             send: jest.fn(),
           },
         },
+        {
+          provide: FiveService,
+          useValue: {
+            getOrderStatus: jest.fn(),
+            requestWithAuth: jest.fn(),
+            getToken: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -177,7 +167,6 @@ describe('AppService', () => {
     yaService = module.get<YaService>(YaService);
     mailService = module.get<MailService>(MailService);
     botService = module.get<BotService>(BotService);
-    bxbService = module.get<BxbService>(BxbService);
     cashService = module.get<CashService>(CashService);
     dpdService = module.get<DpdService>(DpdService);
   });
@@ -370,73 +359,6 @@ describe('AppService', () => {
     });
   });
 
-  describe('createBxbOrder', () => {
-    it('creates a Boxberry parcel and compares costs', async () => {
-      const basicInfo = buildBasicOrderInfo();
-      const destination = 'BXB-POINT';
-      const bxbPayload = { order_id: 'ORD-55' } as any;
-      const carrierInfo = { ...shippingDetails.order_carriers[0] } as any;
-      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
-      jest
-        .spyOn(shopService, 'getOrderCarrierInfo')
-        .mockResolvedValue(carrierInfo);
-      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(77);
-      jest
-        .spyOn(shopService, 'getOrderMessages')
-        .mockResolvedValue(orderMessages);
-      findPointIdMock.mockReturnValue(destination);
-      convertOrderToBxbMock.mockReturnValue(bxbPayload);
-      jest
-        .spyOn(bxbService, 'createBoxberryParcel')
-        .mockResolvedValue({ track: 'BBX-42' } as any);
-      jest
-        .spyOn(bxbService, 'getParcelCost')
-        .mockResolvedValue({ price: '420' } as any);
-      const compareSpy = jest
-        .spyOn(service, 'compareDeliveryCost')
-        .mockResolvedValue(undefined);
-
-      const result = await service.createBxbOrder({ order: '55' });
-
-      expect(convertOrderToBxbMock).toHaveBeenCalledWith(
-        basicInfo.orderDetails,
-        basicInfo.addressDetails,
-        basicInfo.customerDetails,
-        carrierInfo,
-        destination,
-      );
-      expect(bxbService.createBoxberryParcel).toHaveBeenCalledWith(bxbPayload);
-      expect(bxbService.getParcelCost).toHaveBeenCalledWith(bxbPayload);
-      expect(compareSpy).toHaveBeenCalledWith(
-        basicInfo.orderDetails.total_shipping,
-        '420',
-        bxbPayload.order_id,
-      );
-      expect(result).toEqual({ ok: true, data: { track: 'BBX-42' } });
-    });
-
-    it('returns error when destination is missing', async () => {
-      const basicInfo = buildBasicOrderInfo();
-      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
-      jest
-        .spyOn(shopService, 'getOrderCarrierInfo')
-        .mockResolvedValue(shippingDetails.order_carriers[0]);
-      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(77);
-      jest
-        .spyOn(shopService, 'getOrderMessages')
-        .mockResolvedValue(orderMessages);
-      findPointIdMock.mockReturnValue(undefined);
-
-      const result = await service.createBxbOrder({ order: '12' });
-
-      expect(result).toEqual({
-        ok: false,
-        data: 'Error: destination point not found',
-      });
-      expect(convertOrderToBxbMock).not.toHaveBeenCalled();
-    });
-  });
-
   describe('createDpdOrder', () => {
     it('creates DPD order and returns track number', async () => {
       const basicInfo = buildBasicOrderInfo();
@@ -523,7 +445,7 @@ describe('AppService', () => {
       const orders = [
         buildRevisingOrder({
           reference: 'REF-PROB',
-          cargo: Cargos.BXB,
+          cargo: Cargos.YA,
           unifiedCargoState: UnifiedOrderState.PROBLEM,
           actualCargoState: 'Problem',
         }),
