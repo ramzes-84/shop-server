@@ -60,7 +60,8 @@ export enum PlatformStation {
   RND = 'c6e86b41-a146-47aa-a619-857832465049', //Gorsov
   // RND = 'af1356a6-5b4e-42e2-b85d-2c67a11a1a7c', //Suzd
   // RND = '3a9bea08-e463-49fb-93af-fad094ff3db9', //Selmash
-  TUL = '8c78c9db-dd0f-45c4-851a-7df333b8c089',
+  // TUL = '8c78c9db-dd0f-45c4-851a-7df333b8c089', //Lenina 122
+  TUL = 'cff4e1c7-3d7c-4b8d-877f-26e96da0d466',
   TEST = 'fbed3aa1-2cc6-4370-ab4d-59c5cc9bb924',
 }
 
