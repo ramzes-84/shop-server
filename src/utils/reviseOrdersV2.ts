@@ -56,6 +56,7 @@ export function unifyParcelStatus(status: string) {
     case FivePostParcelStatus.RETURNED_TO_PARTNER:
     case FivePostParcelStatus.RETURNING_BY_COURIER:
     case FivePostParcelStatus.WAITING_FOR_REPICKUP:
+    case FivePostParcelStatus.WITHDRAWN_FROM_PICKUP_POINT:
       return UnifiedOrderState.IN_TRANSIT;
 
     case YaParcelStatus.DELIVERY_ARRIVED_PICKUP_POINT:
@@ -105,7 +106,6 @@ export function unifyParcelStatus(status: string) {
     case DpdParselStatus.Problem:
     case PostParcelStatus.Undefined:
     case FivePostParcelStatus.REJECTED:
-    case FivePostParcelStatus.WITHDRAWN_FROM_PICKUP_POINT:
     case FivePostParcelStatus.LOST:
     case FivePostParcelStatus.READY_FOR_UTILIZE:
     case FivePostParcelStatus.UTILIZED:
