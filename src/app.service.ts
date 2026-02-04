@@ -123,7 +123,7 @@ export class AppService {
       const { addressDetails, customerDetails, orderDetails } =
         await this.getOrderBasicInfo(order);
       const cashInvoiceInfo = await this.cashService.createCashInvoice(
-        convertOrderShopToCash(orderDetails, customerDetails),
+        convertOrderShopToCash(orderDetails, customerDetails, addressDetails),
       );
       message = generateCashInvoiceMessage(
         orderDetails,

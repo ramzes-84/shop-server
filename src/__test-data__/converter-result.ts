@@ -98,7 +98,7 @@ export const orderConverterResult: CreateYaOrderDto = {
   recipient_info: {
     first_name: 'Doe',
     last_name: 'John',
-    phone: '00000000000',
+    phone: '79000000000',
     email: 'test@test.com',
   },
   last_mile_policy: 'self_pickup',

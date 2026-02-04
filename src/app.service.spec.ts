@@ -455,6 +455,7 @@ describe('AppService', () => {
       expect(convertOrderShopToCashMock).toHaveBeenCalledWith(
         basicInfo.orderDetails,
         basicInfo.customerDetails,
+        basicInfo.addressDetails,
       );
       expect(cashService.createCashInvoice).toHaveBeenCalledWith(cashPayload);
       expect(generateCashInvoiceMessageMock).toHaveBeenCalledWith(

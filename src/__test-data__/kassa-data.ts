@@ -111,7 +111,8 @@ export const invoiceRequest: CreateCashInvoiceDto = {
     },
   ],
   delivery_method_data: {
-    type: 'self',
+    type: 'sms',
+    phone: '79000000000',
   },
   locale: 'ru_RU',
   expires_at: '2025-01-04T05:58:09.064Z',

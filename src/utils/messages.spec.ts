@@ -10,7 +10,7 @@ describe('generateCashInvoiceMessage', () => {
     firstname: 'Olga',
   } as CustomerInfoResDto['customer'];
   const cashInvoiceInfo = {
-    delivery_method: { type: 'self', url: 'https://pay.example/REF-42' },
+    delivery_method: { type: 'sms', url: 'https://pay.example/REF-42' },
   } as CashInvoiceInfoDto;
   const addressDetails = {
     phone_mobile: '+7 (999) 123-45-67',
