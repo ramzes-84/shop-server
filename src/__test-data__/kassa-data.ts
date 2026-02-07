@@ -111,7 +111,7 @@ export const invoiceRequest: CreateCashInvoiceDto = {
     },
   ],
   delivery_method_data: {
-    type: 'sms',
+    type: 'self',
     phone: '79000000000',
   },
   locale: 'ru_RU',

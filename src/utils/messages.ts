@@ -9,13 +9,19 @@ export function generateCashInvoiceMessage(
   cashInvoiceInfo: CashInvoiceInfoDto,
   addressDetails: AddressInfoResDto['address'],
 ): string {
-  return `
+  if (cashInvoiceInfo.delivery_method.type === 'self') {
+    return `
 Прошу отправить SMS о выставлении счёта ${normalizePhoneNumber(addressDetails.phone_mobile)}
 \`\`\`
 Здравствуйте, ${customerDetails.firstname}!
 Счёт для заказа №${orderDetails.reference} выставлен. Для оплаты перейдите по ссылке: ${cashInvoiceInfo.delivery_method.url}
 \`\`\`
 `;
+  }
+
+  if (cashInvoiceInfo.delivery_method.type === 'sms') {
+    return `SMS о выставлении счёта для заказа №${orderDetails.reference} отправлено.`;
+  }
 }
 
 function normalizePhoneNumber(phone: string): string {

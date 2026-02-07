@@ -35,6 +35,7 @@ export function convertOrderShopToCash(
   orderDetails: ShopOrderInfo,
   customerDetails: CustomerInfo,
   addressDetails: AddressInfo,
+  sms: boolean = false,
 ): CreateCashInvoiceDto {
   const discount =
     calcDiscount(orderDetails.total_products, orderDetails.total_discounts) ||
@@ -121,7 +122,7 @@ export function convertOrderShopToCash(
     },
     cart: goods,
     delivery_method_data: {
-      type: 'sms',
+      type: sms ? 'sms' : 'self',
       phone: normalizePhoneToE164(addressDetails.phone_mobile) || '79081907675',
     },
     locale: 'ru_RU',

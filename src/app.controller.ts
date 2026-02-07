@@ -1,9 +1,9 @@
-import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Body, Post, UseGuards } from '@nestjs/common';
 import { AppService } from './app.service';
 import {
-  CreateInvoiceQueries,
   CreateOrderQueries,
   OrderIdParams,
+  CreateCashRequest,
 } from './validation/yandex';
 import { AuthGuard } from '@nestjs/passport';
 
@@ -19,20 +19,14 @@ export class AppController {
 
   @Post('yandex/create')
   @UseGuards(AuthGuard('bearer'))
-  yaOrderCreate(@Query() query: CreateOrderQueries) {
-    return this.appService.createYaOrder(query);
-  }
-
-  @Post('dpd/create')
-  @UseGuards(AuthGuard('bearer'))
-  dpdOrderCreate(@Query() query: CreateOrderQueries) {
-    return this.appService.createDpdOrder(query);
+  async yaOrderCreate(@Body() body: CreateOrderQueries) {
+    return this.appService.createYaOrder(body);
   }
 
   @Post('cash/create')
   @UseGuards(AuthGuard('bearer'))
-  cashInvoiceCreate(@Query() query: CreateInvoiceQueries) {
-    return this.appService.createCashInvoice(query);
+  async cashInvoiceCreate(@Body() body: CreateCashRequest) {
+    return this.appService.createCashInvoice(body);
   }
 
   @Get('yandex/tracking/:id')

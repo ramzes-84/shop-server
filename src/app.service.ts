@@ -2,13 +2,9 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ShopService } from './shop/shop.service';
 import { YaService } from './ya/ya.service';
 import { CreateYaOrderDto } from './ya/dto/ya.dto';
-import {
-  convertOrder,
-  convertOrderToDpd,
-  convertYaOrderToCostReq,
-} from './utils/convertOrder';
+import { convertOrder, convertYaOrderToCostReq } from './utils/convertOrder';
 import { parseYaHistoryToHtml } from './utils/parseYaHistoryToHtml';
-import { CreateOrderQueries } from './validation/yandex';
+import { CreateCashRequest, CreateOrderQueries } from './validation/yandex';
 import { MailService } from './mail/mail.service';
 import { CashService } from './cash/cash.service';
 import { convertOrderShopToCash } from './utils/convert-order-shop-to-cash';
@@ -116,26 +112,36 @@ export class AppService {
   }
 
   async createCashInvoice({
-    order,
-  }: Pick<CreateOrderQueries, 'order'>): Promise<TransferInterface> {
+    orderId,
+    sms,
+  }: CreateCashRequest): Promise<TransferInterface> {
     let message: string;
     try {
       const { addressDetails, customerDetails, orderDetails } =
-        await this.getOrderBasicInfo(order);
+        await this.getOrderBasicInfo(orderId);
       const cashInvoiceInfo = await this.cashService.createCashInvoice(
-        convertOrderShopToCash(orderDetails, customerDetails, addressDetails),
+        convertOrderShopToCash(
+          orderDetails,
+          customerDetails,
+          addressDetails,
+          sms,
+        ),
       );
+
       message = generateCashInvoiceMessage(
         orderDetails,
         customerDetails,
         cashInvoiceInfo,
         addressDetails,
       );
+
       return {
         ok: true,
         data: cashInvoiceInfo.delivery_method,
       };
     } catch (error) {
+      message = `❗ Ошибка при создании счёта для заказа ${orderId}: ${error instanceof Error ? error.message : String(error ?? 'Unknown error')}`;
+
       return {
         ok: false,
         data: error,
@@ -161,68 +167,16 @@ export class AppService {
     }
   }
 
-  async createDpdOrder({
-    order,
-  }: CreateOrderQueries): Promise<TransferInterface> {
-    try {
-      const { addressDetails, customerDetails, orderDetails } =
-        await this.getOrderBasicInfo(order);
-
-      const [shippingDetails, threadId] = await Promise.all([
-        this.shopService.getOrderCarrierInfo(+order),
-        this.shopService.getMessagesThread(+order),
-      ]);
-
-      const destination = findPointId(
-        await this.shopService.getOrderMessages(threadId),
-      );
-
-      if (!destination) {
-        return {
-          ok: false,
-          data: 'Error: destination point not found',
-        };
-      }
-
-      const dpdOrderData = convertOrderToDpd(
-        orderDetails,
-        addressDetails,
-        customerDetails,
-        shippingDetails,
-        destination,
-      );
-
-      const orderInfo = await this.dpdService.createOrder(dpdOrderData);
-
-      if ('orderNum' in orderInfo.return) {
-        return {
-          ok: true,
-          data: { track: orderInfo.return.orderNum },
-        };
-      } else {
-        return {
-          ok: false,
-          data: orderInfo.return.errorMessage,
-        };
-      }
-    } catch (error) {
-      return {
-        ok: false,
-        data: error,
-      };
-    }
-  }
-
   async createYaOrder({
-    order,
+    orderId,
   }: CreateOrderQueries): Promise<TransferInterface> {
     try {
       const { addressDetails, customerDetails, orderDetails } =
-        await this.getOrderBasicInfo(order);
+        await this.getOrderBasicInfo(orderId);
 
       const [shippingDetails, threadId] = await Promise.all([
-        this.shopService.getOrderCarrierInfo(+order),
-        this.shopService.getMessagesThread(+order),
+        this.shopService.getOrderCarrierInfo(+orderId),
+        this.shopService.getMessagesThread(+orderId),
       ]);
 
       const destination = findPointId(

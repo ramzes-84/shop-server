@@ -1,4 +1,11 @@
-import { IsDefined, IsString, Length, Matches } from 'class-validator';
+import {
+  IsDefined,
+  IsString,
+  Length,
+  Matches,
+  IsOptional,
+  IsBoolean,
+} from 'class-validator';
 
 export class OrderIdParams {
   @IsDefined({ message: 'id is required' })
@@ -9,15 +16,19 @@ export class OrderIdParams {
 }
 
 export class CreateOrderQueries {
-  @IsDefined({ message: 'order is required' })
-  @IsString({ message: 'order must be a string' })
-  @Length(5, 5, { message: 'order is incorrect' })
-  order: string;
+  @IsDefined({ message: 'orderId is required' })
+  @IsString({ message: 'orderId must be a string' })
+  @Length(5, 5, { message: 'orderId is incorrect' })
+  orderId: string;
 }
 
-export class CreateInvoiceQueries {
-  @IsDefined({ message: 'order is required' })
-  @IsString({ message: 'order must be a string' })
-  @Length(5, 5, { message: 'order is incorrect' })
-  order: string;
+export class CreateCashRequest {
+  @IsDefined({ message: 'orderId is required' })
+  @IsString({ message: 'orderId must be a string' })
+  @Length(5, 5, { message: 'orderId is incorrect' })
+  orderId: string;
+
+  @IsOptional()
+  @IsBoolean({ message: 'sms must be boolean' })
+  sms?: boolean;
 }

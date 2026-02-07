@@ -9,7 +9,7 @@ import {
   YaOrderCreationRes,
   YaOrderInfoRes,
 } from './ya/dto/ya.dto';
-import { convertOrder, convertOrderToDpd } from './utils/convertOrder';
+import { convertOrder } from './utils/convertOrder';
 import {
   addressDetails,
   customerDetails,
@@ -51,9 +51,6 @@ const checkDeliveryCostMock = checkDeliveryCost as jest.MockedFunction<
 const convertOrderMock = convertOrder as jest.MockedFunction<
   typeof convertOrder
 >;
-const convertOrderToDpdMock = convertOrderToDpd as jest.MockedFunction<
-  typeof convertOrderToDpd
->;
 const convertOrderShopToCashMock =
   convertOrderShopToCash as jest.MockedFunction<typeof convertOrderShopToCash>;
 const generateCashInvoiceMessageMock =
@@ -89,7 +86,6 @@ describe('AppService', () => {
   let mailService: MailService;
   let botService: BotService;
   let cashService: CashService;
-  let dpdService: DpdService;
   let fiveService: any;
   let postService: any;
 
@@ -170,7 +166,6 @@ describe('AppService', () => {
     mailService = module.get<MailService>(MailService);
     botService = module.get<BotService>(BotService);
     cashService = module.get<CashService>(CashService);
-    dpdService = module.get<DpdService>(DpdService);
     fiveService = module.get<any>(FiveService);
     postService = module.get<any>(PostService);
   });
@@ -355,7 +350,7 @@ describe('AppService', () => {
       convertOrderMock.mockReturnValue(mockYaOrderData);
 
       const createOrderQueries: CreateOrderQueries = {
-        order: '1',
+        orderId: '1',
       };
 
       const result = await service.createYaOrder(createOrderQueries);
@@ -385,7 +380,7 @@ describe('AppService', () => {
       jest.spyOn(shopService, 'getOrderInfo').mockRejectedValue(mockError);
 
       const createOrderQueries: CreateOrderQueries = {
-        order: '1',
+        orderId: '1',
       };
 
       const result = await service.createYaOrder(createOrderQueries);
@@ -450,12 +445,13 @@ describe('AppService', () => {
         .mockResolvedValue(invoiceResponse);
       generateCashInvoiceMessageMock.mockReturnValue('Invoice ready');
 
-      const result = await service.createCashInvoice({ order: '42' });
+      const result = await service.createCashInvoice({ orderId: '42' } as any);
 
       expect(convertOrderShopToCashMock).toHaveBeenCalledWith(
         basicInfo.orderDetails,
         basicInfo.customerDetails,
         basicInfo.addressDetails,
+        undefined,
       );
       expect(cashService.createCashInvoice).toHaveBeenCalledWith(cashPayload);
       expect(generateCashInvoiceMessageMock).toHaveBeenCalledWith(
@@ -479,93 +475,14 @@ describe('AppService', () => {
       const failure = new Error('cash failed');
       jest.spyOn(service, 'getOrderBasicInfo').mockRejectedValue(failure);
 
-      const result = await service.createCashInvoice({ order: '13' });
+      const result = await service.createCashInvoice({ orderId: '13' } as any);
 
       expect(result).toEqual({ ok: false, data: failure });
       expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
-        undefined,
+        expect.stringContaining('Ошибка при создании счёта для заказа 13'),
         true,
         'bot-group',
       );
-    });
-  });
-
-  describe('createDpdOrder', () => {
-    it('creates DPD order and returns track number', async () => {
-      const basicInfo = buildBasicOrderInfo();
-      const destination = 'DPD-POINT';
-      const carrierInfo = { ...shippingDetails.order_carriers[0] } as any;
-      const dpdPayload = { payload: true } as any;
-      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
-      jest
-        .spyOn(shopService, 'getOrderCarrierInfo')
-        .mockResolvedValue(carrierInfo);
-      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(11);
-      jest
-        .spyOn(shopService, 'getOrderMessages')
-        .mockResolvedValue(orderMessages);
-      findPointIdMock.mockReturnValue(destination);
-      convertOrderToDpdMock.mockReturnValue(dpdPayload);
-      jest.spyOn(dpdService, 'createOrder').mockResolvedValue({
-        return: { orderNum: 'DPD-77' },
-      } as any);
-
-      const result = await service.createDpdOrder({ order: '77' });
-
-      expect(convertOrderToDpdMock).toHaveBeenCalledWith(
-        basicInfo.orderDetails,
-        basicInfo.addressDetails,
-        basicInfo.customerDetails,
-        carrierInfo,
-        destination,
-      );
-      expect(dpdService.createOrder).toHaveBeenCalledWith(dpdPayload);
-      expect(result).toEqual({ ok: true, data: { track: 'DPD-77' } });
-    });
-
-    it('returns service error when DPD responds with error message', async () => {
-      const basicInfo = buildBasicOrderInfo();
-      const destination = 'DPD-POINT';
-      const carrierInfo = { ...shippingDetails.order_carriers[0] } as any;
-      const dpdPayload = { payload: true } as any;
-      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
-      jest
-        .spyOn(shopService, 'getOrderCarrierInfo')
-        .mockResolvedValue(carrierInfo);
-      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(11);
-      jest
-        .spyOn(shopService, 'getOrderMessages')
-        .mockResolvedValue(orderMessages);
-      findPointIdMock.mockReturnValue(destination);
-      convertOrderToDpdMock.mockReturnValue(dpdPayload);
-      jest.spyOn(dpdService, 'createOrder').mockResolvedValue({
-        return: { errorMessage: 'No capacity' },
-      } as any);
-
-      const result = await service.createDpdOrder({ order: '77' });
-
-      expect(result).toEqual({ ok: false, data: 'No capacity' });
-    });
-
-    it('returns error when destination cannot be detected', async () => {
-      const basicInfo = buildBasicOrderInfo();
-      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
-      jest
-        .spyOn(shopService, 'getOrderCarrierInfo')
-        .mockResolvedValue(shippingDetails.order_carriers[0]);
-      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(11);
-      jest
-        .spyOn(shopService, 'getOrderMessages')
-        .mockResolvedValue(orderMessages);
-      findPointIdMock.mockReturnValue(undefined);
-
-      const result = await service.createDpdOrder({ order: '33' });
-
-      expect(result).toEqual({
-        ok: false,
-        data: 'Error: destination point not found',
-      });
-      expect(dpdService.createOrder).not.toHaveBeenCalled();
     });
   });
 
