@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
-    "target": "es6",
-    "lib": ["es2017", "dom"],
+    /* es2020: при более низком target TypeScript разворачивает ?. в глобальный `var _a`,
+       а бандлы виджетов объявляют свой `const _a` и падают с SyntaxError. */
+    "target": "es2020",
+    "lib": ["es2020", "dom"],
     /* Скрипты внедряются в PrestaShop как глобальные: import/export сломает вызовы из inline-кода виджетов. */
     "module": "none",
     "strict": true,

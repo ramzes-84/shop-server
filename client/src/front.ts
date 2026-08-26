@@ -142,7 +142,9 @@ if (document.readyState === 'loading') {
   initDeliveryMaps();
 }
 
-window.prestashop?.on(DELIVERY_UPDATE_EVENT, initDeliveryMaps);
+if (window.prestashop) {
+  window.prestashop.on(DELIVERY_UPDATE_EVENT, initDeliveryMaps);
+}
 
 // Запасной путь на случай темы без события updatedDeliveryForm; initDeliveryMaps идемпотентна.
 document.addEventListener('click', (event) => {
