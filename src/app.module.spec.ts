@@ -7,11 +7,11 @@ import { YaModule } from './ya/ya.module';
 import { ShopModule } from './shop/shop.module';
 import { AuthModule } from './auth/auth.module';
 import { MailService } from './mail/mail.service';
-import { BxbModule } from './bxb/bxb.module';
 import { CashModule } from './cash/cash.module';
 import { BotModule } from './bot/bot.module';
 import { DpdModule } from './dpd/dpd.module';
 import { PostModule } from './post/post.module';
+import { FiveService } from './five/five.service';
 
 describe('AppModule', () => {
   let module: TestingModule;
@@ -25,7 +25,6 @@ describe('AppModule', () => {
         YaModule,
         ShopModule,
         AuthModule,
-        BxbModule,
         CashModule,
         BotModule,
         DpdModule,
@@ -49,7 +48,14 @@ describe('AppModule', () => {
         }),
       ],
       controllers: [AppController],
-      providers: [AppService, MailService],
+      providers: [
+        AppService,
+        MailService,
+        {
+          provide: FiveService,
+          useValue: { getOrderStatus: jest.fn(), getToken: jest.fn() },
+        },
+      ],
     }).compile();
   });
 
@@ -81,11 +87,6 @@ describe('AppModule', () => {
   it('should import ShopModule', () => {
     const shopModule = module.get<ShopModule>(ShopModule);
     expect(shopModule).toBeDefined();
-  });
-
-  it('should import BxbModule', () => {
-    const bxbModule = module.get<BxbModule>(BxbModule);
-    expect(bxbModule).toBeDefined();
   });
 
   it('should import CashModule', () => {

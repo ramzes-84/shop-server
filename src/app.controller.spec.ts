@@ -2,7 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthGuard } from '@nestjs/passport';
-import { CreateOrderQueries, OrderIdParams } from './validation/yandex';
+import {
+  CreateOrderQueries,
+  OrderIdParams,
+  CreateCashRequest,
+} from './validation/yandex';
 import { TransferInterface } from './types/common';
 
 describe('AppController', () => {
@@ -20,6 +24,7 @@ describe('AppController', () => {
             createYaOrder: jest.fn(),
             getYaOrderHistory: jest.fn(),
             getOrderInfo: jest.fn(),
+            createCashInvoice: jest.fn(),
           },
         },
       ],
@@ -54,7 +59,7 @@ describe('AppController', () => {
       jest.spyOn(service, 'createYaOrder').mockResolvedValue(mockResponse);
 
       const query: CreateOrderQueries = {
-        order: '1',
+        orderId: '1',
         // destination: 'destination',
       };
 
@@ -62,6 +67,25 @@ describe('AppController', () => {
 
       expect(result).toBe(mockResponse);
       expect(service.createYaOrder).toHaveBeenCalledWith(query);
+    });
+  });
+
+  describe('cashInvoiceCreate', () => {
+    it('should forward orderId to AppService.createCashInvoice', async () => {
+      const mockResponse = { ok: true, data: { delivery_method: 'test' } };
+      jest
+        .spyOn(service, 'createCashInvoice')
+        .mockResolvedValue(mockResponse as any);
+
+      const body: CreateCashRequest = {
+        orderId: '42',
+        sms: true,
+      } as CreateCashRequest;
+
+      const result = await controller.cashInvoiceCreate(body);
+
+      expect(result).toBe(mockResponse);
+      expect(service.createCashInvoice).toHaveBeenCalledWith(body);
     });
   });
 

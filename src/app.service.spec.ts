@@ -9,11 +9,7 @@ import {
   YaOrderCreationRes,
   YaOrderInfoRes,
 } from './ya/dto/ya.dto';
-import {
-  convertOrder,
-  convertOrderToBxb,
-  convertOrderToDpd,
-} from './utils/convertOrder';
+import { convertOrder } from './utils/convertOrder';
 import {
   addressDetails,
   customerDetails,
@@ -23,11 +19,11 @@ import {
 } from 'src/__test-data__/shop-data';
 import { orderConverterResult } from './__test-data__/converter-result';
 import { yaOrderHistory } from './__test-data__/ya-data';
-import { BxbService } from './bxb/bxb.service';
 import { CashService } from './cash/cash.service';
 import { BotService } from './bot/bot.service';
 import { DpdService } from './dpd/dpd.service';
 import { PostService } from './post/post.service';
+import { FiveService } from './five/five.service';
 import { yaOrderInfo } from './__test-data__/ya-order-info';
 import { checkDeliveryCost } from './utils/check-delivery-cost';
 import { Cargos, RevisingOrderData, UnifiedOrderState } from './types/common';
@@ -54,12 +50,6 @@ const checkDeliveryCostMock = checkDeliveryCost as jest.MockedFunction<
 >;
 const convertOrderMock = convertOrder as jest.MockedFunction<
   typeof convertOrder
->;
-const convertOrderToBxbMock = convertOrderToBxb as jest.MockedFunction<
-  typeof convertOrderToBxb
->;
-const convertOrderToDpdMock = convertOrderToDpd as jest.MockedFunction<
-  typeof convertOrderToDpd
 >;
 const convertOrderShopToCashMock =
   convertOrderShopToCash as jest.MockedFunction<typeof convertOrderShopToCash>;
@@ -95,9 +85,9 @@ describe('AppService', () => {
   let yaService: YaService;
   let mailService: MailService;
   let botService: BotService;
-  let bxbService: BxbService;
   let cashService: CashService;
-  let dpdService: DpdService;
+  let fiveService: any;
+  let postService: any;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -123,16 +113,6 @@ describe('AppService', () => {
             getHistoryById: jest.fn(),
             createYaOrder: jest.fn(),
             getOrderInfo: jest.fn(),
-            getParcelCost: jest.fn(),
-          },
-        },
-        {
-          provide: BxbService,
-          useValue: {
-            getParcelsInInterval: jest.fn(),
-            getInProgressParcels: jest.fn(),
-            getParcelStatuses: jest.fn(),
-            createBoxberryParcel: jest.fn(),
             getParcelCost: jest.fn(),
           },
         },
@@ -169,6 +149,14 @@ describe('AppService', () => {
             send: jest.fn(),
           },
         },
+        {
+          provide: FiveService,
+          useValue: {
+            getOrderStatus: jest.fn(),
+            requestWithAuth: jest.fn(),
+            getToken: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -177,9 +165,9 @@ describe('AppService', () => {
     yaService = module.get<YaService>(YaService);
     mailService = module.get<MailService>(MailService);
     botService = module.get<BotService>(BotService);
-    bxbService = module.get<BxbService>(BxbService);
     cashService = module.get<CashService>(CashService);
-    dpdService = module.get<DpdService>(DpdService);
+    fiveService = module.get<any>(FiveService);
+    postService = module.get<any>(PostService);
   });
 
   afterEach(() => {
@@ -198,6 +186,132 @@ describe('AppService', () => {
 
       // expect(mailService.emitHealth).toHaveBeenCalled();
       expect(result).toBe('Hello World!');
+    });
+  });
+
+  describe('fetchBatchOfStatuses batching for FIVE_POST', () => {
+    it('calls fiveService.getOrderStatus once with all references and resolves per-order', async () => {
+      const five = fiveService;
+
+      const revising = [
+        {
+          id: 1,
+          reference: 'R1',
+          track: 'R1-1',
+          cargo: 'FIVE_POST',
+          unifiedShopState: 'IN_TRANSIT',
+          shopStateUpdatedAt: Date.now(),
+        },
+        {
+          id: 2,
+          reference: 'R2',
+          track: 'R2-1',
+          cargo: 'FIVE_POST',
+          unifiedShopState: 'IN_TRANSIT',
+          shopStateUpdatedAt: Date.now(),
+        },
+        {
+          id: 3,
+          reference: 'R3',
+          track: 'R3-1',
+          cargo: 'POST',
+          unifiedShopState: 'IN_TRANSIT',
+          shopStateUpdatedAt: Date.now(),
+        },
+      ];
+
+      // Mock POST service for the non-five item
+      postService.getOperationHistory = jest
+        .fn()
+        .mockResolvedValue({ OperationHistoryData: { historyRecord: [] } });
+
+      // Mock fiveService to return results only for R1 and R2
+      const resp = [
+        { senderOrderId: 'R1', executionStatus: 'PICKED_UP', status: 'DONE' },
+        {
+          senderOrderId: 'R2',
+          executionStatus: 'SHIPPED',
+          status: 'IN_PROCESS',
+        },
+      ];
+      five.getOrderStatus.mockResolvedValue(resp);
+
+      const serviceInstance = service;
+      const results = await serviceInstance.fetchBatchOfStatuses(
+        revising as any,
+      );
+
+      // should call fiveService once with both R1 and R2
+      expect(five.getOrderStatus).toHaveBeenCalledTimes(1);
+      expect(five.getOrderStatus).toHaveBeenCalledWith(
+        expect.arrayContaining(['R1', 'R2']),
+      );
+
+      // results is an array of settled promises
+      expect(results).toHaveLength(3);
+      // first two should be fulfilled
+      expect((results[0] as any).status).toBe('fulfilled');
+      expect((results[1] as any).status).toBe('fulfilled');
+    });
+
+    it('resolves null for missing five items when API does not return them', async () => {
+      const five = fiveService;
+
+      const revising = [
+        {
+          id: 1,
+          reference: 'R1',
+          track: 'R1-1',
+          cargo: 'FIVE_POST',
+          unifiedShopState: 'IN_TRANSIT',
+          shopStateUpdatedAt: Date.now(),
+        },
+      ];
+
+      five.getOrderStatus.mockResolvedValue([]); // no results
+
+      const serviceInstance = service;
+      const results = await serviceInstance.fetchBatchOfStatuses(
+        revising as any,
+      );
+
+      expect(five.getOrderStatus).toHaveBeenCalledTimes(1);
+      expect((results[0] as any).status).toBe('fulfilled');
+      expect((results[0] as any).value).toBeNull();
+    });
+
+    it('rejects per-order promises when fiveService fails', async () => {
+      const five = fiveService;
+
+      const revising = [
+        {
+          id: 1,
+          reference: 'R1',
+          track: 'R1-1',
+          cargo: 'FIVE_POST',
+          unifiedShopState: 'IN_TRANSIT',
+          shopStateUpdatedAt: Date.now(),
+        },
+        {
+          id: 2,
+          reference: 'R2',
+          track: 'R2-1',
+          cargo: 'FIVE_POST',
+          unifiedShopState: 'IN_TRANSIT',
+          shopStateUpdatedAt: Date.now(),
+        },
+      ];
+
+      five.getOrderStatus.mockRejectedValue(new Error('service down'));
+
+      const serviceInstance = service;
+      const results = await serviceInstance.fetchBatchOfStatuses(
+        revising as any,
+      );
+
+      // both should be rejected
+      expect((results[0] as any).status).toBe('rejected');
+      expect((results[1] as any).status).toBe('rejected');
     });
   });
 
@@ -236,7 +350,7 @@ describe('AppService', () => {
       convertOrderMock.mockReturnValue(mockYaOrderData);
 
       const createOrderQueries: CreateOrderQueries = {
-        order: '1',
+        orderId: '1',
       };
 
       const result = await service.createYaOrder(createOrderQueries);
@@ -266,7 +380,7 @@ describe('AppService', () => {
       jest.spyOn(shopService, 'getOrderInfo').mockRejectedValue(mockError);
 
       const createOrderQueries: CreateOrderQueries = {
-        order: '1',
+        orderId: '1',
       };
 
       const result = await service.createYaOrder(createOrderQueries);
@@ -331,11 +445,13 @@ describe('AppService', () => {
         .mockResolvedValue(invoiceResponse);
       generateCashInvoiceMessageMock.mockReturnValue('Invoice ready');
 
-      const result = await service.createCashInvoice({ order: '42' });
+      const result = await service.createCashInvoice({ orderId: '42' } as any);
 
       expect(convertOrderShopToCashMock).toHaveBeenCalledWith(
         basicInfo.orderDetails,
         basicInfo.customerDetails,
+        basicInfo.addressDetails,
+        undefined,
       );
       expect(cashService.createCashInvoice).toHaveBeenCalledWith(cashPayload);
       expect(generateCashInvoiceMessageMock).toHaveBeenCalledWith(
@@ -359,160 +475,14 @@ describe('AppService', () => {
       const failure = new Error('cash failed');
       jest.spyOn(service, 'getOrderBasicInfo').mockRejectedValue(failure);
 
-      const result = await service.createCashInvoice({ order: '13' });
+      const result = await service.createCashInvoice({ orderId: '13' } as any);
 
       expect(result).toEqual({ ok: false, data: failure });
       expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
-        undefined,
+        expect.stringContaining('Ошибка при создании счёта для заказа 13'),
         true,
         'bot-group',
       );
-    });
-  });
-
-  describe('createBxbOrder', () => {
-    it('creates a Boxberry parcel and compares costs', async () => {
-      const basicInfo = buildBasicOrderInfo();
-      const destination = 'BXB-POINT';
-      const bxbPayload = { order_id: 'ORD-55' } as any;
-      const carrierInfo = { ...shippingDetails.order_carriers[0] } as any;
-      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
-      jest
-        .spyOn(shopService, 'getOrderCarrierInfo')
-        .mockResolvedValue(carrierInfo);
-      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(77);
-      jest
-        .spyOn(shopService, 'getOrderMessages')
-        .mockResolvedValue(orderMessages);
-      findPointIdMock.mockReturnValue(destination);
-      convertOrderToBxbMock.mockReturnValue(bxbPayload);
-      jest
-        .spyOn(bxbService, 'createBoxberryParcel')
-        .mockResolvedValue({ track: 'BBX-42' } as any);
-      jest
-        .spyOn(bxbService, 'getParcelCost')
-        .mockResolvedValue({ price: '420' } as any);
-      const compareSpy = jest
-        .spyOn(service, 'compareDeliveryCost')
-        .mockResolvedValue(undefined);
-
-      const result = await service.createBxbOrder({ order: '55' });
-
-      expect(convertOrderToBxbMock).toHaveBeenCalledWith(
-        basicInfo.orderDetails,
-        basicInfo.addressDetails,
-        basicInfo.customerDetails,
-        carrierInfo,
-        destination,
-      );
-      expect(bxbService.createBoxberryParcel).toHaveBeenCalledWith(bxbPayload);
-      expect(bxbService.getParcelCost).toHaveBeenCalledWith(bxbPayload);
-      expect(compareSpy).toHaveBeenCalledWith(
-        basicInfo.orderDetails.total_shipping,
-        '420',
-        bxbPayload.order_id,
-      );
-      expect(result).toEqual({ ok: true, data: { track: 'BBX-42' } });
-    });
-
-    it('returns error when destination is missing', async () => {
-      const basicInfo = buildBasicOrderInfo();
-      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
-      jest
-        .spyOn(shopService, 'getOrderCarrierInfo')
-        .mockResolvedValue(shippingDetails.order_carriers[0]);
-      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(77);
-      jest
-        .spyOn(shopService, 'getOrderMessages')
-        .mockResolvedValue(orderMessages);
-      findPointIdMock.mockReturnValue(undefined);
-
-      const result = await service.createBxbOrder({ order: '12' });
-
-      expect(result).toEqual({
-        ok: false,
-        data: 'Error: destination point not found',
-      });
-      expect(convertOrderToBxbMock).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('createDpdOrder', () => {
-    it('creates DPD order and returns track number', async () => {
-      const basicInfo = buildBasicOrderInfo();
-      const destination = 'DPD-POINT';
-      const carrierInfo = { ...shippingDetails.order_carriers[0] } as any;
-      const dpdPayload = { payload: true } as any;
-      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
-      jest
-        .spyOn(shopService, 'getOrderCarrierInfo')
-        .mockResolvedValue(carrierInfo);
-      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(11);
-      jest
-        .spyOn(shopService, 'getOrderMessages')
-        .mockResolvedValue(orderMessages);
-      findPointIdMock.mockReturnValue(destination);
-      convertOrderToDpdMock.mockReturnValue(dpdPayload);
-      jest.spyOn(dpdService, 'createOrder').mockResolvedValue({
-        return: { orderNum: 'DPD-77' },
-      } as any);
-
-      const result = await service.createDpdOrder({ order: '77' });
-
-      expect(convertOrderToDpdMock).toHaveBeenCalledWith(
-        basicInfo.orderDetails,
-        basicInfo.addressDetails,
-        basicInfo.customerDetails,
-        carrierInfo,
-        destination,
-      );
-      expect(dpdService.createOrder).toHaveBeenCalledWith(dpdPayload);
-      expect(result).toEqual({ ok: true, data: { track: 'DPD-77' } });
-    });
-
-    it('returns service error when DPD responds with error message', async () => {
-      const basicInfo = buildBasicOrderInfo();
-      const destination = 'DPD-POINT';
-      const carrierInfo = { ...shippingDetails.order_carriers[0] } as any;
-      const dpdPayload = { payload: true } as any;
-      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
-      jest
-        .spyOn(shopService, 'getOrderCarrierInfo')
-        .mockResolvedValue(carrierInfo);
-      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(11);
-      jest
-        .spyOn(shopService, 'getOrderMessages')
-        .mockResolvedValue(orderMessages);
-      findPointIdMock.mockReturnValue(destination);
-      convertOrderToDpdMock.mockReturnValue(dpdPayload);
-      jest.spyOn(dpdService, 'createOrder').mockResolvedValue({
-        return: { errorMessage: 'No capacity' },
-      } as any);
-
-      const result = await service.createDpdOrder({ order: '77' });
-
-      expect(result).toEqual({ ok: false, data: 'No capacity' });
-    });
-
-    it('returns error when destination cannot be detected', async () => {
-      const basicInfo = buildBasicOrderInfo();
-      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
-      jest
-        .spyOn(shopService, 'getOrderCarrierInfo')
-        .mockResolvedValue(shippingDetails.order_carriers[0]);
-      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(11);
-      jest
-        .spyOn(shopService, 'getOrderMessages')
-        .mockResolvedValue(orderMessages);
-      findPointIdMock.mockReturnValue(undefined);
-
-      const result = await service.createDpdOrder({ order: '33' });
-
-      expect(result).toEqual({
-        ok: false,
-        data: 'Error: destination point not found',
-      });
-      expect(dpdService.createOrder).not.toHaveBeenCalled();
     });
   });
 
@@ -523,7 +493,7 @@ describe('AppService', () => {
       const orders = [
         buildRevisingOrder({
           reference: 'REF-PROB',
-          cargo: Cargos.BXB,
+          cargo: Cargos.YA,
           unifiedCargoState: UnifiedOrderState.PROBLEM,
           actualCargoState: 'Problem',
         }),

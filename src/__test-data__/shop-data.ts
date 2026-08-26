@@ -112,7 +112,7 @@ export const addressDetails: AddressInfoResDto['address'] = {
   postcode: '125252',
   city: 'Москва',
   phone: '00000000000',
-  phone_mobile: '00000000000',
+  phone_mobile: '79000000000',
   date_add: '2020-05-16 02:23:16',
   date_upd: '2020-05-16 02:23:16',
 };

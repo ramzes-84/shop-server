@@ -1,10 +1,3 @@
-import { StatusItem } from 'src/bxb/dto/bxb.dto';
-
-export type RecentBxbParcelsType = {
-  imId: string;
-  status: StatusItem;
-};
-
 export class TransferInterface {
   ok: boolean;
   data: any;
@@ -38,7 +31,7 @@ export enum UnifiedOrderState {
 export enum Cargos {
   YA = 'YA',
   POST = 'POST',
-  BXB = 'BXB',
   DPD = 'DPD',
+  FIVE_POST = 'FIVE_POST',
   UNKNOWN = 'UNKNOWN',
 }

@@ -19,7 +19,8 @@ export class CreateCashInvoiceDto {
   };
   cart: CartItem[];
   delivery_method_data: {
-    type: 'self';
+    type: 'self' | 'sms';
+    phone?: string;
   };
   locale: 'ru_RU';
   expires_at: string;
@@ -58,7 +59,7 @@ export class CashInvoiceInfoDto extends CreateCashInvoiceDto {
   id: string;
   status: 'pending';
   delivery_method: {
-    type: 'self';
+    type: 'self' | 'sms';
     url: string;
   };
   created_at: string;

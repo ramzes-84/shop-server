@@ -28,47 +28,6 @@ describe('DpdService', () => {
     expect(service).toBeDefined();
   });
 
-  it('creates DPD order through SOAP client', async () => {
-    const creationResponse = {
-      return: { orderNum: 'DPD-1' },
-    } as any;
-    createClientMock.mockImplementation((endpoint, options, cb) => {
-      const callback = typeof options === 'function' ? options : cb;
-      const client = {
-        createOrder: (args: any, done: (err: any, res?: any) => void) => {
-          expect(args.orders.auth).toEqual({
-            clientNumber: 1234,
-            clientKey: 'secret',
-          });
-          done(null, creationResponse);
-        },
-      } as any;
-      callback?.(null, client);
-    });
-
-    const result = await service.createOrder({
-      header: { datePickup: '2025-01-01' },
-      order: { orderNumberInternal: '10' },
-    } as any);
-
-    expect(result).toBe(creationResponse);
-    expect(createClientMock).toHaveBeenCalledWith(
-      service.createEndpoint,
-      expect.any(Function),
-    );
-  });
-
-  it('rejects when createOrder client creation fails', async () => {
-    createClientMock.mockImplementation((_endpoint, options, cb) => {
-      const callback = typeof options === 'function' ? options : cb;
-      callback?.(new Error('soap down'), undefined as any);
-    });
-
-    await expect(
-      service.createOrder({ header: {}, order: {} } as any),
-    ).rejects.toThrow('soap down');
-  });
-
   it('retrieves states via SOAP client', async () => {
     const statesResponse = {
       return: { states: [{ newState: 'Delivered' }] },

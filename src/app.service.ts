@@ -2,17 +2,10 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ShopService } from './shop/shop.service';
 import { YaService } from './ya/ya.service';
 import { CreateYaOrderDto } from './ya/dto/ya.dto';
-import {
-  convertOrder,
-  convertOrderToBxb,
-  convertOrderToDpd,
-  convertYaOrderToCostReq,
-} from './utils/convertOrder';
+import { convertOrder, convertYaOrderToCostReq } from './utils/convertOrder';
 import { parseYaHistoryToHtml } from './utils/parseYaHistoryToHtml';
-import { CreateOrderQueries } from './validation/yandex';
+import { CreateCashRequest, CreateOrderQueries } from './validation/yandex';
 import { MailService } from './mail/mail.service';
-import { BxbService } from './bxb/bxb.service';
-import { BxbParselStatus } from './bxb/dto/bxb.dto';
 import { CashService } from './cash/cash.service';
 import { convertOrderShopToCash } from './utils/convert-order-shop-to-cash';
 import { generateCashInvoiceMessage } from './utils/messages';
@@ -29,6 +22,7 @@ import { unifyParcelStatus, unifyShopState } from './utils/reviseOrdersV2';
 import { PostService } from './post/post.service';
 import { findPointId } from './utils/find-point-from-messages';
 import { checkDeliveryCost } from './utils/check-delivery-cost';
+import { FiveService } from './five/five.service';
 
 @Injectable()
 export class AppService {
@@ -59,11 +53,11 @@ export class AppService {
     private readonly shopService: ShopService,
     private readonly yaService: YaService,
     private readonly mailService: MailService,
-    private readonly bxbService: BxbService,
     private readonly cashService: CashService,
     private readonly botService: BotService,
     private readonly dpdService: DpdService,
     private readonly postService: PostService,
+    private readonly fiveService: FiveService,
   ) {
     this.unifiedStateTargetMap = {
       [UnifiedOrderState.IN_TRANSIT]:
@@ -118,26 +112,36 @@ export class AppService {
   }
 
   async createCashInvoice({
-    order,
-  }: Pick<CreateOrderQueries, 'order'>): Promise<TransferInterface> {
+    orderId,
+    sms,
+  }: CreateCashRequest): Promise<TransferInterface> {
     let message: string;
     try {
       const { addressDetails, customerDetails, orderDetails } =
-        await this.getOrderBasicInfo(order);
+        await this.getOrderBasicInfo(orderId);
       const cashInvoiceInfo = await this.cashService.createCashInvoice(
-        convertOrderShopToCash(orderDetails, customerDetails),
+        convertOrderShopToCash(
+          orderDetails,
+          customerDetails,
+          addressDetails,
+          sms,
+        ),
       );
+
       message = generateCashInvoiceMessage(
         orderDetails,
         customerDetails,
         cashInvoiceInfo,
         addressDetails,
       );
+
       return {
         ok: true,
         data: cashInvoiceInfo.delivery_method,
       };
     } catch (error) {
+      message = `❗ Ошибка при создании счёта для заказа ${orderId}: ${error instanceof Error ? error.message : String(error ?? 'Unknown error')}`;
+
       return {
         ok: false,
         data: error,
@@ -148,60 +152,6 @@ export class AppService {
         true,
         this.botService.buGroup,
       );
-    }
-  }
-
-  async createBxbOrder({
-    order,
-  }: CreateOrderQueries): Promise<TransferInterface> {
-    try {
-      const { addressDetails, customerDetails, orderDetails } =
-        await this.getOrderBasicInfo(order);
-
-      const [shippingDetails, threadId] = await Promise.all([
-        this.shopService.getOrderCarrierInfo(+order),
-        this.shopService.getMessagesThread(+order),
-      ]);
-
-      const destination = findPointId(
-        await this.shopService.getOrderMessages(threadId),
-      );
-
-      if (!destination) {
-        return {
-          ok: false,
-          data: 'Error: destination point not found',
-        };
-      }
-
-      const bxbOrderData = convertOrderToBxb(
-        orderDetails,
-        addressDetails,
-        customerDetails,
-        shippingDetails,
-        destination,
-      );
-
-      const [{ track }, { price }] = await Promise.all([
-        await this.bxbService.createBoxberryParcel(bxbOrderData),
-        await this.bxbService.getParcelCost(bxbOrderData),
-      ]);
-
-      this.compareDeliveryCost(
-        orderDetails.total_shipping,
-        price,
-        bxbOrderData.order_id,
-      );
-
-      return {
-        ok: true,
-        data: { track },
-      };
-    } catch (error) {
-      return {
-        ok: false,
-        data: error,
-      };
     }
   }
 
@@ -217,68 +167,16 @@ export class AppService {
     }
   }
 
-  async createDpdOrder({
-    order,
-  }: CreateOrderQueries): Promise<TransferInterface> {
-    try {
-      const { addressDetails, customerDetails, orderDetails } =
-        await this.getOrderBasicInfo(order);
-
-      const [shippingDetails, threadId] = await Promise.all([
-        this.shopService.getOrderCarrierInfo(+order),
-        this.shopService.getMessagesThread(+order),
-      ]);
-
-      const destination = findPointId(
-        await this.shopService.getOrderMessages(threadId),
-      );
-
-      if (!destination) {
-        return {
-          ok: false,
-          data: 'Error: destination point not found',
-        };
-      }
-
-      const dpdOrderData = convertOrderToDpd(
-        orderDetails,
-        addressDetails,
-        customerDetails,
-        shippingDetails,
-        destination,
-      );
-
-      const orderInfo = await this.dpdService.createOrder(dpdOrderData);
-
-      if ('orderNum' in orderInfo.return) {
-        return {
-          ok: true,
-          data: { track: orderInfo.return.orderNum },
-        };
-      } else {
-        return {
-          ok: false,
-          data: orderInfo.return.errorMessage,
-        };
-      }
-    } catch (error) {
-      return {
-        ok: false,
-        data: error,
-      };
-    }
-  }
-
   async createYaOrder({
-    order,
+    orderId,
   }: CreateOrderQueries): Promise<TransferInterface> {
     try {
       const { addressDetails, customerDetails, orderDetails } =
-        await this.getOrderBasicInfo(order);
+        await this.getOrderBasicInfo(orderId);
 
       const [shippingDetails, threadId] = await Promise.all([
-        this.shopService.getOrderCarrierInfo(+order),
-        this.shopService.getMessagesThread(+order),
+        this.shopService.getOrderCarrierInfo(+orderId),
+        this.shopService.getMessagesThread(+orderId),
       ]);
 
       const destination = findPointId(
@@ -336,34 +234,68 @@ export class AppService {
   }
 
   async fetchBatchOfStatuses(revisingOrderData: RevisingOrderData[]) {
-    return await Promise.allSettled(
-      revisingOrderData.map((order) => {
-        if (order.cargo === Cargos.YA) {
-          return undefined;
-        } else if (order.cargo === Cargos.BXB) {
-          return this.bxbService
-            .getParcelStatuses(order.track)
-            .then((r) => r)
-            .catch((e) => {
-              throw e;
-            });
-        } else if (order.cargo === Cargos.DPD) {
-          return this.dpdService
-            .getStatesByDPDOrder(order.track)
-            .then((r) => r)
-            .catch((e) => {
-              throw e;
-            });
-        } else if (order.cargo === Cargos.POST) {
-          return this.postService
-            .getOperationHistory(order.track)
-            .then((r) => r)
-            .catch((e) => {
-              throw e;
-            });
-        }
-      }),
+    // We'll build per-order promises, but batch FIVE_POST requests to a single call
+    const promises: Array<Promise<any> | undefined> = new Array(
+      revisingOrderData.length,
     );
+
+    const fiveRefs: string[] = [];
+    const fiveIndices: number[] = [];
+    const fiveResolvers: Array<{
+      resolve: (v: any) => void;
+      reject: (e: any) => void;
+    }> = [];
+
+    revisingOrderData.forEach((order, idx) => {
+      if (order.cargo === Cargos.YA) {
+        promises[idx] = Promise.resolve(undefined);
+      } else if (order.cargo === Cargos.DPD) {
+        promises[idx] = this.dpdService
+          .getStatesByDPDOrder(order.track)
+          .then((r) => r)
+          .catch((e) => {
+            throw e;
+          });
+      } else if (order.cargo === Cargos.POST) {
+        promises[idx] = this.postService
+          .getOperationHistory(order.track)
+          .then((r) => r)
+          .catch((e) => {
+            throw e;
+          });
+      } else if (order.cargo === Cargos.FIVE_POST) {
+        // placeholder promise to be resolved when batch result returns
+        fiveRefs.push(order.reference);
+        fiveIndices.push(idx);
+        promises[idx] = new Promise((resolve, reject) => {
+          fiveResolvers.push({ resolve, reject });
+        });
+      } else {
+        promises[idx] = Promise.resolve(undefined);
+      }
+    });
+
+    // If we have any FIVE_POST refs, fetch them in a single call and resolve placeholders
+    if (fiveRefs.length > 0) {
+      this.fiveService
+        .getOrderStatus(fiveRefs)
+        .then((results) => {
+          const map = new Map<string, any>();
+          for (const item of results || [])
+            if (item && item.senderOrderId) map.set(item.senderOrderId, item);
+          for (let i = 0; i < fiveRefs.length; i++) {
+            const ref = fiveRefs[i];
+            const resolver = fiveResolvers[i];
+            const val = map.get(ref) ?? null;
+            resolver.resolve(val);
+          }
+        })
+        .catch((err) => {
+          for (const r of fiveResolvers) r.reject(err);
+        });
+    }
+
+    return await Promise.allSettled(promises);
   }
 
   async getDataForRevise(): Promise<RevisingOrderData[]> {
@@ -375,13 +307,13 @@ export class AppService {
         error instanceof Error
           ? error.message
           : 'Error in Promise.all while gathering data';
-      await this.mailService.sendToAdmin('Error in Promise.all', message);
+      await this.botService.sendEmployeeMessage(`Promise.all: ${message}`);
       throw new HttpException(error, HttpStatus.SERVICE_UNAVAILABLE);
     });
 
     const revisingOrdersData: RevisingOrderData[] = ordersInTransit.map(
       (order) => {
-        const cargo = recognizeCargo(order.shipping_number);
+        const cargo = recognizeCargo(order.shipping_number, order.reference);
         const unifiedState = unifyShopState(order.current_state);
         return {
           id: order.id,
@@ -411,14 +343,6 @@ export class AppService {
               .at(0)?.state.status;
             break;
           }
-          case Cargos.BXB: {
-            if (settled.value instanceof Array && settled.value.length) {
-              currState = settled.value.at(-1).Name;
-            } else {
-              currState = BxbParselStatus.CustomProblem;
-            }
-            break;
-          }
           case Cargos.DPD: {
             if ('return' in settled.value) {
               currState = settled.value.return.states.at(-1).newState;
@@ -433,11 +357,17 @@ export class AppService {
             }
             break;
           }
+          case Cargos.FIVE_POST: {
+            // After batching, settled.value is the single GetOrderStatusResponseItem or null
+            if (settled.value) {
+              const item = settled.value as any;
+              currState = item.executionStatus;
+            }
+            break;
+          }
           default:
             break;
         }
-      } else {
-        currState = BxbParselStatus.Unknown;
       }
 
       order.actualCargoState = currState;
@@ -634,12 +564,12 @@ export class AppService {
   }
 
   async testEndpoint() {
-    return await this.mailService.sendToAdmin(
-      'Test email from shop-server',
-      'If you see this, email sending works fine.',
-    );
+    return await this.fiveService.getOrderStatus(['1', '2']);
+    // return await this.mailService.sendToAdmin(
+    //   'Test email from shop-server',
+    //   'If you see this, email sending works fine.',
+    // );
     // return await this.shopService.getOrderInfo(1);
-    // return await this.bxbService.getParcelStatuses('PUXQMWBBU');
     // return await this.postService.getPostParcelData('80082713220575');
     // return await this.dpdService.getStatesByDPDOrder('');
   }
