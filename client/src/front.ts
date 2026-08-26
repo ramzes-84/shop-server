@@ -16,7 +16,6 @@ type ShopServerFrontConfig = {
 
 type PrestashopEmitter = {
   on: (event: string, handler: () => void) => void;
-  off: (event: string, handler: () => void) => void;
 };
 
 // Расширение глобального Window: значения приходят из модуля PrestaShop и из inline-скриптов виджетов.
@@ -118,20 +117,27 @@ async function selectCarrierAndOpenMap(
   await openMapPopup(carrier, config);
 }
 
-/** Смена перевозчика перерисовывает блок доставки аяксом — карту открываем после этого. */
+/**
+ * Смена перевозчика перерисовывает блок доставки аяксом — карту открываем после этого.
+ * У эмиттера темы есть только on/emit, поэтому подписка одна на всё время жизни страницы,
+ * а ожидающие копятся в очереди.
+ */
+const deliveryUpdateWaiters: Array<() => void> = [];
+
 function afterDeliveryUpdate(): Promise<void> {
   return new Promise((resolve) => {
-    const emitter = window.prestashop;
     let settled = false;
 
     const finish = () => {
       if (settled) return;
       settled = true;
-      emitter?.off(DELIVERY_UPDATE_EVENT, finish);
       resolve();
     };
 
-    emitter?.on(DELIVERY_UPDATE_EVENT, finish);
+    if (window.prestashop) {
+      deliveryUpdateWaiters.push(finish);
+    }
+
     window.setTimeout(finish, DELIVERY_UPDATE_FALLBACK_MS);
   });
 }
@@ -143,7 +149,10 @@ if (document.readyState === 'loading') {
 }
 
 if (window.prestashop) {
-  window.prestashop.on(DELIVERY_UPDATE_EVENT, initDeliveryMaps);
+  window.prestashop.on(DELIVERY_UPDATE_EVENT, () => {
+    initDeliveryMaps();
+    deliveryUpdateWaiters.splice(0).forEach((resolve) => resolve());
+  });
 }
 
 // Запасной путь на случай темы без события updatedDeliveryForm; initDeliveryMaps идемпотентна.
