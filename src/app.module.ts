@@ -7,11 +7,11 @@ import { ShopModule } from './shop/shop.module';
 import { AuthModule } from './auth/auth.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { MailService } from './mail/mail.service';
-import { BxbModule } from './bxb/bxb.module';
 import { CashModule } from './cash/cash.module';
 import { BotModule } from './bot/bot.module';
 import { DpdModule } from './dpd/dpd.module';
 import { PostModule } from './post/post.module';
+import { FiveModule } from './five/five.module';
 
 @Module({
   imports: [
@@ -21,11 +21,11 @@ import { PostModule } from './post/post.module';
     YaModule,
     ShopModule,
     AuthModule,
-    BxbModule,
     CashModule,
     DpdModule,
     BotModule,
     PostModule,
+    FiveModule,
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

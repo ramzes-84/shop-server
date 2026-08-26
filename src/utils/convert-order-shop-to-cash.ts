@@ -3,13 +3,39 @@ import {
   CreateCashInvoiceDto,
   CurrenciesTypes,
 } from 'src/cash/dto/cash.dto';
-import { OrderInfoResDto } from 'src/shop/dto/order-info.dto';
+import { ShopOrderInfo } from 'src/shop/dto/order-info.dto';
 import { calcDiscount } from './convertOrder';
-import { CustomerInfoResDto } from 'src/shop/dto/customer-info.dto';
+import { CustomerInfo } from 'src/shop/dto/customer-info.dto';
+import { AddressInfo } from 'src/shop/dto/address-info.dto';
+
+function normalizePhoneToE164(phone?: string): string | undefined {
+  if (!phone) return undefined;
+  const digits = phone.replace(/\D/g, '');
+
+  // Russian-specific common cases:
+  // - leading 8 (local) -> replace with 7
+  // - 10-digit mobile (e.g. 9000000000) -> prefix with 7
+  if (digits.length === 11 && digits.startsWith('8')) {
+    return '7' + digits.slice(1);
+  }
+  if (digits.length === 11 && digits.startsWith('7')) {
+    return digits;
+  }
+  if (digits.length === 10) {
+    return '7' + digits;
+  }
+
+  // If it already looks like an international number (11-15 digits),
+  // return as-is (without a plus). Otherwise return undefined.
+  if (digits.length >= 11 && digits.length <= 15) return digits;
+  return undefined;
+}
 
 export function convertOrderShopToCash(
-  orderDetails: OrderInfoResDto['order'],
-  customerDetails: CustomerInfoResDto['customer'],
+  orderDetails: ShopOrderInfo,
+  customerDetails: CustomerInfo,
+  addressDetails: AddressInfo,
+  sms: boolean = false,
 ): CreateCashInvoiceDto {
   const discount =
     calcDiscount(orderDetails.total_products, orderDetails.total_discounts) ||
@@ -96,7 +122,8 @@ export function convertOrderShopToCash(
     },
     cart: goods,
     delivery_method_data: {
-      type: 'self',
+      type: sms ? 'sms' : 'self',
+      phone: normalizePhoneToE164(addressDetails.phone_mobile) || '79081907675',
     },
     locale: 'ru_RU',
     expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 4).toISOString(),

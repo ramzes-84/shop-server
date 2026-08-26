@@ -2,7 +2,7 @@ export class CustomerInfoResDto {
   customer: CustomerInfo;
 }
 
-class CustomerInfo {
+export class CustomerInfo {
   id: number;
   id_default_group: string;
   id_lang: string;

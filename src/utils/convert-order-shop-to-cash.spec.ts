@@ -2,7 +2,11 @@ import { convertOrderShopToCash } from './convert-order-shop-to-cash';
 import { OrderInfoResDto } from 'src/shop/dto/order-info.dto';
 import { CustomerInfoResDto } from 'src/shop/dto/customer-info.dto';
 import { CreateCashInvoiceDto } from 'src/cash/dto/cash.dto';
-import { customerDetails, orderDetails } from 'src/__test-data__/shop-data';
+import {
+  addressDetails,
+  customerDetails,
+  orderDetails,
+} from 'src/__test-data__/shop-data';
 import { invoiceRequest } from 'src/__test-data__/kassa-data';
 
 describe('convertOrderShopToCash', () => {
@@ -11,6 +15,7 @@ describe('convertOrderShopToCash', () => {
     const testCustomerDetails: CustomerInfoResDto['customer'] = {
       ...customerDetails,
     };
+    const testAddressDetails = { ...addressDetails };
     const expected: CreateCashInvoiceDto = {
       ...invoiceRequest,
     };
@@ -18,6 +23,7 @@ describe('convertOrderShopToCash', () => {
     const result = convertOrderShopToCash(
       testOrderDetails,
       testCustomerDetails,
+      testAddressDetails,
     );
     expected.expires_at = result.expires_at;
 

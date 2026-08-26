@@ -2,7 +2,7 @@ export class AddressInfoResDto {
   address: AddressInfo;
 }
 
-class AddressInfo {
+export class AddressInfo {
   id: number;
   id_customer: string;
   id_country: string;
