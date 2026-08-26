@@ -6,7 +6,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Document</title>
   <link rel="stylesheet" href="index.css">
-  <script defer src="../../build/client/script.js"></script>
+  <link rel="stylesheet" href="../../prestashop/shopserver/views/css/front.css">
+  <script>
+    // Локальный стенд: в бою этот объект отдаёт модуль через Media::addJsDef.
+    window.shopServerFront = {
+      carriers: { '493': 'post', '486': 'dpd', '497': 'yandex' },
+      fivePostKey: '',
+      dpdSid: '',
+      pochtaWidgetId: ''
+    };
+  </script>
+  <script defer src="../../prestashop/shopserver/views/js/front.js"></script>
 </head>
 
 <body>

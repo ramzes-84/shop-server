@@ -16,7 +16,11 @@ class ShopServer extends Module
     public const CONF_TOKEN_TTL = 'SHOPSERVER_TOKEN_TTL';
     public const CONF_CARRIER_YANDEX = 'SHOPSERVER_CARRIER_YANDEX';
     public const CONF_CARRIER_FIVEPOST = 'SHOPSERVER_CARRIER_FIVEPOST';
+    public const CONF_CARRIER_POST = 'SHOPSERVER_CARRIER_POST';
+    public const CONF_CARRIER_DPD = 'SHOPSERVER_CARRIER_DPD';
     public const CONF_FIVEPOST_KEY = 'SHOPSERVER_FIVEPOST_KEY';
+    public const CONF_DPD_SID = 'SHOPSERVER_DPD_SID';
+    public const CONF_POCHTA_WIDGET_ID = 'SHOPSERVER_POCHTA_WIDGET_ID';
 
     private const DEFAULT_TOKEN_TTL = 7200;
     private const MIN_TOKEN_TTL = 300;
@@ -43,12 +47,17 @@ class ShopServer extends Module
     {
         return parent::install()
             && $this->registerHook('displayAdminOrderTop')
+            && $this->registerHook('actionFrontControllerSetMedia')
             && Configuration::updateValue(self::CONF_SECRET, $this->generateSecret())
             && Configuration::updateValue(self::CONF_API_URL, '')
             && Configuration::updateValue(self::CONF_TOKEN_TTL, self::DEFAULT_TOKEN_TTL)
             && Configuration::updateValue(self::CONF_CARRIER_YANDEX, 0)
             && Configuration::updateValue(self::CONF_CARRIER_FIVEPOST, 0)
-            && Configuration::updateValue(self::CONF_FIVEPOST_KEY, '');
+            && Configuration::updateValue(self::CONF_CARRIER_POST, 0)
+            && Configuration::updateValue(self::CONF_CARRIER_DPD, 0)
+            && Configuration::updateValue(self::CONF_FIVEPOST_KEY, '')
+            && Configuration::updateValue(self::CONF_DPD_SID, '')
+            && Configuration::updateValue(self::CONF_POCHTA_WIDGET_ID, '');
     }
 
     public function uninstall(): bool
@@ -112,6 +121,41 @@ class ShopServer extends Module
         return $this->display(__FILE__, 'views/templates/admin/order_actions.tpl');
     }
 
+    /**
+     * Подключает виджеты ПВЗ на шаге доставки в оформлении заказа.
+     */
+    public function hookActionFrontControllerSetMedia(): void
+    {
+        if ($this->context->controller->php_self !== 'order') {
+            return;
+        }
+
+        $carriers = $this->frontCarrierMap();
+
+        if (!$carriers) {
+            return;
+        }
+
+        Media::addJsDef(['shopServerFront' => [
+            'carriers' => $carriers,
+            'fivePostKey' => (string) Configuration::get(self::CONF_FIVEPOST_KEY),
+            'dpdSid' => (string) Configuration::get(self::CONF_DPD_SID),
+            'pochtaWidgetId' => (string) Configuration::get(self::CONF_POCHTA_WIDGET_ID),
+        ]]);
+
+        $this->context->controller->registerStylesheet(
+            'shopserver-front',
+            'modules/' . $this->name . '/views/css/front.css',
+            ['media' => 'all', 'priority' => 150]
+        );
+
+        $this->context->controller->registerJavascript(
+            'shopserver-front',
+            'modules/' . $this->name . '/views/js/front.js',
+            ['position' => 'bottom', 'priority' => 150]
+        );
+    }
+
     public function getContent(): string
     {
         $output = '';
@@ -156,7 +200,11 @@ class ShopServer extends Module
         Configuration::updateValue(self::CONF_TOKEN_TTL, $ttl);
         Configuration::updateValue(self::CONF_CARRIER_YANDEX, (int) Tools::getValue(self::CONF_CARRIER_YANDEX));
         Configuration::updateValue(self::CONF_CARRIER_FIVEPOST, (int) Tools::getValue(self::CONF_CARRIER_FIVEPOST));
+        Configuration::updateValue(self::CONF_CARRIER_POST, (int) Tools::getValue(self::CONF_CARRIER_POST));
+        Configuration::updateValue(self::CONF_CARRIER_DPD, (int) Tools::getValue(self::CONF_CARRIER_DPD));
         Configuration::updateValue(self::CONF_FIVEPOST_KEY, trim((string) Tools::getValue(self::CONF_FIVEPOST_KEY)));
+        Configuration::updateValue(self::CONF_DPD_SID, trim((string) Tools::getValue(self::CONF_DPD_SID)));
+        Configuration::updateValue(self::CONF_POCHTA_WIDGET_ID, trim((string) Tools::getValue(self::CONF_POCHTA_WIDGET_ID)));
 
         return $this->displayConfirmation('Настройки сохранены.');
     }
@@ -196,10 +244,32 @@ class ShopServer extends Module
                         'options' => ['query' => $carrierOptions, 'id' => 'id', 'name' => 'name'],
                     ],
                     [
+                        'type' => 'select',
+                        'label' => 'Перевозчик Почта России',
+                        'name' => self::CONF_CARRIER_POST,
+                        'options' => ['query' => $carrierOptions, 'id' => 'id', 'name' => 'name'],
+                    ],
+                    [
+                        'type' => 'select',
+                        'label' => 'Перевозчик DPD',
+                        'name' => self::CONF_CARRIER_DPD,
+                        'options' => ['query' => $carrierOptions, 'id' => 'id', 'name' => 'name'],
+                    ],
+                    [
                         'type' => 'text',
                         'label' => 'Ключ виджета 5Post',
                         'name' => self::CONF_FIVEPOST_KEY,
-                        'desc' => 'Ключ попадает в браузер сотрудника — используйте ключ, ограниченный доменом.',
+                        'desc' => 'Ключ попадает в браузер покупателя — используйте ключ, ограниченный доменом.',
+                    ],
+                    [
+                        'type' => 'text',
+                        'label' => 'SID чузера DPD',
+                        'name' => self::CONF_DPD_SID,
+                    ],
+                    [
+                        'type' => 'text',
+                        'label' => 'ID виджета Почты России',
+                        'name' => self::CONF_POCHTA_WIDGET_ID,
                     ],
                     [
                         'type' => 'text',
@@ -235,7 +305,11 @@ class ShopServer extends Module
                 self::CONF_TOKEN_TTL => $this->tokenTtl(),
                 self::CONF_CARRIER_YANDEX => (int) Configuration::get(self::CONF_CARRIER_YANDEX),
                 self::CONF_CARRIER_FIVEPOST => (int) Configuration::get(self::CONF_CARRIER_FIVEPOST),
+                self::CONF_CARRIER_POST => (int) Configuration::get(self::CONF_CARRIER_POST),
+                self::CONF_CARRIER_DPD => (int) Configuration::get(self::CONF_CARRIER_DPD),
                 self::CONF_FIVEPOST_KEY => Configuration::get(self::CONF_FIVEPOST_KEY),
+                self::CONF_DPD_SID => Configuration::get(self::CONF_DPD_SID),
+                self::CONF_POCHTA_WIDGET_ID => Configuration::get(self::CONF_POCHTA_WIDGET_ID),
                 'SHOPSERVER_SECRET_READONLY' => Configuration::get(self::CONF_SECRET),
             ],
         ];
@@ -274,21 +348,51 @@ class ShopServer extends Module
             return '';
         }
 
-        $reference = (int) $carrier->id_reference;
+        return $this->carrierTypesByReference()[(int) $carrier->id_reference] ?? '';
+    }
 
-        if ($reference === 0) {
-            return '';
+    /**
+     * @return array<int, string> id_reference => тип перевозчика
+     */
+    private function carrierTypesByReference(): array
+    {
+        $map = [
+            (int) Configuration::get(self::CONF_CARRIER_YANDEX) => 'yandex',
+            (int) Configuration::get(self::CONF_CARRIER_FIVEPOST) => 'fivepost',
+            (int) Configuration::get(self::CONF_CARRIER_POST) => 'post',
+            (int) Configuration::get(self::CONF_CARRIER_DPD) => 'dpd',
+        ];
+
+        unset($map[0]);
+
+        return $map;
+    }
+
+    /**
+     * Витрина знает перевозчика только по id_carrier из радиокнопки, поэтому
+     * сопоставление reference -> тип разворачивается в id_carrier -> тип.
+     *
+     * @return array<string, string>
+     */
+    private function frontCarrierMap(): array
+    {
+        $byReference = $this->carrierTypesByReference();
+
+        if (!$byReference) {
+            return [];
         }
 
-        if ($reference === (int) Configuration::get(self::CONF_CARRIER_YANDEX)) {
-            return 'yandex';
+        $map = [];
+
+        foreach (Carrier::getCarriers((int) $this->context->language->id, true, false, false, null, Carrier::ALL_CARRIERS) as $carrier) {
+            $type = $byReference[(int) $carrier['id_reference']] ?? null;
+
+            if ($type !== null) {
+                $map[(string) $carrier['id_carrier']] = $type;
+            }
         }
 
-        if ($reference === (int) Configuration::get(self::CONF_CARRIER_FIVEPOST)) {
-            return 'fivepost';
-        }
-
-        return '';
+        return $map;
     }
 
     private function tokenTtl(): int
@@ -311,7 +415,11 @@ class ShopServer extends Module
             self::CONF_TOKEN_TTL,
             self::CONF_CARRIER_YANDEX,
             self::CONF_CARRIER_FIVEPOST,
+            self::CONF_CARRIER_POST,
+            self::CONF_CARRIER_DPD,
             self::CONF_FIVEPOST_KEY,
+            self::CONF_DPD_SID,
+            self::CONF_POCHTA_WIDGET_ID,
         ];
     }
 }

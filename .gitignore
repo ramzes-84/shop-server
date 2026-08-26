@@ -3,6 +3,7 @@
 /node_modules
 /build
 /prestashop/shopserver/views/js/backend.js
+/prestashop/shopserver/views/js/front.js
 /prestashop/shopserver.zip
 
 # Logs

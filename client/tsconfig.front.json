@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "outDir": "../build/client"
+    "outDir": "../prestashop/shopserver/views/js"
   },
-  "files": ["src/script.ts"]
+  "files": ["src/front.ts"]
 }
