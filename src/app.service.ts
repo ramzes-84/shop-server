@@ -24,6 +24,7 @@ import { findPointId } from './utils/find-point-from-messages';
 import { checkDeliveryCost } from './utils/check-delivery-cost';
 import { FiveService } from './five/five.service';
 import { describeError, toSafeMessage } from './common/request-context';
+import { getCurrentRequestId } from './common/request-id.storage';
 
 @Injectable()
 export class AppService {
@@ -89,7 +90,12 @@ export class AppService {
     context: Record<string, unknown> = {},
   ): TransferInterface {
     this.logger.error(
-      JSON.stringify({ operation, ...context, error: describeError(error) }),
+      JSON.stringify({
+        requestId: getCurrentRequestId(),
+        operation,
+        ...context,
+        error: describeError(error),
+      }),
     );
 
     return {
