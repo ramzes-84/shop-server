@@ -11,7 +11,7 @@
     "build:backend": "tsc -p client/tsconfig.backend.json",
     "build:front": "tsc -p client/tsconfig.front.json",
     "watch:backend": "tsc -p client/tsconfig.backend.json --watch",
-    "pack:module": "npm run build:client && powershell -NoProfile -Command \"Compress-Archive -Path prestashop/shopserver -DestinationPath prestashop/shopserver.zip -Force\"",
+    "pack:module": "npm run build:client && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pack-module.ps1",
     "start:dev": "nest start --watch",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"client/src/**/*.ts\"",
     "start": "nest start",
