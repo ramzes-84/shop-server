@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "es6",
+    "lib": ["es2017", "dom"],
+    /* Скрипты внедряются в PrestaShop как глобальные: import/export сломает вызовы из inline-кода виджетов. */
+    "module": "none",
+    "strict": true,
+    "types": [],
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "../build/client"
+  },
+  "include": ["src"]
+}
