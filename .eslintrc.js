@@ -18,8 +18,13 @@ module.exports = {
   ignorePatterns: ['.eslintrc.js'],
   overrides: [
     {
-      files: ['client/**/*.ts'],
-      parserOptions: { project: 'client/tsconfig.json' },
+      files: ['client/src/backend.ts'],
+      parserOptions: { project: 'client/tsconfig.backend.json' },
+      env: { browser: true, node: false, jest: false },
+    },
+    {
+      files: ['client/src/script.ts'],
+      parserOptions: { project: 'client/tsconfig.front.json' },
       env: { browser: true, node: false, jest: false },
     },
   ],

@@ -17,6 +17,8 @@ describe('AppModule', () => {
   let module: TestingModule;
 
   beforeEach(async () => {
+    process.env.SHOPSERVER_JWT_SECRET = 'a'.repeat(64);
+
     module = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({

@@ -2,6 +2,8 @@
 /dist
 /node_modules
 /build
+/prestashop/shopserver/views/js/backend.js
+/prestashop/shopserver.zip
 
 # Logs
 logs

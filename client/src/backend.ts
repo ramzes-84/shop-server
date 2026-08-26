@@ -1,71 +1,25 @@
-document.addEventListener('DOMContentLoaded', () => {
-  const orderActionsNode = document.querySelector('.order-navigation');
-  const carrierNode = document.querySelector('td.carrier-name');
-  const isYandexDelivery = carrierNode?.textContent === CargoNames.YANDEX;
-  const isFivePostDelivery = carrierNode?.textContent === CargoNames.FIVE_POST;
+/**
+ * Скрипт панели shop-server на странице заказа PrestaShop.
+ * Всё окружение (адрес сервера, токен, заказ, перевозчик) приходит из модуля
+ * через window.shopServerConfig — из DOM ничего не вычитывается.
+ */
 
-  if (orderActionsNode) {
-    const orderId = findOrderId();
+type ShopServerCarrier = '' | 'yandex' | 'fivepost';
 
-    const invoiceButton = document.createElement('button');
-    invoiceButton.textContent = '💰';
-    invoiceButton.type = 'button';
-    invoiceButton.title = 'Создать счёт';
-    invoiceButton.className = 'btn btn-success';
-    invoiceButton.addEventListener('click', () => {
-      void runExclusive(invoiceButton, () => createInvoice(orderId));
-    });
+type ShopServerConfig = {
+  apiUrl: string;
+  token: string;
+  orderId: string;
+  carrier: ShopServerCarrier;
+  fivePostKey: string;
+};
 
-    orderActionsNode.before(invoiceButton);
-
-    if (isYandexDelivery) {
-      const outerScript = document.createElement('script');
-      outerScript.src = 'https://ndd-widget.landpro.site/widget.js';
-      document.body.append(outerScript);
-
-      const button = document.createElement('button');
-      button.textContent = '🚛';
-      button.type = 'button';
-      button.title = 'Зарегистрировать отправку';
-      button.className = 'btn btn-primary';
-      button.addEventListener('click', () => {
-        void runExclusive(button, () => createOrder(orderId));
-      });
-
-      const mapButton = document.createElement('button');
-      mapButton.textContent = '🌍';
-      mapButton.type = 'button';
-      mapButton.title = 'Посмотреть пункты';
-      mapButton.className = 'btn btn-light';
-      mapButton.addEventListener('click', () => {
-        openMap(CargoNames.YANDEX);
-      });
-
-      orderActionsNode.before(mapButton, button);
-    } else if (isFivePostDelivery) {
-      const outerScript = document.createElement('script');
-      outerScript.src = 'https://fivepost.ru/static/5post-widget-v1.0.js';
-      document.body.append(outerScript);
-
-      const mapButton = document.createElement('button');
-      mapButton.textContent = '🌍';
-      mapButton.type = 'button';
-      mapButton.title = 'Посмотреть пункты';
-      mapButton.className = 'btn btn-light';
-      mapButton.addEventListener('click', () => {
-        openMap(CargoNames.FIVE_POST);
-      });
-
-      orderActionsNode.before(mapButton);
-    }
-  }
-});
-
-enum CargoNames {
-  POST = 'Почтоматы: Почта России (ОПЛАТА СЕЙЧАС НА САЙТЕ)',
-  DPD = 'Пункты DPD',
-  FIVE_POST = '5Post: Пятёрочки и постаматы (ОПЛАТА СЕЙЧАС НА САЙТЕ)',
-  YANDEX = 'Пункты Яндекс.Маркет (ОПЛАТА СЕЙЧАС НА САЙТЕ)',
+// Расширение глобального Window: значения приходят из модуля PrestaShop и из inline-скриптов виджетов.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+interface Window {
+  shopServerConfig?: ShopServerConfig;
+  __fivepostMaps?: Record<string, { destroy: () => void }>;
+  destroyFivepostMap?: (id: string) => void;
 }
 
 type YandexData = {
@@ -79,42 +33,18 @@ type YandexData = {
 
 type FivePostPointData = {
   id: string;
-  name: string;
-  storeId: string;
-  partnerName: string;
-  type: string;
   fullAddress: string;
-  address: {
-    country: string;
-    zipCode: string;
-    region: string;
-    city: string;
-    regionType: string;
-    cityType: string;
-    street: string;
-    house: string;
-    building: string;
-    metroStation: string;
-    lat: number;
-    lng: number;
-  };
   additional: string;
-  phone: string;
-  cashAllowed: boolean;
-  cardAllowed: boolean;
-  returnAllowed: boolean;
-  workHoursBrief: string;
   label: string;
   resultAddress: string;
 };
 
 type TransferInterface = {
   ok: boolean;
-  data: any;
+  data: Record<string, unknown>;
 };
 
-enum Endpoints {
-  BXB_CREATE = '/boxberry/create',
+const enum Endpoints {
   YA_CREATE = '/yandex/create',
   INVOICE = '/cash/create',
 }
@@ -125,127 +55,157 @@ type RequestParams = {
 };
 
 const REQUEST_TIMEOUT_MS = 15_000;
+const YA_WIDGET_SRC = 'https://ndd-widget.landpro.site/widget.js';
+const FIVEPOST_WIDGET_SRC = 'https://fivepost.ru/static/5post-widget-v1.0.js';
 
-function findOrderId() {
-  return document.querySelector('*[data-role=order-id]')?.textContent?.slice(1);
+const SESSION_EXPIRED_MESSAGE =
+  'Сессия истекла. Обновите страницу заказа и повторите действие.';
+
+function initShopServerPanel() {
+  const config = window.shopServerConfig;
+  const panel = document.querySelector('.shopserver-panel');
+
+  if (!config || !panel) return;
+
+  panel.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    const button = target.closest<HTMLButtonElement>(
+      'button[data-shopserver-action]',
+    );
+    if (!button) return;
+
+    switch (button.dataset.shopserverAction) {
+      case 'invoice':
+        void runExclusive(button, () => createInvoice(config));
+        break;
+      case 'create-order':
+        void runExclusive(button, () => createOrder(config));
+        break;
+      case 'map':
+        openMap(config);
+        break;
+    }
+  });
 }
 
-// runtime window properties for fivepost instances will be accessed as (window as any)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initShopServerPanel);
+} else {
+  initShopServerPanel();
+}
 
-function openMap(carrier: CargoNames) {
-  const popupContainer = document.createElement('dialog');
-  popupContainer.open = true;
-  popupContainer.style.position = 'absolute';
-  popupContainer.style.top = '150px';
-  popupContainer.style.width = '70vw';
+function loadScript(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error(`Не удалось загрузить ${src}`));
+    document.body.append(script);
+  });
+}
 
-  const customScript = document.createElement('script');
+function openMap(config: ShopServerConfig) {
+  if (config.carrier === 'yandex') {
+    void openYandexMap();
+    return;
+  }
 
-  const closePopupBtn = document.createElement('button');
-  closePopupBtn.innerText = 'Закрыть';
-  const closePopupBtnStyle = {
-    display: 'block',
-    backgroundColor: '#24b9d7',
-    height: '45px',
-    width: '100%',
-    border: 'none',
-    fontFamily: 'Manrope, sans-serif',
-    fontSize: '1rem',
-    fontWeight: '500',
-    textTransform: 'uppercase',
-    color: 'white',
-    textAlign: 'center',
-  };
-  Object.assign(closePopupBtn.style, closePopupBtnStyle);
-  closePopupBtn.addEventListener('click', () => {
-    popupContainer.remove();
+  if (config.carrier === 'fivepost') {
+    void openFivePostMap(config.fivePostKey);
+  }
+}
+
+function buildDialog(): {
+  dialog: HTMLDialogElement;
+  closeButton: HTMLButtonElement;
+} {
+  const dialog = document.createElement('dialog');
+  dialog.className = 'shopserver-dialog';
+  dialog.open = true;
+
+  const closeButton = document.createElement('button');
+  closeButton.type = 'button';
+  closeButton.className = 'shopserver-dialog-close';
+  closeButton.textContent = 'Закрыть';
+  closeButton.addEventListener('click', () => dialog.remove());
+
+  return { dialog, closeButton };
+}
+
+async function openYandexMap() {
+  const { dialog, closeButton } = buildDialog();
+
+  const container = document.createElement('div');
+  container.id = `ya-map-${Date.now()}`;
+  container.className = 'shopserver-dialog-map';
+  dialog.append(container, closeButton);
+  document.body.append(dialog);
+
+  try {
+    await loadScript(YA_WIDGET_SRC);
+  } catch {
+    container.textContent = 'Не удалось загрузить виджет Яндекс.Доставки';
+    return;
+  }
+
+  const script = document.createElement('script');
+  script.text = buildYaWidgetScript(container.id);
+  dialog.append(script);
+}
+
+async function openFivePostMap(apiKey: string) {
+  const { dialog, closeButton } = buildDialog();
+
+  const mapId = `fivepost-map-${Date.now()}`;
+  const infoId = `fivepost-info-${Date.now()}`;
+
+  const mapContainer = document.createElement('div');
+  mapContainer.id = mapId;
+  mapContainer.className = 'shopserver-dialog-map';
+
+  const infoContainer = document.createElement('div');
+  infoContainer.id = infoId;
+  infoContainer.className = 'shopserver-dialog-info';
+  infoContainer.textContent = 'Выберите пункт выдачи';
+
+  dialog.append(mapContainer, infoContainer, closeButton);
+  document.body.append(dialog);
+
+  closeButton.addEventListener('click', () => {
+    window.destroyFivepostMap?.(mapId);
   });
 
-  // create containers depending on carrier
-  if (carrier === CargoNames.YANDEX) {
-    const yaDostavkaContainer = document.createElement('div');
-    yaDostavkaContainer.id = 'delivery-widget';
-    popupContainer.append(yaDostavkaContainer);
-
-    customScript.innerText = buildYaWidgetBackEndScript(yaDostavkaContainer.id);
-
-    popupContainer.append(closePopupBtn, customScript);
-    document.body.append(popupContainer);
+  if (!apiKey) {
+    infoContainer.textContent =
+      'Ключ виджета 5Post не задан в настройках модуля';
     return;
   }
 
-  if (carrier === CargoNames.FIVE_POST) {
-    // ensure widget script loaded then initialize
-    const fivePostScript = document.createElement('script');
-    fivePostScript.src = 'https://fivepost.ru/static/5post-widget-v1.0.js';
-
-    // create unique ids to avoid collisions
-    const mapId = `fivepost-map-${Date.now()}`;
-    const infoId = `fivepost-info-${Date.now()}`;
-
-    const mapWrapper = document.createElement('div');
-    mapWrapper.style.minWidth = '300px';
-    mapWrapper.style.minHeight = '300px';
-    mapWrapper.style.width = '100%';
-    mapWrapper.className = 'fivepost-backend-wrapper';
-
-    const fivePostMapContainer = document.createElement('div');
-    fivePostMapContainer.id = mapId;
-    fivePostMapContainer.style.width = '100%';
-    fivePostMapContainer.style.height = '400px';
-    fivePostMapContainer.style.background = '#f7f7f7';
-
-    const fivePostTextContainer = document.createElement('div');
-    fivePostTextContainer.id = infoId;
-    fivePostTextContainer.innerText = 'Выберите пункт выдачи';
-
-    mapWrapper.append(fivePostMapContainer, fivePostTextContainer);
-    popupContainer.append(mapWrapper);
-
-    // after the external script loads, insert the inline init
-    fivePostScript.onload = () => {
-      customScript.innerText = buildFivePostWidgetBackEndScript(mapId, infoId);
-      // ensure that when the close button is clicked we also destroy the fivepost map instance
-      closePopupBtn.addEventListener('click', () => {
-        try {
-          if ((window as any).destroyFivepostMap) {
-            (window as any).destroyFivepostMap(mapId);
-          }
-        } catch (e) {
-          console.error('Error destroying backend fivepost map on close', e);
-        }
-      });
-
-      popupContainer.append(closePopupBtn, customScript);
-    };
-
-    fivePostScript.onerror = () => {
-      console.error('Failed to load fivepost widget script');
-      popupContainer.append(closePopupBtn);
-    };
-
-    document.body.append(fivePostScript, popupContainer);
+  try {
+    await loadScript(FIVEPOST_WIDGET_SRC);
+  } catch {
+    infoContainer.textContent = 'Не удалось загрузить виджет 5Post';
     return;
   }
 
-  // fallback: just append close button
-  popupContainer.append(closePopupBtn);
-  document.body.append(popupContainer);
+  const script = document.createElement('script');
+  script.text = buildFivePostWidgetScript(mapId, infoId, apiKey);
+  dialog.append(script);
 }
 
-// Вызывается по имени из inline-скрипта виджета Яндекса — статический анализ этого не видит.
+// Вызывается по имени из inline-скриптов виджетов — статический анализ этого не видит.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function saveDestination(data: YandexData | FivePostPointData) {
   const messageElement = document.querySelector('#order_message_message');
   if (!(messageElement instanceof HTMLTextAreaElement)) return;
 
-  let message = '';
   if ('detail' in data) {
-    message = `Уточните, удобно ли Вам будет получить заказ в пункте Я.Маркет по адресу: ${data.detail.address.full_address} [ID: ${data.detail.id}]?`;
+    messageElement.value = `Уточните, удобно ли Вам будет получить заказ в пункте Я.Маркет по адресу: ${data.detail.address.full_address} [ID: ${data.detail.id}]?`;
   } else if ('id' in data) {
-    message = `Уточните, удобно ли Вам будет получить заказ в пункте Five Post по адресу: ${data.fullAddress} [ID: ${data.id}]?`;
+    messageElement.value = `Уточните, удобно ли Вам будет получить заказ в пункте Five Post по адресу: ${data.fullAddress} [ID: ${data.id}]?`;
   }
-  messageElement.value = message;
 }
 
 // Блокирует кнопку на время операции, чтобы повторный клик не создал дубль счёта или отправки.
@@ -269,21 +229,18 @@ async function runExclusive(
   }
 }
 
-async function createInvoice(orderId: string | null | undefined) {
-  if (!orderId) {
-    alert('Не удалось корректно получить данные для оформления');
-    return;
-  }
+async function createInvoice(config: ShopServerConfig) {
   if (!confirm('Вы уверены, что хотите создать счёт?')) return;
 
   const sms = confirm('Направить счёт в SMS?');
 
   try {
-    const result = await fetchFromServer(Endpoints.INVOICE, 'POST', {
-      orderId,
+    const result = await fetchFromServer(config, Endpoints.INVOICE, {
+      orderId: config.orderId,
       sms,
     });
-    if (result.ok && result.data.url) {
+
+    if (result.ok && typeof result.data.url === 'string') {
       await copyToClipboard(result.data.url);
       alert('Счёт успешно создан. Ссылка: ' + result.data.url);
     } else if (result.ok && result.data.type === 'sms') {
@@ -296,37 +253,33 @@ async function createInvoice(orderId: string | null | undefined) {
   }
 }
 
-async function createOrder(orderId: string | null | undefined) {
-  if (!orderId) {
-    alert('Не удалось корректно получить данные для оформления');
-    return;
-  }
+async function createOrder(config: ShopServerConfig) {
   if (!confirm('Вы уверены, что хотите создать заказ?')) return;
 
-  const currentEndpoint = Endpoints.YA_CREATE;
-
   try {
-    const result = await fetchFromServer(currentEndpoint, 'POST', {
-      orderId,
+    const result = await fetchFromServer(config, Endpoints.YA_CREATE, {
+      orderId: config.orderId,
     });
-    if (result.ok) {
-      let trackNumber = '';
-      if ('sharing_url' in result.data) {
-        trackNumber = (result.data.sharing_url as string).replace(
-          'https://dostavka.yandex.ru/route/',
-          '',
-        );
-      } else if ('track' in result.data) {
-        trackNumber = result.data.track;
-      }
 
-      await copyToClipboard(trackNumber);
-      alert(
-        `Трек-номер для отправки клиенту скопирован в буфер обмена: \n${trackNumber}`,
-      );
-    } else {
+    if (!result.ok) {
       alert('Не удалось создать заказ');
+      return;
     }
+
+    let trackNumber = '';
+    if (typeof result.data.sharing_url === 'string') {
+      trackNumber = result.data.sharing_url.replace(
+        'https://dostavka.yandex.ru/route/',
+        '',
+      );
+    } else if (typeof result.data.track === 'string') {
+      trackNumber = result.data.track;
+    }
+
+    await copyToClipboard(trackNumber);
+    alert(
+      `Трек-номер для отправки клиенту скопирован в буфер обмена: \n${trackNumber}`,
+    );
   } catch (error) {
     alert(error instanceof Error ? error.message : 'Не удалось создать заказ');
   }
@@ -341,11 +294,11 @@ async function copyToClipboard(text: string) {
 }
 
 async function fetchFromServer(
+  config: ShopServerConfig,
   endpoint: Endpoints,
-  method: 'POST',
   params: RequestParams,
 ): Promise<TransferInterface> {
-  const url = new URL('https://shop-server-4y1m.onrender.com' + endpoint);
+  const url = new URL(config.apiUrl + endpoint);
 
   const controller = new AbortController();
   const timeoutId = window.setTimeout(
@@ -356,10 +309,10 @@ async function fetchFromServer(
   let response: Response;
   try {
     response = await fetch(url.toString(), {
-      method,
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${btoa(window.location.pathname.split('/')[1])}`,
+        Authorization: `Bearer ${config.token}`,
       },
       body: JSON.stringify(params),
       signal: controller.signal,
@@ -375,6 +328,10 @@ async function fetchFromServer(
     window.clearTimeout(timeoutId);
   }
 
+  if (response.status === 401) {
+    throw new Error(SESSION_EXPIRED_MESSAGE);
+  }
+
   if (!response.ok) {
     throw new Error(
       `Не удалось выполнить запрос к серверу: ${response.status}`,
@@ -384,11 +341,11 @@ async function fetchFromServer(
   return response.json();
 }
 
-const buildYaWidgetBackEndScript = (containerId: string) => `
+const buildYaWidgetScript = (containerId: string) => `
 (function(w){
   function startWidget() {
     w.YaDelivery.createWidget({
-      containerId:"${containerId}",
+      containerId: ${JSON.stringify(containerId)},
       params:{
         city:"Москва",
         size:{"height":"450px","width":"100%"},
@@ -411,7 +368,11 @@ document.addEventListener("YaNddWidgetPointSelected", function (data) {
 }, true);
 `;
 
-const buildFivePostWidgetBackEndScript = (mapId: string, infoId: string) => `
+const buildFivePostWidgetScript = (
+  mapId: string,
+  infoId: string,
+  apiKey: string,
+) => `
 window.__fivepostMaps = window.__fivepostMaps || {};
 window.destroyFivepostMap = window.destroyFivepostMap || function (id) {
   try {
@@ -425,43 +386,38 @@ window.destroyFivepostMap = window.destroyFivepostMap || function (id) {
 };
 
 setTimeout(function initFivepostWidget() {
-  try {
-    if (window.__fivepostMaps && window.__fivepostMaps['${mapId}']) {
-      try { window.__fivepostMaps['${mapId}'].destroy(); } catch(e){ console.warn('Existing fivepostMap.destroy() failed', e); }
-      delete window.__fivepostMaps['${mapId}'];
-    }
+  var mapId = ${JSON.stringify(mapId)};
+  var infoId = ${JSON.stringify(infoId)};
 
-    const fivepostMap = new fivepost.PickupPointsMap({
-      apikey: 'd986ab4c-1a82-443d-b833-706578a4137d',
-      target: '#${mapId}',
-      onSelectPoint: point => {
+  try {
+    window.destroyFivepostMap(mapId);
+
+    window.__fivepostMaps[mapId] = new fivepost.PickupPointsMap({
+      apikey: ${JSON.stringify(apiKey)},
+      target: '#' + mapId,
+      onSelectPoint: function (point) {
         saveDestination(point);
-        const pointInfoContainer = document.getElementById('${infoId}');
+        var pointInfoContainer = document.getElementById(infoId);
 
         if (!pointInfoContainer) {
           return;
         }
 
-        if (point) {
-          pointInfoContainer.innerHTML = '<p>' + point.label + '</p>' +
-            '<p><b>Адрес:</b> ' + point.resultAddress + '</p>' +
-            (point.additional ? '<p><b>Местонахождение:</b> ' + point.additional + '</p>' : '');
-        } else {
-          pointInfoContainer.innerHTML = 'Выберите точку';
+        if (!point) {
+          pointInfoContainer.textContent = 'Выберите точку';
+          return;
         }
-      },
-      onLoadYandexApi: () => {
-        console.log('onLoadYandexApi');
-      },
-      onInit: () => {
-        console.log('onInit');
-      },
-      onCancel: point => {
-        console.log('canceled', point);
+
+        pointInfoContainer.textContent = '';
+        [point.label, 'Адрес: ' + point.resultAddress, point.additional ? 'Местонахождение: ' + point.additional : '']
+          .filter(Boolean)
+          .forEach(function (line) {
+            var p = document.createElement('p');
+            p.textContent = line;
+            pointInfoContainer.appendChild(p);
+          });
       }
     });
-
-    window.__fivepostMaps['${mapId}'] = fivepostMap;
   } catch (e) {
     console.error('initFivepostWidget error', e);
   }

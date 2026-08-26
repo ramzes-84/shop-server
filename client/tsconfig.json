@@ -7,8 +7,9 @@
     "strict": true,
     "types": [],
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "outDir": "../build/client"
+    "forceConsistentCasingInFileNames": true
   },
-  "include": ["src"]
+  /* Каждый скрипт собирается отдельно (tsconfig.backend.json / tsconfig.front.json):
+     в общем глобальном scope их объявления конфликтуют. */
+  "files": []
 }

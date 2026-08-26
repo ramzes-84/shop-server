@@ -1,15 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth.module';
-import { AuthService } from './auth.service';
-import { BearerStrategy } from './strategies/bearer.strategy/bearer.strategy';
+import { JwtStrategy } from './strategies/jwt.strategy/jwt.strategy';
 import { PassportModule } from '@nestjs/passport';
 
 describe('AuthModule', () => {
   let module: TestingModule;
 
   beforeEach(async () => {
+    process.env.SHOPSERVER_JWT_SECRET = 'a'.repeat(64);
+
     module = await Test.createTestingModule({
-      imports: [AuthModule],
+      imports: [ConfigModule.forRoot({ isGlobal: true }), AuthModule],
     }).compile();
   });
 
@@ -23,13 +25,8 @@ describe('AuthModule', () => {
     expect(passportModule).toBeDefined();
   });
 
-  it('should provide AuthService', () => {
-    const authService = module.get<AuthService>(AuthService);
-    expect(authService).toBeDefined();
-  });
-
-  it('should provide BearerStrategy', () => {
-    const bearerStrategy = module.get<BearerStrategy>(BearerStrategy);
-    expect(bearerStrategy).toBeDefined();
+  it('should provide JwtStrategy', () => {
+    const jwtStrategy = module.get<JwtStrategy>(JwtStrategy);
+    expect(jwtStrategy).toBeDefined();
   });
 });
