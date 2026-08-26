@@ -79,6 +79,11 @@ class ShopServer extends Module
         }
 
         $employee = $this->context->employee;
+
+        if (!Validate::isLoadedObject($employee)) {
+            return '';
+        }
+
         $token = ShopServerJwtSigner::issueForEmployee(
             (int) $employee->id,
             (string) $employee->email,
