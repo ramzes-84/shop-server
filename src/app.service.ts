@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ShopService } from './shop/shop.service';
 import { YaService } from './ya/ya.service';
 import { CreateYaOrderDto } from './ya/dto/ya.dto';
@@ -23,9 +23,11 @@ import { PostService } from './post/post.service';
 import { findPointId } from './utils/find-point-from-messages';
 import { checkDeliveryCost } from './utils/check-delivery-cost';
 import { FiveService } from './five/five.service';
+import { describeError, toSafeMessage } from './common/request-context';
 
 @Injectable()
 export class AppService {
+  private readonly logger = new Logger(AppService.name);
   private readonly unifiedStateTargetMap: Partial<
     Record<UnifiedOrderState, number>
   >;
@@ -80,6 +82,22 @@ export class AppService {
     return `Hello World!`;
   }
 
+  /** Полная ошибка уходит в лог, наружу — только текст, пригодный для показа сотруднику. */
+  private failure(
+    operation: string,
+    error: unknown,
+    context: Record<string, unknown> = {},
+  ): TransferInterface {
+    this.logger.error(
+      JSON.stringify({ operation, ...context, error: describeError(error) }),
+    );
+
+    return {
+      ok: false,
+      data: { message: toSafeMessage(error) },
+    };
+  }
+
   async getOrderInfo(id: string): Promise<TransferInterface> {
     try {
       const response = await this.yaService.getOrderInfo(id);
@@ -88,10 +106,7 @@ export class AppService {
         data: { sharing_url: response.sharing_url },
       };
     } catch (error) {
-      return {
-        ok: false,
-        data: error,
-      };
+      return this.failure('getOrderInfo', error, { id });
     }
   }
 
@@ -142,10 +157,7 @@ export class AppService {
     } catch (error) {
       message = `❗ Ошибка при создании счёта для заказа ${orderId}: ${error instanceof Error ? error.message : String(error ?? 'Unknown error')}`;
 
-      return {
-        ok: false,
-        data: error,
-      };
+      return this.failure('createCashInvoice', error, { orderId });
     } finally {
       await this.botService.sendEmployeeMessage(
         message,
@@ -186,7 +198,7 @@ export class AppService {
       if (!destination) {
         return {
           ok: false,
-          data: 'Error: destination point not found',
+          data: { message: 'Пункт выдачи не найден в переписке по заказу' },
         };
       }
 
@@ -218,10 +230,7 @@ export class AppService {
         data: { sharing_url: orderInfo.sharing_url },
       };
     } catch (error) {
-      return {
-        ok: false,
-        data: error,
-      };
+      return this.failure('createYaOrder', error, { orderId });
     }
   }
 

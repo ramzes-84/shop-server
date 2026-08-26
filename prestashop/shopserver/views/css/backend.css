@@ -8,6 +8,66 @@
   cursor: progress;
 }
 
+.shopserver-notice {
+  position: relative;
+  margin: 12px 16px 16px;
+  padding: 12px 36px 12px 14px;
+  border-left: 4px solid;
+  border-radius: 3px;
+}
+
+.shopserver-notice--success {
+  border-color: #4caf50;
+  background: #edf7ed;
+}
+
+.shopserver-notice--error {
+  border-color: #d9534f;
+  background: #fdf0f0;
+}
+
+.shopserver-notice-text {
+  margin: 0;
+  font-weight: 600;
+}
+
+.shopserver-notice-value {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.06);
+  word-break: break-all;
+}
+
+.shopserver-notice-details {
+  margin-top: 10px;
+}
+
+.shopserver-notice-details summary {
+  cursor: pointer;
+  color: #6c757d;
+}
+
+.shopserver-notice-details pre {
+  margin: 8px 0;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.04);
+  white-space: pre-wrap;
+}
+
+.shopserver-notice-close {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 20px;
+  line-height: 1;
+  color: #6c757d;
+  cursor: pointer;
+}
+
 .shopserver-dialog {
   position: fixed;
   top: 10vh;

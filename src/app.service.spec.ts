@@ -385,7 +385,10 @@ describe('AppService', () => {
 
       const result = await service.createYaOrder(createOrderQueries);
 
-      expect(result).toEqual({ ok: false, data: mockError });
+      expect(result).toEqual({
+        ok: false,
+        data: { message: 'Something went wrong' },
+      });
     });
   });
 
@@ -428,7 +431,7 @@ describe('AppService', () => {
       const result = await service.getOrderInfo('1');
       expect(result).toEqual({
         ok: false,
-        data: mockError,
+        data: { message: 'Something went wrong' },
       });
     });
   });
@@ -477,7 +480,7 @@ describe('AppService', () => {
 
       const result = await service.createCashInvoice({ orderId: '13' } as any);
 
-      expect(result).toEqual({ ok: false, data: failure });
+      expect(result).toEqual({ ok: false, data: { message: 'cash failed' } });
       expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
         expect.stringContaining('Ошибка при создании счёта для заказа 13'),
         true,

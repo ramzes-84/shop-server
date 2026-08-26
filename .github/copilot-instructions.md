@@ -23,7 +23,6 @@ npm run build         # nest build
 npm run build:client  # оба клиентских скрипта в модуль
 npm run pack:module   # сборка + prestashop/shopserver.zip
 ```
-
 Перед коммитом прогоняйте `npm run lint` и `npm test` — на `pre-commit` висит husky + lint-staged.
 
 ## Ключевые решения

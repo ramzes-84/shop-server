@@ -1,7 +1,8 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { RequestIdMiddleware } from './common/request-id.middleware';
 import { YaModule } from './ya/ya.module';
 import { ShopModule } from './shop/shop.module';
 import { AuthModule } from './auth/auth.module';
@@ -47,4 +48,8 @@ import { FiveModule } from './five/five.module';
   controllers: [AppController],
   providers: [AppService, MailService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestIdMiddleware).forRoutes('*');
+  }
+}

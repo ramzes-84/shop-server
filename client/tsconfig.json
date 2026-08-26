@@ -7,9 +7,10 @@
     "strict": true,
     "types": [],
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "../prestashop/shopserver/views/js"
   },
-  /* Каждый скрипт собирается отдельно (tsconfig.backend.json / tsconfig.front.json):
-     в общем глобальном scope их объявления конфликтуют. */
-  "files": []
+  /* Оба скрипта живут в одной глобальной области, поэтому имена верхнего уровня
+     не должны пересекаться между backend.ts и front.ts. */
+  "include": ["src"]
 }

@@ -19,12 +19,7 @@ module.exports = {
   overrides: [
     {
       files: ['client/**/*.ts'],
-      parserOptions: {
-        project: [
-          'client/tsconfig.backend.json',
-          'client/tsconfig.front.json',
-        ],
-      },
+      parserOptions: { project: 'client/tsconfig.json' },
       env: { browser: true, node: false, jest: false },
     },
   ],

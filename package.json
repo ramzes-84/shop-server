@@ -7,10 +7,8 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
-    "build:client": "npm run build:backend && npm run build:front",
-    "build:backend": "tsc -p client/tsconfig.backend.json",
-    "build:front": "tsc -p client/tsconfig.front.json",
-    "watch:backend": "tsc -p client/tsconfig.backend.json --watch",
+    "build:client": "tsc -p client/tsconfig.json",
+    "watch:client": "tsc -p client/tsconfig.json --watch",
     "pack:module": "npm run build:client && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pack-module.ps1",
     "start:dev": "nest start --watch",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"client/src/**/*.ts\"",

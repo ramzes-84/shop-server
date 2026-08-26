@@ -61,6 +61,106 @@ const FIVEPOST_WIDGET_SRC = 'https://fivepost.ru/static/5post-widget-v1.0.js';
 const SESSION_EXPIRED_MESSAGE =
   'Сессия истекла. Обновите страницу заказа и повторите действие.';
 
+const REQUEST_ID_HEADER = 'X-Request-Id';
+
+/** Только то, что безопасно переслать в чат: токен сюда попасть не должен. */
+type NoticeDetails = {
+  action: string;
+  endpoint: string;
+  orderId: string;
+  status?: number | string;
+  requestId?: string | null;
+};
+
+type Notice = {
+  type: 'success' | 'error';
+  message: string;
+  value?: string;
+  details?: NoticeDetails;
+};
+
+class ShopServerError extends Error {
+  readonly details: NoticeDetails;
+
+  constructor(message: string, details: NoticeDetails) {
+    super(message);
+    this.name = 'ShopServerError';
+    this.details = details;
+  }
+}
+
+function showNotice(notice: Notice) {
+  const panel = document.querySelector('.shopserver-panel');
+  if (!panel) return;
+
+  panel.querySelector('.shopserver-notice')?.remove();
+
+  const box = document.createElement('div');
+  box.className = `shopserver-notice shopserver-notice--${notice.type}`;
+  box.setAttribute('role', notice.type === 'error' ? 'alert' : 'status');
+
+  const text = document.createElement('p');
+  text.className = 'shopserver-notice-text';
+  text.textContent = notice.message;
+  box.append(text);
+
+  if (notice.value) {
+    const value = document.createElement('code');
+    value.className = 'shopserver-notice-value';
+    value.textContent = notice.value;
+    box.append(value);
+  }
+
+  if (notice.details) {
+    box.append(buildNoticeDetails(notice.details));
+  }
+
+  const dismiss = document.createElement('button');
+  dismiss.type = 'button';
+  dismiss.className = 'shopserver-notice-close';
+  dismiss.textContent = '×';
+  dismiss.title = 'Скрыть';
+  dismiss.addEventListener('click', () => box.remove());
+  box.append(dismiss);
+
+  panel.append(box);
+}
+
+function buildNoticeDetails(details: NoticeDetails): HTMLElement {
+  const report = [
+    `Время: ${new Date().toLocaleString()}`,
+    `Действие: ${details.action}`,
+    `Заказ: ${details.orderId}`,
+    `Запрос: POST ${details.endpoint}`,
+    `Статус: ${details.status ?? '—'}`,
+    `ID запроса: ${details.requestId ?? '—'}`,
+  ].join('\n');
+
+  const wrapper = document.createElement('details');
+  wrapper.className = 'shopserver-notice-details';
+
+  const summary = document.createElement('summary');
+  summary.textContent = 'Детали для разработчика';
+  wrapper.append(summary);
+
+  const pre = document.createElement('pre');
+  pre.textContent = report;
+  wrapper.append(pre);
+
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.className = 'btn btn-sm btn-outline-secondary';
+  copy.textContent = 'Скопировать';
+  copy.addEventListener('click', () => {
+    void copyToClipboard(report).then(() => {
+      copy.textContent = 'Скопировано';
+    });
+  });
+  wrapper.append(copy);
+
+  return wrapper;
+}
+
 function initShopServerPanel() {
   const config = window.shopServerConfig;
   const panel = document.querySelector('.shopserver-panel');
@@ -151,7 +251,7 @@ async function openYandexMap() {
   }
 
   const script = document.createElement('script');
-  script.text = buildYaWidgetScript(container.id);
+  script.text = buildYaWidgetAdminScript(container.id);
   dialog.append(script);
 }
 
@@ -191,7 +291,7 @@ async function openFivePostMap(apiKey: string) {
   }
 
   const script = document.createElement('script');
-  script.text = buildFivePostWidgetScript(mapId, infoId, apiKey);
+  script.text = buildFivePostWidgetAdminScript(mapId, infoId, apiKey);
   dialog.append(script);
 }
 
@@ -234,55 +334,104 @@ async function createInvoice(config: ShopServerConfig) {
 
   const sms = confirm('Направить счёт в SMS?');
 
-  try {
-    const result = await fetchFromServer(config, Endpoints.INVOICE, {
-      orderId: config.orderId,
-      sms,
-    });
-
-    if (result.ok && typeof result.data.url === 'string') {
-      await copyToClipboard(result.data.url);
-      alert('Счёт успешно создан. Ссылка: ' + result.data.url);
-    } else if (result.ok && result.data.type === 'sms') {
-      alert('Счёт успешно направлен в SMS');
-    } else {
-      alert('Не удалось создать счёт');
-    }
-  } catch (error) {
-    alert(error instanceof Error ? error.message : 'Не удалось создать счёт');
-  }
+  await runAction(config, 'Создание счёта', Endpoints.INVOICE, {
+    orderId: config.orderId,
+    sms,
+  });
 }
 
 async function createOrder(config: ShopServerConfig) {
   if (!confirm('Вы уверены, что хотите создать заказ?')) return;
 
-  try {
-    const result = await fetchFromServer(config, Endpoints.YA_CREATE, {
-      orderId: config.orderId,
-    });
+  await runAction(config, 'Регистрация отправки', Endpoints.YA_CREATE, {
+    orderId: config.orderId,
+  });
+}
 
-    if (!result.ok) {
-      alert('Не удалось создать заказ');
+async function runAction(
+  config: ShopServerConfig,
+  action: string,
+  endpoint: Endpoints,
+  params: RequestParams,
+) {
+  try {
+    const { body, requestId } = await fetchFromServer(
+      config,
+      endpoint,
+      params,
+      action,
+    );
+
+    if (!body.ok) {
+      showNotice({
+        type: 'error',
+        message: serverMessage(body) ?? `${action}: сервер отклонил запрос`,
+        details: {
+          action,
+          endpoint,
+          status: 200,
+          requestId,
+          orderId: config.orderId,
+        },
+      });
       return;
     }
 
-    let trackNumber = '';
-    if (typeof result.data.sharing_url === 'string') {
-      trackNumber = result.data.sharing_url.replace(
-        'https://dostavka.yandex.ru/route/',
-        '',
-      );
-    } else if (typeof result.data.track === 'string') {
-      trackNumber = result.data.track;
-    }
-
-    await copyToClipboard(trackNumber);
-    alert(
-      `Трек-номер для отправки клиенту скопирован в буфер обмена: \n${trackNumber}`,
-    );
+    await showSuccess(action, body);
   } catch (error) {
-    alert(error instanceof Error ? error.message : 'Не удалось создать заказ');
+    showNotice({
+      type: 'error',
+      message: error instanceof Error ? error.message : `${action}: ошибка`,
+      details:
+        error instanceof ShopServerError
+          ? error.details
+          : { action, endpoint, orderId: config.orderId },
+    });
   }
+}
+
+function serverMessage(body: TransferInterface): string | null {
+  const message = (body.data as { message?: unknown } | undefined)?.message;
+  return typeof message === 'string' && message ? message : null;
+}
+
+async function showSuccess(action: string, body: TransferInterface) {
+  if (typeof body.data.url === 'string') {
+    await copyToClipboard(body.data.url);
+    showNotice({
+      type: 'success',
+      message: 'Счёт создан, ссылка скопирована в буфер обмена.',
+      value: body.data.url,
+    });
+    return;
+  }
+
+  if (body.data.type === 'sms') {
+    showNotice({ type: 'success', message: 'Счёт направлен в SMS.' });
+    return;
+  }
+
+  let trackNumber = '';
+  if (typeof body.data.sharing_url === 'string') {
+    trackNumber = body.data.sharing_url.replace(
+      'https://dostavka.yandex.ru/route/',
+      '',
+    );
+  } else if (typeof body.data.track === 'string') {
+    trackNumber = body.data.track;
+  }
+
+  if (trackNumber) {
+    await copyToClipboard(trackNumber);
+    showNotice({
+      type: 'success',
+      message: 'Трек-номер скопирован в буфер обмена.',
+      value: trackNumber,
+    });
+    return;
+  }
+
+  showNotice({ type: 'success', message: `${action}: выполнено.` });
 }
 
 async function copyToClipboard(text: string) {
@@ -297,8 +446,10 @@ async function fetchFromServer(
   config: ShopServerConfig,
   endpoint: Endpoints,
   params: RequestParams,
-): Promise<TransferInterface> {
+  action: string,
+): Promise<{ body: TransferInterface; requestId: string | null }> {
   const url = new URL(config.apiUrl + endpoint);
+  const details: NoticeDetails = { action, endpoint, orderId: config.orderId };
 
   const controller = new AbortController();
   const timeoutId = window.setTimeout(
@@ -319,29 +470,50 @@ async function fetchFromServer(
     });
   } catch {
     if (controller.signal.aborted) {
-      throw new Error(
+      throw new ShopServerError(
         'Сервер не ответил за отведённое время. Операция могла всё же выполниться — проверьте заказ перед повторной попыткой.',
+        { ...details, status: 'timeout' },
       );
     }
-    throw new Error('Не удалось связаться с сервером. Проверьте подключение.');
+    throw new ShopServerError(
+      'Не удалось связаться с сервером. Проверьте подключение.',
+      { ...details, status: 'network' },
+    );
   } finally {
     window.clearTimeout(timeoutId);
   }
 
+  const requestId = response.headers.get(REQUEST_ID_HEADER);
+  const failure: NoticeDetails = {
+    ...details,
+    status: response.status,
+    requestId,
+  };
+
   if (response.status === 401) {
-    throw new Error(SESSION_EXPIRED_MESSAGE);
+    throw new ShopServerError(SESSION_EXPIRED_MESSAGE, failure);
   }
 
   if (!response.ok) {
-    throw new Error(
-      `Не удалось выполнить запрос к серверу: ${response.status}`,
+    throw new ShopServerError(
+      (await readErrorMessage(response)) ??
+        `Сервер вернул ошибку ${response.status}`,
+      failure,
     );
   }
 
-  return response.json();
+  return { body: (await response.json()) as TransferInterface, requestId };
 }
 
-const buildYaWidgetScript = (containerId: string) => `
+async function readErrorMessage(response: Response): Promise<string | null> {
+  try {
+    return serverMessage((await response.json()) as TransferInterface);
+  } catch {
+    return null;
+  }
+}
+
+const buildYaWidgetAdminScript = (containerId: string) => `
 (function(w){
   function startWidget() {
     w.YaDelivery.createWidget({
@@ -368,7 +540,7 @@ document.addEventListener("YaNddWidgetPointSelected", function (data) {
 }, true);
 `;
 
-const buildFivePostWidgetScript = (
+const buildFivePostWidgetAdminScript = (
   mapId: string,
   infoId: string,
   apiKey: string,
