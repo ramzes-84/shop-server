@@ -1,9 +1,15 @@
+/* .delivery-option — флекс с переносом, поэтому 100% выносит ссылку на отдельную строку во всю ширину. */
 .map-link {
-  margin-left: 15px;
+  flex: 0 0 100%;
+  margin: 4px 0 0;
+  padding-left: 8.33333%;
   font-weight: 700;
   color: #e14d0b;
-  border-bottom: 1px dashed #e14d0b;
   cursor: pointer;
+  white-space: nowrap;
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 3px;
 }
 
 .map-popup-container {

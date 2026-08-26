@@ -139,7 +139,7 @@ async function openYandexMap() {
 
   const container = document.createElement('div');
   container.id = `ya-map-${Date.now()}`;
-  container.className = 'shopserver-dialog-map';
+  container.className = 'shopserver-dialog-map shopserver-dialog-map--auto';
   dialog.append(container, closeButton);
   document.body.append(dialog);
 

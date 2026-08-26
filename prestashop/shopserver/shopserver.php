@@ -30,7 +30,7 @@ class ShopServer extends Module
     {
         $this->name = 'shopserver';
         $this->tab = 'shipping_logistics';
-        $this->version = '1.0.0';
+        $this->version = '1.1.0';
         $this->author = 'Mineral Magic';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = ['min' => '8.0.0', 'max' => _PS_VERSION_];
@@ -146,13 +146,13 @@ class ShopServer extends Module
         $this->context->controller->registerStylesheet(
             'shopserver-front',
             'modules/' . $this->name . '/views/css/front.css',
-            ['media' => 'all', 'priority' => 150]
+            ['media' => 'all', 'priority' => 150, 'version' => $this->version]
         );
 
         $this->context->controller->registerJavascript(
             'shopserver-front',
             'modules/' . $this->name . '/views/js/front.js',
-            ['position' => 'bottom', 'priority' => 150]
+            ['position' => 'bottom', 'priority' => 150, 'version' => $this->version]
         );
     }
 

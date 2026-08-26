@@ -14,10 +14,16 @@ type ShopServerFrontConfig = {
   pochtaWidgetId: string;
 };
 
+type PrestashopEmitter = {
+  on: (event: string, handler: () => void) => void;
+  off: (event: string, handler: () => void) => void;
+};
+
 // Расширение глобального Window: значения приходят из модуля PrestaShop и из inline-скриптов виджетов.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface Window {
   shopServerFront?: ShopServerFrontConfig;
+  prestashop?: PrestashopEmitter;
   __fivepostMaps?: Record<string, { destroy: () => void }>;
   destroyFivepostMap?: (id: string) => void;
 }
@@ -35,6 +41,9 @@ const MAP_LINK_LABEL: Record<FrontCarrier, string> = {
   yandex: 'Карта пунктов Яндекс',
   fivepost: 'Карта пунктов 5Post',
 };
+
+const DELIVERY_UPDATE_EVENT = 'updatedDeliveryForm';
+const DELIVERY_UPDATE_FALLBACK_MS = 2000;
 
 const loadedWidgets: Record<string, Promise<void>> = {};
 
@@ -78,15 +87,52 @@ function initDeliveryMaps() {
 
     if (!carrier || option.querySelector('.map-link')) return;
 
-    const nameContainer = option.querySelector('.carrier-name');
     const linkToMap = document.createElement('div');
     linkToMap.className = 'map-link';
     linkToMap.textContent = MAP_LINK_LABEL[carrier];
     linkToMap.addEventListener('click', () => {
-      void openMapPopup(carrier, config);
+      void selectCarrierAndOpenMap(option, carrier, config);
     });
 
-    (nameContainer?.parentElement ?? option).append(linkToMap);
+    // Вне <label>: иначе клик обрабатывался бы дважды — и как выбор label, и как наш обработчик.
+    option.append(linkToMap);
+  });
+}
+
+/**
+ * Выбирает перевозчика перед показом его карты, иначе покупатель укажет пункт
+ * одного перевозчика, оставив отмеченным другого.
+ */
+async function selectCarrierAndOpenMap(
+  option: Element,
+  carrier: FrontCarrier,
+  config: ShopServerFrontConfig,
+) {
+  const input = option.querySelector('input[type=radio]');
+
+  if (input instanceof HTMLInputElement && !input.checked) {
+    input.click();
+    await afterDeliveryUpdate();
+  }
+
+  await openMapPopup(carrier, config);
+}
+
+/** Смена перевозчика перерисовывает блок доставки аяксом — карту открываем после этого. */
+function afterDeliveryUpdate(): Promise<void> {
+  return new Promise((resolve) => {
+    const emitter = window.prestashop;
+    let settled = false;
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      emitter?.off(DELIVERY_UPDATE_EVENT, finish);
+      resolve();
+    };
+
+    emitter?.on(DELIVERY_UPDATE_EVENT, finish);
+    window.setTimeout(finish, DELIVERY_UPDATE_FALLBACK_MS);
   });
 }
 
@@ -96,7 +142,9 @@ if (document.readyState === 'loading') {
   initDeliveryMaps();
 }
 
-// Шаг доставки перерисовывается аяксом при смене адреса или перевозчика.
+window.prestashop?.on(DELIVERY_UPDATE_EVENT, initDeliveryMaps);
+
+// Запасной путь на случай темы без события updatedDeliveryForm; initDeliveryMaps идемпотентна.
 document.addEventListener('click', (event) => {
   if (
     event.target instanceof HTMLElement &&

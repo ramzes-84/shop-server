@@ -20,8 +20,15 @@
 
 .shopserver-dialog-map {
   width: 100%;
-  height: 400px;
+  height: 450px;
   background: #f7f7f7;
+}
+
+/* Виджет Яндекса сам задаёт высоту (size.height в параметрах): при фиксированной
+   высоте контейнера он выходил за его границы и перекрывал кнопку закрытия. */
+.shopserver-dialog-map--auto {
+  height: auto;
+  min-height: 450px;
 }
 
 .shopserver-dialog-info {
