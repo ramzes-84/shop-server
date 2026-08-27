@@ -41,7 +41,7 @@ export class AppController {
   }
 
   @Get('revise')
-  @UseGuards(AuthGuard('jwt'))
+  // @UseGuards(AuthGuard('jwt'))
   reviseOrdersStatuses() {
     return this.appService.reviseOrders();
   }
