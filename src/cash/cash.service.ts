@@ -4,7 +4,7 @@ import {
   CreateCashInvoiceDto,
   ErrorCashResDTO,
 } from './dto/cash.dto';
-import fetch from 'node-fetch';
+import { fetchWithTimeout } from 'src/common/fetch-with-timeout';
 import { ServicesUrl } from 'src/types/services-url';
 
 @Injectable()
@@ -39,7 +39,7 @@ export class CashService {
     headers?: Record<string, string>,
     body?: string,
   ) {
-    const response = await fetch(url.toString(), {
+    const response = await fetchWithTimeout(url.toString(), {
       method: RequestMethod[method],
       headers: {
         Authorization: `Basic ${this.tokenBase64}`,

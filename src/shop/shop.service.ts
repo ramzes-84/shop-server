@@ -1,6 +1,6 @@
 import { HttpException, Injectable, RequestMethod } from '@nestjs/common';
 import { ServicesUrl } from 'src/types/services-url';
-import fetch from 'node-fetch';
+import { fetchWithTimeout } from 'src/common/fetch-with-timeout';
 import {
   CustomerMessagesResDto,
   OrderInfoResDto,
@@ -105,7 +105,7 @@ export class ShopService {
       url.searchParams.append('output_format', 'JSON');
     }
 
-    const response = await fetch(url.toString(), {
+    const response = await fetchWithTimeout(url.toString(), {
       method: RequestMethod[method],
       headers: {
         Authorization: `Basic ${this.tokenBase64}`,

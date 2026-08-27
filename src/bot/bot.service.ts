@@ -1,6 +1,6 @@
-import { Injectable, RequestMethod } from '@nestjs/common';
+import { HttpException, Injectable, RequestMethod } from '@nestjs/common';
 import { ServicesUrl } from 'src/types/services-url';
-import fetch from 'node-fetch';
+import { fetchWithTimeout } from 'src/common/fetch-with-timeout';
 import {
   BotCommand,
   ErrorTelegramResDTO,
@@ -49,13 +49,21 @@ export class BotService {
   ) {
     const url = new URL(`${this.url}${command}`);
 
-    const response = await fetch(url.toString(), {
+    const response = await fetchWithTimeout(url.toString(), {
       method: RequestMethod[method],
       headers: {
         'Content-Type': 'application/json',
       },
       body,
     });
+
+    // Telegram отвечает 429 при превышении лимитов: без проверки тело ошибки уходило дальше как успех.
+    if (!response.ok) {
+      throw new HttpException(
+        `Telegram API error: ${response.statusText}`,
+        response.status,
+      );
+    }
 
     const data: T = await response.json();
     return data;
