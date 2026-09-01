@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import fetch from 'node-fetch';
 import type { Response } from 'node-fetch';
+import { fetchWithTimeout } from 'src/common/fetch-with-timeout';
 import { ServicesUrl } from 'src/types/services-url';
 import type {
   GetOrderStatusRequestItem,
@@ -71,7 +71,7 @@ export class FiveService {
     const url = `${this.endpoint}/jwt-generate-claims/rs256/1?apikey=${this.apiKey}`;
     const body = 'subject=OpenAPI&audience=A122019!';
 
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body,
@@ -129,7 +129,7 @@ export class FiveService {
       ...(options.headers || {}),
       authorization: `Bearer ${token}`,
     };
-    let res = await fetch(url, { ...options, headers });
+    let res = await fetchWithTimeout(url, { ...options, headers });
 
     if (res.status === 401) {
       const text = await res.text();
@@ -146,7 +146,10 @@ export class FiveService {
           ...(options.headers || {}),
           authorization: `Bearer ${retryToken}`,
         };
-        res = await fetch(url, { ...options, headers: retryHeaders });
+        res = await fetchWithTimeout(url, {
+          ...options,
+          headers: retryHeaders,
+        });
       }
     }
 
