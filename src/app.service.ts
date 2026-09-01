@@ -136,7 +136,7 @@ export class AppService {
     orderId,
     sms,
   }: CreateCashRequest): Promise<TransferInterface> {
-    let message: string;
+    let message = '';
     try {
       const { addressDetails, customerDetails, orderDetails } =
         await this.getOrderBasicInfo(orderId);
@@ -344,7 +344,7 @@ export class AppService {
     const allStatuses = await this.fetchBatchOfStatuses(revisingOrdersData);
 
     revisingOrdersData.map((order, index) => {
-      let currState: string;
+      let currState: string | undefined;
       const settled = allStatuses[index];
       if (settled.status === 'fulfilled') {
         switch (order.cargo) {
@@ -385,8 +385,10 @@ export class AppService {
         }
       }
 
-      order.actualCargoState = currState;
-      order.unifiedCargoState = unifyParcelStatus(currState);
+      if (currState !== undefined) {
+        order.actualCargoState = currState;
+        order.unifiedCargoState = unifyParcelStatus(currState);
+      }
     });
     return revisingOrdersData;
   }

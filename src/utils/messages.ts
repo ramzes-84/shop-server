@@ -22,6 +22,8 @@ export function generateCashInvoiceMessage(
   if (cashInvoiceInfo.delivery_method.type === 'sms') {
     return `SMS о выставлении счёта для заказа №${orderDetails.reference} отправлено.`;
   }
+
+  throw new Error('Unsupported cash invoice delivery method');
 }
 
 function normalizePhoneNumber(phone: string): string {

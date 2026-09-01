@@ -88,11 +88,12 @@ export class FiveService {
     if (!json || !json.jwt)
       throw new Error('Invalid token response: missing jwt');
 
-    this.jwtToken = json.jwt;
+    const jwtToken = json.jwt as string;
+    this.jwtToken = jwtToken;
 
     // Try to parse exp from JWT payload. If parsing fails, default to 1 hour from now.
     try {
-      const parts = this.jwtToken.split('.');
+      const parts = jwtToken.split('.');
       if (parts.length >= 2) {
         const payload = JSON.parse(
           Buffer.from(
@@ -138,7 +139,8 @@ export class FiveService {
         try {
           await this.getToken(true);
         } catch (err) {
-          throw new Error(`Token refresh failed after 401: ${err.message}`);
+          const message = err instanceof Error ? err.message : String(err);
+          throw new Error(`Token refresh failed after 401: ${message}`);
         }
 
         const retryToken = this.jwtToken!;

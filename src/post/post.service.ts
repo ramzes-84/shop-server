@@ -57,12 +57,15 @@ export class PostService {
             'http://schemas.xmlsoap.org/soap/envelope/',
           );
 
-          client.getOperationHistory(args, (err, result) => {
-            if (err) {
-              return reject(err);
-            }
-            resolve(result);
-          });
+          client.getOperationHistory(
+            args,
+            (err: unknown, result: PostSoapResDTO) => {
+              if (err) {
+                return reject(err);
+              }
+              resolve(result);
+            },
+          );
         },
       );
     });

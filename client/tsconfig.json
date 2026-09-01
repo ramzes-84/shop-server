@@ -10,6 +10,7 @@
     "types": [],
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "rootDir": "src",
     "outDir": "../prestashop/shopserver/views/js"
   },
   /* Оба скрипта живут в одной глобальной области, поэтому имена верхнего уровня

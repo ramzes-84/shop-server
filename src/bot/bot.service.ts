@@ -12,7 +12,7 @@ export class BotService {
   private readonly token = process.env.TELEGRAM_TOKEN;
   private readonly endpoint = ServicesUrl.TELEGRAM;
   private readonly url = `${this.endpoint}${this.token}`;
-  readonly alGroup = process.env.TELEGRAM_GROUP_AL;
+  readonly alGroup = process.env.TELEGRAM_GROUP_AL!;
   readonly buGroup = process.env.TELEGRAM_GROUP_BU;
 
   async sendEmployeeMessage(

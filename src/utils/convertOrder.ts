@@ -155,14 +155,14 @@ export function convertOrderToDpd(
     header: {
       datePickup: new Date().toISOString().split('T')[0],
       senderAddress: {
-        name: process.env.SHOP_NAME,
+        name: process.env.SHOP_NAME!,
         terminalCode:
           orderDetails.current_state === '12'
             ? DpdSourceTerminal.RND
             : DpdSourceTerminal.TUL,
-        contactFio: process.env.SHOP_OWNER,
-        contactPhone: process.env.SHOP_PHONE,
-        contactEmail: process.env.MAIL_ADMIN,
+        contactFio: process.env.SHOP_OWNER!,
+        contactPhone: process.env.SHOP_PHONE!,
+        contactEmail: process.env.MAIL_ADMIN!,
         instructions: '',
         needPass: '0',
       },

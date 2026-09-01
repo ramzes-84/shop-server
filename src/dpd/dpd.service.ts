@@ -6,10 +6,10 @@ import { EXTERNAL_REQUEST_TIMEOUT_MS } from 'src/common/fetch-with-timeout';
 
 @Injectable()
 export class DpdService {
-  token = process.env.DPD_TOKEN;
+  token = process.env.DPD_TOKEN!;
   trackingEndpoint = ServicesUrl.DPD + 'tracing1-1?wsdl';
   createEndpoint = ServicesUrl.DPD + 'order2?wsdl';
-  clientNumber = process.env.DPD_CLIENT;
+  clientNumber = process.env.DPD_CLIENT!;
 
   async getStatesByDPDOrder(dpdOrderNr: string): Promise<DpdStatesResDTO> {
     const args: DpdRequestDTO<TrackingRequest> = {
@@ -31,7 +31,7 @@ export class DpdService {
 
           client.getStatesByDPDOrder(
             args,
-            (err, result: DpdStatesResDTO) => {
+            (err: unknown, result: DpdStatesResDTO) => {
               if (err) {
                 return reject(err);
               }

@@ -530,9 +530,11 @@ describe('AppService', () => {
 
       jest.spyOn(service, 'getDataForRevise').mockResolvedValue(orders);
       jest.spyOn(mailService, 'sendToAdmin').mockResolvedValue(undefined);
-      jest
-        .spyOn(botService, 'sendEmployeeMessage')
-        .mockResolvedValue(undefined);
+      jest.spyOn(botService, 'sendEmployeeMessage').mockResolvedValue({
+        ok: false,
+        error_code: 500,
+        description: 'Test response',
+      });
       const syncSpy = jest
         .spyOn(service as any, 'syncOrderStateWithCargo')
         .mockImplementation(
