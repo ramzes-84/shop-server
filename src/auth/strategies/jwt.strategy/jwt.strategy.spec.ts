@@ -45,6 +45,17 @@ describe('JwtStrategy', () => {
       expect(strategy.validate(buildPayload())).toEqual({
         id: '1',
         email: 'employee@example.com',
+        scope: undefined,
+      });
+    });
+
+    it('should preserve a token scope', () => {
+      expect(
+        strategy.validate(buildPayload({ scope: 'orders:revise' })),
+      ).toEqual({
+        id: '1',
+        email: 'employee@example.com',
+        scope: 'orders:revise',
       });
     });
 

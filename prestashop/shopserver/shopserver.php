@@ -14,6 +14,7 @@ class ShopServer extends Module
     public const CONF_SECRET = 'SHOPSERVER_JWT_SECRET';
     public const CONF_API_URL = 'SHOPSERVER_API_URL';
     public const CONF_TOKEN_TTL = 'SHOPSERVER_TOKEN_TTL';
+    public const CONF_CRON_KEY = 'SHOPSERVER_CRON_KEY';
     public const CONF_CARRIER_YANDEX = 'SHOPSERVER_CARRIER_YANDEX';
     public const CONF_CARRIER_FIVEPOST = 'SHOPSERVER_CARRIER_FIVEPOST';
     public const CONF_CARRIER_POST = 'SHOPSERVER_CARRIER_POST';
@@ -30,7 +31,7 @@ class ShopServer extends Module
     {
         $this->name = 'shopserver';
         $this->tab = 'shipping_logistics';
-        $this->version = '1.2.1';
+        $this->version = '1.3.0';
         $this->author = 'Mineral Magic';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = ['min' => '8.0.0', 'max' => _PS_VERSION_];
@@ -51,6 +52,7 @@ class ShopServer extends Module
             && Configuration::updateValue(self::CONF_SECRET, $this->generateSecret())
             && Configuration::updateValue(self::CONF_API_URL, '')
             && Configuration::updateValue(self::CONF_TOKEN_TTL, self::DEFAULT_TOKEN_TTL)
+            && Configuration::updateValue(self::CONF_CRON_KEY, $this->generateSecret())
             && Configuration::updateValue(self::CONF_CARRIER_YANDEX, 0)
             && Configuration::updateValue(self::CONF_CARRIER_FIVEPOST, 0)
             && Configuration::updateValue(self::CONF_CARRIER_POST, 0)
@@ -167,6 +169,13 @@ class ShopServer extends Module
             );
         }
 
+        if (Tools::isSubmit('submitShopServerRegenerateCronKey')) {
+            Configuration::updateValue(self::CONF_CRON_KEY, $this->generateSecret());
+            $output .= $this->displayConfirmation(
+                'Ключ CRON перевыпущен. Обновите заголовок X-ShopServer-Cron-Key в сервисе расписания.'
+            );
+        }
+
         if (Tools::isSubmit('submitShopServerSettings')) {
             $output .= $this->saveSettings();
         }
@@ -219,10 +228,24 @@ class ShopServer extends Module
                 'input' => [
                     [
                         'type' => 'text',
+                        'label' => 'Ключ CRON',
+                        'name' => 'SHOPSERVER_CRON_KEY_READONLY',
+                        'readonly' => true,
+                        'desc' => 'CRON вызывает POST /module/shopserver/cron с этим значением в заголовке X-ShopServer-Cron-Key.',
+                    ],
+                    [
+                        'type' => 'text',
                         'label' => 'Адрес сервера',
                         'name' => self::CONF_API_URL,
                         'desc' => 'Например: https://shop-server-4y1m.onrender.com',
                         'required' => true,
+                    ],
+                    [
+                        'type' => 'submit',
+                        'title' => 'Перевыпустить ключ CRON',
+                        'name' => 'submitShopServerRegenerateCronKey',
+                        'icon' => 'process-icon-refresh',
+                        'class' => 'btn btn-default pull-right',
                     ],
                     [
                         'type' => 'text',
@@ -303,6 +326,7 @@ class ShopServer extends Module
             'fields_value' => [
                 self::CONF_API_URL => Configuration::get(self::CONF_API_URL),
                 self::CONF_TOKEN_TTL => $this->tokenTtl(),
+                'SHOPSERVER_CRON_KEY_READONLY' => Configuration::get(self::CONF_CRON_KEY),
                 self::CONF_CARRIER_YANDEX => (int) Configuration::get(self::CONF_CARRIER_YANDEX),
                 self::CONF_CARRIER_FIVEPOST => (int) Configuration::get(self::CONF_CARRIER_FIVEPOST),
                 self::CONF_CARRIER_POST => (int) Configuration::get(self::CONF_CARRIER_POST),
@@ -413,6 +437,7 @@ class ShopServer extends Module
             self::CONF_SECRET,
             self::CONF_API_URL,
             self::CONF_TOKEN_TTL,
+            self::CONF_CRON_KEY,
             self::CONF_CARRIER_YANDEX,
             self::CONF_CARRIER_FIVEPOST,
             self::CONF_CARRIER_POST,

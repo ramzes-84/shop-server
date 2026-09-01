@@ -38,6 +38,20 @@ final class ShopServerJwtSigner
         ], $secret);
     }
 
+    public static function issueForCron(int $ttl, string $secret): string
+    {
+        $now = time();
+
+        return self::sign([
+            'iss' => self::ISSUER,
+            'aud' => self::AUDIENCE,
+            'sub' => 'prestashop-cron',
+            'scope' => 'orders:revise',
+            'iat' => $now,
+            'exp' => $now + $ttl,
+        ], $secret);
+    }
+
     private static function base64UrlEncode(string $data): string
     {
         return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');

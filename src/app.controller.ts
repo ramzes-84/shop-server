@@ -6,6 +6,7 @@ import {
   CreateCashRequest,
 } from './validation/yandex';
 import { AuthGuard } from '@nestjs/passport';
+import { CronReviseJwtGuard, EmployeeJwtGuard } from './auth/jwt-scope.guard';
 
 @Controller()
 export class AppController {
@@ -17,37 +18,37 @@ export class AppController {
   }
 
   @Post('yandex/create')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), EmployeeJwtGuard)
   async yaOrderCreate(@Body() body: CreateOrderQueries) {
     return this.appService.createYaOrder(body);
   }
 
   @Post('cash/create')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), EmployeeJwtGuard)
   async cashInvoiceCreate(@Body() body: CreateCashRequest) {
     return this.appService.createCashInvoice(body);
   }
 
   @Get('yandex/tracking/:id')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), EmployeeJwtGuard)
   yaOrderHistory(@Param() params: OrderIdParams) {
     return this.appService.getYaOrderHistory(params.id);
   }
 
   @Get('yandex/info/:id')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), EmployeeJwtGuard)
   yaOrderInfo(@Param() params: OrderIdParams) {
     return this.appService.getOrderInfo(params.id);
   }
 
-  @Get('revise')
-  // @UseGuards(AuthGuard('jwt'))
+  @Post('revise')
+  @UseGuards(AuthGuard('jwt'), CronReviseJwtGuard)
   reviseOrdersStatuses() {
     return this.appService.reviseOrders();
   }
 
   @Get('test')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), EmployeeJwtGuard)
   testEndpoint() {
     return this.appService.testEndpoint();
   }
