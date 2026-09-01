@@ -165,11 +165,22 @@ export class AppService {
 
       return this.failure('createCashInvoice', error, { orderId });
     } finally {
-      await this.botService.sendEmployeeMessage(
-        message,
-        true,
-        this.botService.buGroup,
-      );
+      try {
+        await this.botService.sendEmployeeMessage(
+          message,
+          !sms,
+          this.botService.buGroup,
+        );
+      } catch (error) {
+        this.logger.error(
+          JSON.stringify({
+            requestId: getCurrentRequestId(),
+            operation: 'notifyCashInvoice',
+            orderId,
+            error: describeError(error),
+          }),
+        );
+      }
     }
   }
 

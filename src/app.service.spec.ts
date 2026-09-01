@@ -474,6 +474,43 @@ describe('AppService', () => {
       });
     });
 
+    it('sends an SMS invoice notification without MarkdownV2', async () => {
+      const basicInfo = buildBasicOrderInfo();
+      const invoiceResponse = {
+        delivery_method: { type: 'sms' },
+      } as any;
+      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
+      jest
+        .spyOn(cashService, 'createCashInvoice')
+        .mockResolvedValue(invoiceResponse);
+      generateCashInvoiceMessageMock.mockReturnValue('SMS invoice sent.');
+
+      await service.createCashInvoice({ orderId: '42', sms: true });
+
+      expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+        'SMS invoice sent.',
+        false,
+        'bot-group',
+      );
+    });
+
+    it('returns a successful invoice when Telegram notification fails', async () => {
+      const basicInfo = buildBasicOrderInfo();
+      const invoiceResponse = { delivery_method: 'Express' } as any;
+      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
+      jest
+        .spyOn(cashService, 'createCashInvoice')
+        .mockResolvedValue(invoiceResponse);
+      generateCashInvoiceMessageMock.mockReturnValue('Invoice ready');
+      jest
+        .spyOn(botService, 'sendEmployeeMessage')
+        .mockRejectedValue(new Error('Telegram unavailable'));
+
+      await expect(
+        service.createCashInvoice({ orderId: '42' } as any),
+      ).resolves.toEqual({ ok: true, data: invoiceResponse.delivery_method });
+    });
+
     it('returns error when invoice creation fails but still notifies', async () => {
       const failure = new Error('cash failed');
       jest.spyOn(service, 'getOrderBasicInfo').mockRejectedValue(failure);

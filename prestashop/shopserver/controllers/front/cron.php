@@ -7,6 +7,7 @@ if (!defined('_PS_VERSION_')) {
 class ShopServerCronModuleFrontController extends ModuleFrontController
 {
     private const CRON_TOKEN_TTL = 300;
+    private const SERVER_REQUEST_TIMEOUT = 300;
 
     public function postProcess(): void
     {
@@ -37,7 +38,7 @@ class ShopServerCronModuleFrontController extends ModuleFrontController
             CURLOPT_POST => true,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_TIMEOUT => 30,
+            CURLOPT_TIMEOUT => self::SERVER_REQUEST_TIMEOUT,
             CURLOPT_HTTPHEADER => [
                 'Authorization: Bearer ' . $token,
                 'Accept: application/json',

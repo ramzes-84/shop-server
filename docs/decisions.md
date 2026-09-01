@@ -83,7 +83,7 @@ PrestaShop работает на PHP 7.4.33 — версия без обновл
 
 ## CRON пересмотра статусов
 
-Внешний сервис расписания не получает `SHOPSERVER_JWT_SECRET` и не подписывает JWT сам. Он вызывает `POST /module/shopserver/cron` на магазине с уникальным ключом в заголовке `X-ShopServer-Cron-Key`. Модуль сравнивает ключ через `hash_equals`, сам выпускает JWT на 5 минут с `sub: prestashop-cron` и `scope: orders:revise`, после чего вызывает серверный `POST /revise`.
+Внешний сервис расписания не получает `SHOPSERVER_JWT_SECRET` и не подписывает JWT сам. Он вызывает `POST /module/shopserver/cron` на магазине с уникальным ключом в заголовке `X-ShopServer-Cron-Key`. Модуль сравнивает ключ через `hash_equals`, сам выпускает JWT на 5 минут с `sub: prestashop-cron` и `scope: orders:revise`, после чего вызывает серверный `POST /revise`. Прокси модуля ждёт ответ сервера до 300 секунд: полный пересмотр статусов занимает дольше обычного внешнего API-вызова.
 
 JWT с этим scope допускается только к пересмотру: `CronReviseJwtGuard` блокирует обычные JWT сотрудников на `/revise`, а `EmployeeJwtGuard` блокирует технический токен на действиях сотрудника. Это предотвращает превращение ключа CRON в универсальный ключ API.
 
