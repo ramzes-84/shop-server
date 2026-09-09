@@ -4,7 +4,7 @@
  * через window.shopServerConfig — из DOM ничего не вычитывается.
  */
 
-type ShopServerCarrier = '' | 'yandex' | 'fivepost';
+type ShopServerCarrier = '' | 'yandex' | 'fivepost' | 'post';
 
 type ShopServerConfig = {
   apiUrl: string;
@@ -12,6 +12,7 @@ type ShopServerConfig = {
   orderId: string;
   carrier: ShopServerCarrier;
   fivePostKey: string;
+  pochtaWidgetId: string;
 };
 
 // Расширение глобального Window: значения приходят из модуля PrestaShop и из inline-скриптов виджетов.
@@ -39,6 +40,12 @@ type FivePostPointData = {
   resultAddress: string;
 };
 
+type PostPointData = {
+  indexTo: string;
+  cityTo: string;
+  addressTo: string;
+};
+
 type TransferInterface = {
   ok: boolean;
   data: Record<string, unknown>;
@@ -57,6 +64,7 @@ type RequestParams = {
 const REQUEST_TIMEOUT_MS = 15_000;
 const YA_WIDGET_SRC = 'https://ndd-widget.landpro.site/widget.js';
 const FIVEPOST_WIDGET_SRC = 'https://fivepost.ru/static/5post-widget-v1.0.js';
+const POST_WIDGET_SRC = 'https://widget.pochta.ru/map/widget/widget.js';
 
 const SESSION_EXPIRED_MESSAGE =
   'Сессия истекла. Обновите страницу заказа и повторите действие.';
@@ -214,6 +222,11 @@ function openMap(config: ShopServerConfig) {
 
   if (config.carrier === 'fivepost') {
     void openFivePostMap(config.fivePostKey);
+    return;
+  }
+
+  if (config.carrier === 'post') {
+    void openPostMap(config.pochtaWidgetId);
   }
 }
 
@@ -295,16 +308,49 @@ async function openFivePostMap(apiKey: string) {
   dialog.append(script);
 }
 
+async function openPostMap(widgetId: string) {
+  const { dialog, closeButton } = buildDialog();
+
+  const container = document.createElement('div');
+  container.id = `post-map-${Date.now()}`;
+  container.className = 'shopserver-dialog-map';
+  dialog.append(container, closeButton);
+  document.body.append(dialog);
+
+  if (!widgetId) {
+    container.textContent =
+      'ID виджета Почты России не задан в настройках модуля';
+    return;
+  }
+
+  try {
+    await loadScript(POST_WIDGET_SRC);
+  } catch {
+    container.textContent = 'Не удалось загрузить виджет Почты России';
+    return;
+  }
+
+  const script = document.createElement('script');
+  script.text = buildPostWidgetAdminScript(container.id, widgetId);
+  dialog.append(script);
+}
+
+function buildPostWidgetAdminScript(containerId: string, widgetId: string) {
+  return `ecomStartWidget({id: ${Number(widgetId) || 0}, callbackFunction: saveDestination, containerId: ${JSON.stringify(containerId)}})`;
+}
+
 // Вызывается по имени из inline-скриптов виджетов — статический анализ этого не видит.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-function saveDestination(data: YandexData | FivePostPointData) {
+function saveDestination(data: unknown) {
   const messageElement = document.querySelector('#order_message_message');
   if (!(messageElement instanceof HTMLTextAreaElement)) return;
 
-  if ('detail' in data) {
+  if (isYandexDataAdmin(data)) {
     messageElement.value = `Уточните, удобно ли Вам будет получить заказ в пункте Я.Маркет по адресу: ${data.detail.address.full_address} [ID: ${data.detail.id}]?`;
-  } else if ('id' in data) {
+  } else if (isFivePostPointDataAdmin(data)) {
     messageElement.value = `Уточните, удобно ли Вам будет получить заказ в пункте Five Post по адресу: ${data.fullAddress} [ID: ${data.id}]?`;
+  } else if (isPostPointDataAdmin(data)) {
+    messageElement.value = `Уточните, удобно ли Вам будет получить заказ в почтомате №${data.indexTo} по адресу: ${data.cityTo}, ${data.addressTo}? Другие точки здесь: https://www.pochta.ru/offices?filters%5B%5D=POCHTOMAT (для данного способа подходят только почтоматы, не отделения почты).`;
   }
 }
 
@@ -595,3 +641,41 @@ setTimeout(function initFivepostWidget() {
   }
 }, 0);
 `;
+
+type UnknownRecordAdmin = Record<string, unknown>;
+
+function isRecordAdmin(value: unknown): value is UnknownRecordAdmin {
+  return typeof value === 'object' && value !== null;
+}
+
+function isYandexDataAdmin(data: unknown): data is YandexData {
+  if (
+    !isRecordAdmin(data) ||
+    !isRecordAdmin(data.detail) ||
+    !isRecordAdmin(data.detail.address)
+  ) {
+    return false;
+  }
+
+  return (
+    typeof data.detail.address.full_address === 'string' &&
+    typeof data.detail.id === 'string'
+  );
+}
+
+function isFivePostPointDataAdmin(data: unknown): data is FivePostPointData {
+  return (
+    isRecordAdmin(data) &&
+    typeof data.id === 'string' &&
+    typeof data.fullAddress === 'string'
+  );
+}
+
+function isPostPointDataAdmin(data: unknown): data is PostPointData {
+  return (
+    isRecordAdmin(data) &&
+    typeof data.indexTo === 'string' &&
+    typeof data.cityTo === 'string' &&
+    typeof data.addressTo === 'string'
+  );
+}

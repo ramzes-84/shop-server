@@ -21,6 +21,10 @@
       <button type="button" class="btn btn-light" data-shopserver-action="map">
         🌍 Пункты 5Post
       </button>
+    {elseif $shopserver_carrier === 'post'}
+      <button type="button" class="btn btn-light" data-shopserver-action="map">
+        🌍 Почтоматы Почты России
+      </button>
     {/if}
   </div>
 </div>

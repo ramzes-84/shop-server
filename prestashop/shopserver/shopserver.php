@@ -31,7 +31,7 @@ class ShopServer extends Module
     {
         $this->name = 'shopserver';
         $this->tab = 'shipping_logistics';
-        $this->version = '1.3.1';
+        $this->version = '1.3.2';
         $this->author = 'Mineral Magic';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = ['min' => '8.0.0', 'max' => _PS_VERSION_];
@@ -108,6 +108,7 @@ class ShopServer extends Module
             'orderId' => (string) $order->id,
             'carrier' => $this->resolveCarrierType($order),
             'fivePostKey' => (string) Configuration::get(self::CONF_FIVEPOST_KEY),
+            'pochtaWidgetId' => (string) Configuration::get(self::CONF_POCHTA_WIDGET_ID),
         ];
 
         $this->context->smarty->assign([
