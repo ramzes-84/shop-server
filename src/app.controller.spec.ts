@@ -29,7 +29,7 @@ describe('AppController', () => {
         },
       ],
     })
-      .overrideGuard(AuthGuard('bearer'))
+      .overrideGuard(AuthGuard('jwt'))
       .useValue({ canActivate: jest.fn(() => true) })
       .compile();
 

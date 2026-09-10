@@ -1,0 +1,114 @@
+.shopserver-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.shopserver-actions button[aria-busy='true'] {
+  cursor: progress;
+}
+
+.shopserver-notice {
+  position: relative;
+  margin: 12px 16px 16px;
+  padding: 12px 36px 12px 14px;
+  border-left: 4px solid;
+  border-radius: 3px;
+}
+
+.shopserver-notice--success {
+  border-color: #4caf50;
+  background: #edf7ed;
+}
+
+.shopserver-notice--error {
+  border-color: #d9534f;
+  background: #fdf0f0;
+}
+
+.shopserver-notice-text {
+  margin: 0;
+  font-weight: 600;
+}
+
+.shopserver-notice-value {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.06);
+  word-break: break-all;
+}
+
+.shopserver-notice-link {
+  color: #1d5f96;
+  text-decoration: underline;
+}
+
+.shopserver-notice-details {
+  margin-top: 10px;
+}
+
+.shopserver-notice-details summary {
+  cursor: pointer;
+  color: #6c757d;
+}
+
+.shopserver-notice-details pre {
+  margin: 8px 0;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.04);
+  white-space: pre-wrap;
+}
+
+.shopserver-notice-close {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 20px;
+  line-height: 1;
+  color: #6c757d;
+  cursor: pointer;
+}
+
+.shopserver-dialog {
+  position: fixed;
+  top: 10vh;
+  width: 70vw;
+  max-width: 900px;
+  padding: 0;
+  border: 1px solid #ccc;
+  z-index: 10000;
+}
+
+.shopserver-dialog-map {
+  width: 100%;
+  height: 450px;
+  background: #f7f7f7;
+}
+
+/* Виджет Яндекса сам задаёт высоту (size.height в параметрах): при фиксированной
+   высоте контейнера он выходил за его границы и перекрывал кнопку закрытия. */
+.shopserver-dialog-map--auto {
+  height: auto;
+  min-height: 450px;
+}
+
+.shopserver-dialog-info {
+  padding: 8px 12px;
+}
+
+.shopserver-dialog-close {
+  display: block;
+  width: 100%;
+  height: 45px;
+  border: none;
+  background-color: #24b9d7;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  text-align: center;
+}

@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { PassportModule } from '@nestjs/passport';
-import { AuthService } from './auth.service';
-import { BearerStrategy } from './strategies/bearer.strategy/bearer.strategy';
+import { JwtStrategy } from './strategies/jwt.strategy/jwt.strategy';
+import { CronReviseJwtGuard, EmployeeJwtGuard } from './jwt-scope.guard';
 
 @Module({
   imports: [PassportModule],
-  providers: [AuthService, BearerStrategy],
-  exports: [AuthService],
+  providers: [JwtStrategy, EmployeeJwtGuard, CronReviseJwtGuard],
+  exports: [EmployeeJwtGuard, CronReviseJwtGuard],
 })
 export class AuthModule {}

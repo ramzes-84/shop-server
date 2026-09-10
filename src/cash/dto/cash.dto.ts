@@ -58,12 +58,18 @@ export class ReceiptItem {
 export class CashInvoiceInfoDto extends CreateCashInvoiceDto {
   id: string;
   status: 'pending';
-  delivery_method: {
-    type: 'self' | 'sms';
-    url: string;
-  };
+  delivery_method: CashInvoiceDeliveryMethod;
   created_at: string;
 }
+
+type CashInvoiceDeliveryMethod =
+  | {
+      type: 'self';
+      url: string;
+    }
+  | {
+      type: 'sms';
+    };
 
 export class ErrorCashResDTO {
   type: string;

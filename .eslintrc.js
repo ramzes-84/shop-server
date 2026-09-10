@@ -16,6 +16,13 @@ module.exports = {
     jest: true,
   },
   ignorePatterns: ['.eslintrc.js'],
+  overrides: [
+    {
+      files: ['client/**/*.ts'],
+      parserOptions: { project: 'client/tsconfig.json' },
+      env: { browser: true, node: false, jest: false },
+    },
+  ],
   rules: {
     '@typescript-eslint/interface-name-prefix': 'off',
     '@typescript-eslint/explicit-function-return-type': 'off',

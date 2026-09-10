@@ -55,6 +55,7 @@ describe('DpdService', () => {
     expect(result).toBe(statesResponse);
     expect(createClientMock).toHaveBeenCalledWith(
       service.trackingEndpoint,
+      { wsdl_options: { timeout: expect.any(Number) } },
       expect.any(Function),
     );
   });

@@ -1,0 +1,30 @@
+/* Остаётся в модуле Custom Code: правки темы, не связанные с картами ПВЗ.
+   Стили карт переехали в prestashop/shopserver/views/css/front.css */
+
+@media screen and (max-width: 770px) {
+  #menu-icon {
+    display: none;
+  }
+
+  #custom-text {
+    padding: 12px;
+  }
+}
+
+.mm_menu_content_title {
+  column-gap: 5px;
+}
+
+.product-cover-modal,
+.product-cover img {
+  object-fit: contain;
+}
+
+.hidden {
+  visibility: hidden;
+}
+
+.js-discount.promo-discounts {
+  border: 5px dotted #b03172;
+  border-radius: 12px;
+}

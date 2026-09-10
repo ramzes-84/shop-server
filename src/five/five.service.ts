@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import fetch from 'node-fetch';
 import type { Response } from 'node-fetch';
+import { fetchWithTimeout } from 'src/common/fetch-with-timeout';
 import { ServicesUrl } from 'src/types/services-url';
 import type {
   GetOrderStatusRequestItem,
@@ -71,7 +71,7 @@ export class FiveService {
     const url = `${this.endpoint}/jwt-generate-claims/rs256/1?apikey=${this.apiKey}`;
     const body = 'subject=OpenAPI&audience=A122019!';
 
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body,
@@ -88,11 +88,12 @@ export class FiveService {
     if (!json || !json.jwt)
       throw new Error('Invalid token response: missing jwt');
 
-    this.jwtToken = json.jwt;
+    const jwtToken = json.jwt as string;
+    this.jwtToken = jwtToken;
 
     // Try to parse exp from JWT payload. If parsing fails, default to 1 hour from now.
     try {
-      const parts = this.jwtToken.split('.');
+      const parts = jwtToken.split('.');
       if (parts.length >= 2) {
         const payload = JSON.parse(
           Buffer.from(
@@ -129,7 +130,7 @@ export class FiveService {
       ...(options.headers || {}),
       authorization: `Bearer ${token}`,
     };
-    let res = await fetch(url, { ...options, headers });
+    let res = await fetchWithTimeout(url, { ...options, headers });
 
     if (res.status === 401) {
       const text = await res.text();
@@ -138,7 +139,8 @@ export class FiveService {
         try {
           await this.getToken(true);
         } catch (err) {
-          throw new Error(`Token refresh failed after 401: ${err.message}`);
+          const message = err instanceof Error ? err.message : String(err);
+          throw new Error(`Token refresh failed after 401: ${message}`);
         }
 
         const retryToken = this.jwtToken!;
@@ -146,7 +148,10 @@ export class FiveService {
           ...(options.headers || {}),
           authorization: `Bearer ${retryToken}`,
         };
-        res = await fetch(url, { ...options, headers: retryHeaders });
+        res = await fetchWithTimeout(url, {
+          ...options,
+          headers: retryHeaders,
+        });
       }
     }
 

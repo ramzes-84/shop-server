@@ -1,5 +1,5 @@
 import { HttpException, Injectable, RequestMethod } from '@nestjs/common';
-import fetch from 'node-fetch';
+import { fetchWithTimeout } from 'src/common/fetch-with-timeout';
 import { ServicesUrl } from 'src/types/services-url';
 import { PostEndpoints, PostParcelResDTO } from './dto/post.dto';
 import * as soap from 'soap';
@@ -57,12 +57,15 @@ export class PostService {
             'http://schemas.xmlsoap.org/soap/envelope/',
           );
 
-          client.getOperationHistory(args, (err, result) => {
-            if (err) {
-              return reject(err);
-            }
-            resolve(result);
-          });
+          client.getOperationHistory(
+            args,
+            (err: unknown, result: PostSoapResDTO) => {
+              if (err) {
+                return reject(err);
+              }
+              resolve(result);
+            },
+          );
         },
       );
     });
@@ -72,7 +75,7 @@ export class PostService {
     url: URL,
     method: RequestMethod = RequestMethod.GET,
   ): Promise<T> {
-    const response = await fetch(url.toString(), {
+    const response = await fetchWithTimeout(url.toString(), {
       method: RequestMethod[method],
       headers: {
         Authorization: `AccessToken ${this.accessToken}`,

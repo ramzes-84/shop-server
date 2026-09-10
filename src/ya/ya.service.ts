@@ -4,7 +4,7 @@ import {
   Injectable,
   RequestMethod,
 } from '@nestjs/common';
-import fetch from 'node-fetch';
+import { fetchWithTimeout } from 'src/common/fetch-with-timeout';
 import { ServicesUrl } from 'src/types/services-url';
 import {
   CreateYaOrderDto,
@@ -123,7 +123,7 @@ export class YaService {
     headers?: Record<string, string>,
     body?: string,
   ) {
-    const response = await fetch(url.toString(), {
+    const response = await fetchWithTimeout(url.toString(), {
       method: RequestMethod[method],
       headers: {
         Authorization: `Bearer ${this.token}`,

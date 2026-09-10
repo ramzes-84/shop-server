@@ -197,7 +197,7 @@ export type YaTrackInfo = {
   reference: string;
   requestId: string;
   trackNumber: string;
-  sharingUrl: string;
+  sharingUrl?: string;
   status: YaParcelStatus;
 };
 

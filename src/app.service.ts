@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ShopService } from './shop/shop.service';
 import { YaService } from './ya/ya.service';
 import { CreateYaOrderDto } from './ya/dto/ya.dto';
@@ -23,9 +23,12 @@ import { PostService } from './post/post.service';
 import { findPointId } from './utils/find-point-from-messages';
 import { checkDeliveryCost } from './utils/check-delivery-cost';
 import { FiveService } from './five/five.service';
+import { describeError, toSafeMessage } from './common/request-context';
+import { getCurrentRequestId } from './common/request-id.storage';
 
 @Injectable()
 export class AppService {
+  private readonly logger = new Logger(AppService.name);
   private readonly unifiedStateTargetMap: Partial<
     Record<UnifiedOrderState, number>
   >;
@@ -80,6 +83,27 @@ export class AppService {
     return `Hello World!`;
   }
 
+  /** Полная ошибка уходит в лог, наружу — только текст, пригодный для показа сотруднику. */
+  private failure(
+    operation: string,
+    error: unknown,
+    context: Record<string, unknown> = {},
+  ): TransferInterface {
+    this.logger.error(
+      JSON.stringify({
+        requestId: getCurrentRequestId(),
+        operation,
+        ...context,
+        error: describeError(error),
+      }),
+    );
+
+    return {
+      ok: false,
+      data: { message: toSafeMessage(error) },
+    };
+  }
+
   async getOrderInfo(id: string): Promise<TransferInterface> {
     try {
       const response = await this.yaService.getOrderInfo(id);
@@ -88,10 +112,7 @@ export class AppService {
         data: { sharing_url: response.sharing_url },
       };
     } catch (error) {
-      return {
-        ok: false,
-        data: error,
-      };
+      return this.failure('getOrderInfo', error, { id });
     }
   }
 
@@ -115,7 +136,7 @@ export class AppService {
     orderId,
     sms,
   }: CreateCashRequest): Promise<TransferInterface> {
-    let message: string;
+    let message = '';
     try {
       const { addressDetails, customerDetails, orderDetails } =
         await this.getOrderBasicInfo(orderId);
@@ -142,16 +163,24 @@ export class AppService {
     } catch (error) {
       message = `❗ Ошибка при создании счёта для заказа ${orderId}: ${error instanceof Error ? error.message : String(error ?? 'Unknown error')}`;
 
-      return {
-        ok: false,
-        data: error,
-      };
+      return this.failure('createCashInvoice', error, { orderId });
     } finally {
-      await this.botService.sendEmployeeMessage(
-        message,
-        true,
-        this.botService.buGroup,
-      );
+      try {
+        await this.botService.sendEmployeeMessage(
+          message,
+          !sms,
+          this.botService.buGroup,
+        );
+      } catch (error) {
+        this.logger.error(
+          JSON.stringify({
+            requestId: getCurrentRequestId(),
+            operation: 'notifyCashInvoice',
+            orderId,
+            error: describeError(error),
+          }),
+        );
+      }
     }
   }
 
@@ -186,7 +215,7 @@ export class AppService {
       if (!destination) {
         return {
           ok: false,
-          data: 'Error: destination point not found',
+          data: { message: 'Пункт выдачи не найден в переписке по заказу' },
         };
       }
 
@@ -218,10 +247,7 @@ export class AppService {
         data: { sharing_url: orderInfo.sharing_url },
       };
     } catch (error) {
-      return {
-        ok: false,
-        data: error,
-      };
+      return this.failure('createYaOrder', error, { orderId });
     }
   }
 
@@ -329,7 +355,7 @@ export class AppService {
     const allStatuses = await this.fetchBatchOfStatuses(revisingOrdersData);
 
     revisingOrdersData.map((order, index) => {
-      let currState: string;
+      let currState: string | undefined;
       const settled = allStatuses[index];
       if (settled.status === 'fulfilled') {
         switch (order.cargo) {
@@ -370,8 +396,10 @@ export class AppService {
         }
       }
 
-      order.actualCargoState = currState;
-      order.unifiedCargoState = unifyParcelStatus(currState);
+      if (currState !== undefined) {
+        order.actualCargoState = currState;
+        order.unifiedCargoState = unifyParcelStatus(currState);
+      }
     });
     return revisingOrdersData;
   }
