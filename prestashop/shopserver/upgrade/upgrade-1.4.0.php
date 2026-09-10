@@ -9,8 +9,8 @@ if (!defined('_PS_VERSION_')) {
 
 function upgrade_module_1_4_0($module)
 {
-    if (!Configuration::hasKey(ShopServer::CONF_YA_SOURCE_PLATFORM_ID)) {
-        Configuration::updateValue(ShopServer::CONF_YA_SOURCE_PLATFORM_ID, '');
+    if (!Configuration::hasKey('SHOPSERVER_YA_SOURCE_PLATFORM_ID')) {
+        Configuration::updateValue('SHOPSERVER_YA_SOURCE_PLATFORM_ID', '');
     }
 
     return true;
