@@ -39,6 +39,11 @@
   word-break: break-all;
 }
 
+.shopserver-notice-link {
+  color: #1d5f96;
+  text-decoration: underline;
+}
+
 .shopserver-notice-details {
   margin-top: 10px;
 }

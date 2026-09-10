@@ -113,9 +113,7 @@ function showNotice(notice: Notice) {
   box.append(text);
 
   if (notice.value) {
-    const value = document.createElement('code');
-    value.className = 'shopserver-notice-value';
-    value.textContent = notice.value;
+    const value = buildNoticeValue(notice.value);
     box.append(value);
   }
 
@@ -132,6 +130,32 @@ function showNotice(notice: Notice) {
   box.append(dismiss);
 
   panel.append(box);
+}
+
+function buildNoticeValue(value: string): HTMLElement {
+  if (isHttpUrl(value)) {
+    const link = document.createElement('a');
+    link.className = 'shopserver-notice-value shopserver-notice-link';
+    link.href = value;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = value;
+    return link;
+  }
+
+  const code = document.createElement('code');
+  code.className = 'shopserver-notice-value';
+  code.textContent = value;
+  return code;
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 function buildNoticeDetails(details: NoticeDetails): HTMLElement {
