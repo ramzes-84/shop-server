@@ -353,7 +353,10 @@ describe('AppService', () => {
         orderId: '1',
       };
 
-      const result = await service.createYaOrder(createOrderQueries);
+      const result = await service.createYaOrder(createOrderQueries, {
+        rnd: 'rnd-platform-123',
+        tul: 'source-platform-123',
+      });
 
       expect(shopService.getOrderInfo).toHaveBeenCalledWith(1);
       expect(shopService.getAddressInfo).toHaveBeenCalledWith(111005);
@@ -367,6 +370,7 @@ describe('AppService', () => {
         mockCustomerDetails,
         mockShippingDetails.order_carriers[0],
         'destination',
+        'source-platform-123',
       );
       expect(yaService.createYaOrder).toHaveBeenCalledWith(mockYaOrderData);
       expect(result).toEqual({
@@ -383,12 +387,37 @@ describe('AppService', () => {
         orderId: '1',
       };
 
-      const result = await service.createYaOrder(createOrderQueries);
+      const result = await service.createYaOrder(createOrderQueries, {
+        rnd: 'rnd-platform-123',
+        tul: 'source-platform-123',
+      });
 
       expect(result).toEqual({
         ok: false,
         data: { message: 'Something went wrong' },
       });
+    });
+
+    it('returns a configuration error when the source platform is missing for the order status', async () => {
+      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue({
+        addressDetails: addressDetails as any,
+        customerDetails: customerDetails as any,
+        orderDetails: { ...orderDetails, current_state: '12' },
+      });
+
+      const result = await service.createYaOrder(
+        { orderId: '1' },
+        { tul: 'tul-platform-123' },
+      );
+
+      expect(result).toEqual({
+        ok: false,
+        data: {
+          message:
+            'Не настроен ID пункта приёма Яндекс.Доставки для статуса заказа 12',
+        },
+      });
+      expect(shopService.getOrderCarrierInfo).not.toHaveBeenCalled();
     });
   });
 

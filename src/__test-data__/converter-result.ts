@@ -1,4 +1,4 @@
-import { CreateYaOrderDto, PlatformStation } from 'src/ya/dto/ya.dto';
+import { CreateYaOrderDto } from 'src/ya/dto/ya.dto';
 
 export const orderConverterResult: CreateYaOrderDto = {
   info: {
@@ -6,7 +6,7 @@ export const orderConverterResult: CreateYaOrderDto = {
   },
   source: {
     platform_station: {
-      platform_id: PlatformStation.TUL,
+      platform_id: 'source-platform-123',
     },
   },
   destination: {

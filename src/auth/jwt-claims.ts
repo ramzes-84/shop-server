@@ -5,10 +5,16 @@ export const CRON_REVISE_SCOPE = 'orders:revise';
 /** Допуск на расхождение часов между хостингом PrestaShop и сервером, секунды. */
 export const JWT_CLOCK_TOLERANCE_SEC = 30;
 
+export interface YaSourcePlatformIds {
+  rnd?: string;
+  tul?: string;
+}
+
 export interface JwtPayload {
   sub: string;
   email?: string;
   scope?: string;
+  yaSourcePlatformIds?: YaSourcePlatformIds;
   iss: string;
   aud: string;
   iat: number;
@@ -20,4 +26,5 @@ export interface AuthenticatedEmployee {
   id: string;
   email?: string;
   scope?: string;
+  yaSourcePlatformIds?: YaSourcePlatformIds;
 }

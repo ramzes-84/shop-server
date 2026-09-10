@@ -1,4 +1,13 @@
-import { Controller, Get, Param, Body, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import { Request } from 'express';
 import { AppService } from './app.service';
 import {
   CreateOrderQueries,
@@ -7,6 +16,9 @@ import {
 } from './validation/yandex';
 import { AuthGuard } from '@nestjs/passport';
 import { CronReviseJwtGuard, EmployeeJwtGuard } from './auth/jwt-scope.guard';
+import { AuthenticatedEmployee } from './auth/jwt-claims';
+
+type AuthenticatedRequest = Request & { user: AuthenticatedEmployee };
 
 @Controller()
 export class AppController {
@@ -19,8 +31,14 @@ export class AppController {
 
   @Post('yandex/create')
   @UseGuards(AuthGuard('jwt'), EmployeeJwtGuard)
-  async yaOrderCreate(@Body() body: CreateOrderQueries) {
-    return this.appService.createYaOrder(body);
+  async yaOrderCreate(
+    @Body() body: CreateOrderQueries,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.appService.createYaOrder(
+      body,
+      request.user.yaSourcePlatformIds,
+    );
   }
 
   @Post('cash/create')

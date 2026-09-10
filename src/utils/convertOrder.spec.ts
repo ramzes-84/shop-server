@@ -1,5 +1,5 @@
 import { calcDiscount, convertOrder } from './convertOrder';
-import { CreateYaOrderDto, PlatformStation } from 'src/ya/dto/ya.dto';
+import { CreateYaOrderDto } from 'src/ya/dto/ya.dto';
 import {
   addressDetails,
   customerDetails,
@@ -9,9 +9,10 @@ import {
 import { orderConverterResult } from 'src/__test-data__/converter-result';
 
 const destination = 'destination123';
+const sourcePlatformId = 'source-platform-123';
 
 describe('convertOrder', () => {
-  it('should convert order details correctly when order status is 12 (source city is RND)', () => {
+  it('should use the configured source platform ID', () => {
     const newOrderDetails = { ...orderDetails };
     newOrderDetails.current_state = '12';
 
@@ -21,15 +22,16 @@ describe('convertOrder', () => {
       customerDetails,
       shippingDetails.order_carriers[0],
       destination,
+      sourcePlatformId,
     );
 
     expect(result).toEqual<CreateYaOrderDto>({
       ...orderConverterResult,
-      source: { platform_station: { platform_id: PlatformStation.RND } },
+      source: { platform_station: { platform_id: sourcePlatformId } },
     });
   });
 
-  it('should convert order details correctly when order status is 5 (source city is incorrect)', () => {
+  it('should not derive the source platform from order status', () => {
     const newOrderDetails = { ...orderDetails };
     newOrderDetails.current_state = '5';
 
@@ -39,24 +41,29 @@ describe('convertOrder', () => {
       customerDetails,
       shippingDetails.order_carriers[0],
       destination,
+      sourcePlatformId,
     );
 
     expect(result).toEqual<CreateYaOrderDto>({
       ...orderConverterResult,
-      source: { platform_station: { platform_id: PlatformStation.TUL } },
+      source: { platform_station: { platform_id: sourcePlatformId } },
     });
   });
 
-  it('should convert order details correctly when order status is 13 (source city is TUL)', () => {
+  it('should use the configured source platform for any order status', () => {
     const result = convertOrder(
       orderDetails,
       addressDetails,
       customerDetails,
       shippingDetails.order_carriers[0],
       destination,
+      sourcePlatformId,
     );
 
-    expect(result).toEqual<CreateYaOrderDto>(orderConverterResult);
+    expect(result).toEqual<CreateYaOrderDto>({
+      ...orderConverterResult,
+      source: { platform_station: { platform_id: sourcePlatformId } },
+    });
   });
 
   it('should handle zero discounts correctly', () => {
@@ -69,6 +76,7 @@ describe('convertOrder', () => {
       customerDetails,
       shippingDetails.order_carriers[0],
       destination,
+      sourcePlatformId,
     );
 
     expect(result.items[0].billing_details.unit_price).toEqual(

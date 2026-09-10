@@ -25,6 +25,7 @@ import { checkDeliveryCost } from './utils/check-delivery-cost';
 import { FiveService } from './five/five.service';
 import { describeError, toSafeMessage } from './common/request-context';
 import { getCurrentRequestId } from './common/request-id.storage';
+import { YaSourcePlatformIds } from './auth/jwt-claims';
 
 @Injectable()
 export class AppService {
@@ -196,12 +197,26 @@ export class AppService {
     }
   }
 
-  async createYaOrder({
-    orderId,
-  }: CreateOrderQueries): Promise<TransferInterface> {
+  async createYaOrder(
+    { orderId }: CreateOrderQueries,
+    sourcePlatformIds?: YaSourcePlatformIds,
+  ): Promise<TransferInterface> {
     try {
       const { addressDetails, customerDetails, orderDetails } =
         await this.getOrderBasicInfo(orderId);
+      const sourcePlatformId =
+        orderDetails.current_state === '12'
+          ? sourcePlatformIds?.rnd
+          : orderDetails.current_state === '13'
+            ? sourcePlatformIds?.tul
+            : undefined;
+
+      if (!sourcePlatformId) {
+        throw new HttpException(
+          `Не настроен ID пункта приёма Яндекс.Доставки для статуса заказа ${orderDetails.current_state}`,
+          HttpStatus.SERVICE_UNAVAILABLE,
+        );
+      }
 
       const [shippingDetails, threadId] = await Promise.all([
         this.shopService.getOrderCarrierInfo(+orderId),
@@ -225,6 +240,7 @@ export class AppService {
         customerDetails,
         shippingDetails,
         destination,
+        sourcePlatformId,
       );
 
       const [{ request_id }, { pricing_total }] = await Promise.all([

@@ -63,10 +63,21 @@ describe('AppController', () => {
         // destination: 'destination',
       };
 
-      const result = await controller.yaOrderCreate(query);
+      const result = await controller.yaOrderCreate(query, {
+        user: {
+          id: '1',
+          yaSourcePlatformIds: {
+            rnd: 'rnd-platform-123',
+            tul: 'tul-platform-123',
+          },
+        },
+      } as any);
 
       expect(result).toBe(mockResponse);
-      expect(service.createYaOrder).toHaveBeenCalledWith(query);
+      expect(service.createYaOrder).toHaveBeenCalledWith(query, {
+        rnd: 'rnd-platform-123',
+        tul: 'tul-platform-123',
+      });
     });
   });
 

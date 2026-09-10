@@ -15,6 +15,8 @@ class ShopServer extends Module
     public const CONF_API_URL = 'SHOPSERVER_API_URL';
     public const CONF_TOKEN_TTL = 'SHOPSERVER_TOKEN_TTL';
     public const CONF_CRON_KEY = 'SHOPSERVER_CRON_KEY';
+    public const CONF_YA_SOURCE_PLATFORM_ID_RND = 'SHOPSERVER_YA_SOURCE_PLATFORM_ID_RND';
+    public const CONF_YA_SOURCE_PLATFORM_ID_TUL = 'SHOPSERVER_YA_SOURCE_PLATFORM_ID_TUL';
     public const CONF_CARRIER_YANDEX = 'SHOPSERVER_CARRIER_YANDEX';
     public const CONF_CARRIER_FIVEPOST = 'SHOPSERVER_CARRIER_FIVEPOST';
     public const CONF_CARRIER_POST = 'SHOPSERVER_CARRIER_POST';
@@ -31,7 +33,7 @@ class ShopServer extends Module
     {
         $this->name = 'shopserver';
         $this->tab = 'shipping_logistics';
-        $this->version = '1.3.2';
+        $this->version = '1.4.1';
         $this->author = 'Mineral Magic';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = ['min' => '8.0.0', 'max' => _PS_VERSION_];
@@ -53,6 +55,8 @@ class ShopServer extends Module
             && Configuration::updateValue(self::CONF_API_URL, '')
             && Configuration::updateValue(self::CONF_TOKEN_TTL, self::DEFAULT_TOKEN_TTL)
             && Configuration::updateValue(self::CONF_CRON_KEY, $this->generateSecret())
+            && Configuration::updateValue(self::CONF_YA_SOURCE_PLATFORM_ID_RND, '')
+            && Configuration::updateValue(self::CONF_YA_SOURCE_PLATFORM_ID_TUL, '')
             && Configuration::updateValue(self::CONF_CARRIER_YANDEX, 0)
             && Configuration::updateValue(self::CONF_CARRIER_FIVEPOST, 0)
             && Configuration::updateValue(self::CONF_CARRIER_POST, 0)
@@ -99,7 +103,9 @@ class ShopServer extends Module
             (int) $employee->id,
             (string) $employee->email,
             $this->tokenTtl(),
-            $secret
+            $secret,
+            (string) Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_RND),
+            (string) Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_TUL)
         );
 
         $config = [
@@ -197,6 +203,8 @@ class ShopServer extends Module
         }
 
         $ttl = (int) Tools::getValue(self::CONF_TOKEN_TTL);
+        $yaSourcePlatformIdRnd = trim((string) Tools::getValue(self::CONF_YA_SOURCE_PLATFORM_ID_RND));
+        $yaSourcePlatformIdTul = trim((string) Tools::getValue(self::CONF_YA_SOURCE_PLATFORM_ID_TUL));
 
         if ($ttl < self::MIN_TOKEN_TTL || $ttl > self::MAX_TOKEN_TTL) {
             return $this->displayError(sprintf(
@@ -206,8 +214,14 @@ class ShopServer extends Module
             ));
         }
 
+        if ($yaSourcePlatformIdRnd === '' || $yaSourcePlatformIdTul === '') {
+            return $this->displayError('Укажите ID пунктов приёма Яндекс.Доставки для Ростова и Тулы.');
+        }
+
         Configuration::updateValue(self::CONF_API_URL, rtrim($apiUrl, '/'));
         Configuration::updateValue(self::CONF_TOKEN_TTL, $ttl);
+        Configuration::updateValue(self::CONF_YA_SOURCE_PLATFORM_ID_RND, $yaSourcePlatformIdRnd);
+        Configuration::updateValue(self::CONF_YA_SOURCE_PLATFORM_ID_TUL, $yaSourcePlatformIdTul);
         Configuration::updateValue(self::CONF_CARRIER_YANDEX, (int) Tools::getValue(self::CONF_CARRIER_YANDEX));
         Configuration::updateValue(self::CONF_CARRIER_FIVEPOST, (int) Tools::getValue(self::CONF_CARRIER_FIVEPOST));
         Configuration::updateValue(self::CONF_CARRIER_POST, (int) Tools::getValue(self::CONF_CARRIER_POST));
@@ -253,6 +267,20 @@ class ShopServer extends Module
                         'label' => 'Время жизни токена, сек',
                         'name' => self::CONF_TOKEN_TTL,
                         'desc' => 'Токен выдаётся при открытии страницы заказа. По истечении сотруднику нужно обновить страницу.',
+                        'required' => true,
+                    ],
+                    [
+                        'type' => 'text',
+                        'label' => 'ID пункта приёма Яндекс.Доставки, Ростов',
+                        'name' => self::CONF_YA_SOURCE_PLATFORM_ID_RND,
+                        'desc' => 'platform_id пункта для заказов со статусом 12.',
+                        'required' => true,
+                    ],
+                    [
+                        'type' => 'text',
+                        'label' => 'ID пункта приёма Яндекс.Доставки, Тула',
+                        'name' => self::CONF_YA_SOURCE_PLATFORM_ID_TUL,
+                        'desc' => 'platform_id пункта для заказов со статусом 13.',
                         'required' => true,
                     ],
                     [
@@ -327,6 +355,8 @@ class ShopServer extends Module
             'fields_value' => [
                 self::CONF_API_URL => Configuration::get(self::CONF_API_URL),
                 self::CONF_TOKEN_TTL => $this->tokenTtl(),
+                self::CONF_YA_SOURCE_PLATFORM_ID_RND => Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_RND),
+                self::CONF_YA_SOURCE_PLATFORM_ID_TUL => Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_TUL),
                 'SHOPSERVER_CRON_KEY_READONLY' => Configuration::get(self::CONF_CRON_KEY),
                 self::CONF_CARRIER_YANDEX => (int) Configuration::get(self::CONF_CARRIER_YANDEX),
                 self::CONF_CARRIER_FIVEPOST => (int) Configuration::get(self::CONF_CARRIER_FIVEPOST),
@@ -439,6 +469,8 @@ class ShopServer extends Module
             self::CONF_API_URL,
             self::CONF_TOKEN_TTL,
             self::CONF_CRON_KEY,
+            self::CONF_YA_SOURCE_PLATFORM_ID_RND,
+            self::CONF_YA_SOURCE_PLATFORM_ID_TUL,
             self::CONF_CARRIER_YANDEX,
             self::CONF_CARRIER_FIVEPOST,
             self::CONF_CARRIER_POST,

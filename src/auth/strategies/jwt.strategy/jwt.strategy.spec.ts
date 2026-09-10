@@ -46,6 +46,7 @@ describe('JwtStrategy', () => {
         id: '1',
         email: 'employee@example.com',
         scope: undefined,
+        yaSourcePlatformIds: undefined,
       });
     });
 
@@ -56,6 +57,27 @@ describe('JwtStrategy', () => {
         id: '1',
         email: 'employee@example.com',
         scope: 'orders:revise',
+      });
+    });
+
+    it('should preserve configured Yandex source platform IDs', () => {
+      expect(
+        strategy.validate(
+          buildPayload({
+            yaSourcePlatformIds: {
+              rnd: 'rnd-platform-123',
+              tul: 'tul-platform-123',
+            },
+          }),
+        ),
+      ).toEqual({
+        id: '1',
+        email: 'employee@example.com',
+        scope: undefined,
+        yaSourcePlatformIds: {
+          rnd: 'rnd-platform-123',
+          tul: 'tul-platform-123',
+        },
       });
     });
 
