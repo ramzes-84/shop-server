@@ -33,7 +33,7 @@ class ShopServer extends Module
     {
         $this->name = 'shopserver';
         $this->tab = 'shipping_logistics';
-        $this->version = '1.5.0';
+        $this->version = '1.5.1';
         $this->author = 'Mineral Magic';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = ['min' => '8.0.0', 'max' => _PS_VERSION_];
@@ -446,7 +446,8 @@ class ShopServer extends Module
 
         foreach ($tabs as $tab => $title) {
             $class = $tab === $activeTab ? ' class="active"' : '';
-            $html .= '<li' . $class . '><a href="' . htmlspecialchars($this->configurationUrl($tab), ENT_QUOTES, 'UTF-8') . '">' . $title . '</a></li>';
+            $url = $this->configurationUrl($tab) . '&token=' . Tools::getAdminTokenLite('AdminModules');
+            $html .= '<li' . $class . '><a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">' . $title . '</a></li>';
         }
 
         return $html . '</ul>';
@@ -455,34 +456,6 @@ class ShopServer extends Module
     private function tabTitle(string $tab): string
     {
         return ['server' => 'Сервер и доступ', 'delivery' => 'Доставка', 'widgets' => 'Виджеты', 'status' => 'Проверка статусов'][$tab];
-    }
-
-        $helper = new HelperForm();
-        $helper->module = $this;
-        $helper->identifier = $this->identifier;
-        $helper->submit_action = 'submitShopServerSettings';
-        $helper->token = Tools::getAdminTokenLite('AdminModules');
-        $helper->currentIndex = AdminController::$currentIndex . '&' . http_build_query(['configure' => $this->name]);
-        $helper->default_form_language = (int) Configuration::get('PS_LANG_DEFAULT');
-        $helper->tpl_vars = [
-            'fields_value' => [
-                self::CONF_API_URL => Configuration::get(self::CONF_API_URL),
-                self::CONF_TOKEN_TTL => $this->tokenTtl(),
-                self::CONF_YA_SOURCE_PLATFORM_ID_RND => Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_RND),
-                self::CONF_YA_SOURCE_PLATFORM_ID_TUL => Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_TUL),
-                'SHOPSERVER_CRON_KEY_READONLY' => Configuration::get(self::CONF_CRON_KEY),
-                self::CONF_CARRIER_YANDEX => (int) Configuration::get(self::CONF_CARRIER_YANDEX),
-                self::CONF_CARRIER_FIVEPOST => (int) Configuration::get(self::CONF_CARRIER_FIVEPOST),
-                self::CONF_CARRIER_POST => (int) Configuration::get(self::CONF_CARRIER_POST),
-                self::CONF_CARRIER_DPD => (int) Configuration::get(self::CONF_CARRIER_DPD),
-                self::CONF_FIVEPOST_KEY => Configuration::get(self::CONF_FIVEPOST_KEY),
-                self::CONF_DPD_SID => Configuration::get(self::CONF_DPD_SID),
-                self::CONF_POCHTA_WIDGET_ID => Configuration::get(self::CONF_POCHTA_WIDGET_ID),
-                'SHOPSERVER_SECRET_READONLY' => Configuration::get(self::CONF_SECRET),
-            ],
-        ];
-
-        return $helper->generateForm([$fields]);
     }
 
     /**
