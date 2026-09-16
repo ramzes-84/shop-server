@@ -18,7 +18,7 @@ import {
   shippingDetails,
 } from 'src/__test-data__/shop-data';
 import { orderConverterResult } from './__test-data__/converter-result';
-import { yaOrderHistory } from './__test-data__/ya-data';
+import { yaOrderHistory, yaRecentParcels } from './__test-data__/ya-data';
 import { CashService } from './cash/cash.service';
 import { BotService } from './bot/bot.service';
 import { DpdService } from './dpd/dpd.service';
@@ -105,6 +105,7 @@ describe('AppService', () => {
             getOrderMessages: jest.fn(),
             updateOrderStatus: jest.fn(),
             addMessageToThread: jest.fn(),
+            getInTransitOrders: jest.fn(),
           },
         },
         {
@@ -114,6 +115,7 @@ describe('AppService', () => {
             createYaOrder: jest.fn(),
             getOrderInfo: jest.fn(),
             getParcelCost: jest.fn(),
+            getRecentParcels: jest.fn(),
           },
         },
         {
@@ -652,6 +654,34 @@ describe('AppService', () => {
       jest.spyOn(service, 'getDataForRevise').mockRejectedValue(failure);
 
       await expect(service.reviseOrders()).rejects.toThrow(failure);
+    });
+  });
+
+  describe('getDataForRevise', () => {
+    it('logs an unmatched Yandex order returned by PrestaShop', async () => {
+      const loggerWarn = jest.spyOn((service as any).logger, 'warn');
+      jest.spyOn(shopService, 'getInTransitOrders').mockResolvedValue([
+        {
+          id: 1,
+          reference: 'YA-REF-1',
+          shipping_number: '00000000-0000-0000-0000-000000000001',
+          current_state: '4',
+          date_upd: '2026-09-11T12:00:00.000Z',
+        },
+      ] as any);
+      jest.spyOn(yaService, 'getRecentParcels').mockResolvedValue({
+        ...yaRecentParcels,
+        requests: [],
+      });
+
+      const result = await service.getDataForRevise();
+
+      expect(result[0]).toEqual(expect.objectContaining({ cargo: Cargos.YA }));
+      expect(result[0]).not.toHaveProperty('actualCargoState');
+      expect(result[0]).not.toHaveProperty('unifiedCargoState');
+      expect(loggerWarn).toHaveBeenCalledWith(
+        expect.stringContaining('"event":"yandexParcelNotFound"'),
+      );
     });
   });
 

@@ -368,21 +368,53 @@ export class AppService {
       },
     );
 
+    this.logger.log(
+      JSON.stringify({
+        operation: 'reviseOrdersSnapshot',
+        ordersCount: revisingOrdersData.length,
+        yandexOrdersCount: revisingOrdersData.filter(
+          (order) => order.cargo === Cargos.YA,
+        ).length,
+        yandexParcelsCount: recentYaParcels.requests.length,
+      }),
+    );
+
     const allStatuses = await this.fetchBatchOfStatuses(revisingOrdersData);
 
-    revisingOrdersData.map((order, index) => {
+    revisingOrdersData.forEach((order, index) => {
       let currState: string | undefined;
       const settled = allStatuses[index];
       if (settled.status === 'fulfilled') {
         switch (order.cargo) {
           case Cargos.YA: {
-            currState = recentYaParcels.requests
-              .filter((parcel) =>
-                parcel.request.info.operator_request_id.startsWith(
-                  order.reference,
-                ),
-              )
-              .at(0)?.state.status;
+            const matchedParcels = recentYaParcels.requests.filter((parcel) =>
+              parcel.request.info.operator_request_id.startsWith(
+                order.reference,
+              ),
+            );
+            currState = matchedParcels.at(0)?.state.status;
+
+            if (matchedParcels.length === 0) {
+              this.logger.warn(
+                JSON.stringify({
+                  operation: 'reviseOrders',
+                  event: 'yandexParcelNotFound',
+                  orderId: order.id,
+                  reference: order.reference,
+                  track: order.track,
+                }),
+              );
+            } else if (matchedParcels.length > 1) {
+              this.logger.warn(
+                JSON.stringify({
+                  operation: 'reviseOrders',
+                  event: 'ambiguousYandexParcel',
+                  orderId: order.id,
+                  reference: order.reference,
+                  matchCount: matchedParcels.length,
+                }),
+              );
+            }
             break;
           }
           case Cargos.DPD: {
@@ -415,6 +447,21 @@ export class AppService {
       if (currState !== undefined) {
         order.actualCargoState = currState;
         order.unifiedCargoState = unifyParcelStatus(currState);
+
+        if (
+          order.cargo === Cargos.YA &&
+          order.unifiedCargoState === UnifiedOrderState.UNKNOWN
+        ) {
+          this.logger.warn(
+            JSON.stringify({
+              operation: 'reviseOrders',
+              event: 'unknownYandexParcelStatus',
+              orderId: order.id,
+              reference: order.reference,
+              status: currState,
+            }),
+          );
+        }
       }
     });
     return revisingOrdersData;
