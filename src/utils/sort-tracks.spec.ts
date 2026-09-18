@@ -7,6 +7,7 @@ describe('recognizeCargo', () => {
   it.each([
     ['RU987654321', Cargos.DPD],
     ['123E4567-E89B-12D3-A456-426655440000', Cargos.YA],
+    ['#123E4567-E89B-12D3-A456-426655440000', Cargos.YA],
     ['990099', Cargos.POST],
     [ORDER_REFERENCE, Cargos.FIVE_POST],
     ['SOMETHING', Cargos.UNKNOWN],

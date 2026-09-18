@@ -658,6 +658,43 @@ describe('AppService', () => {
   });
 
   describe('getDataForRevise', () => {
+    it('recognizes a Yandex order by its reference when its tracking number is not a UUID', async () => {
+      jest.spyOn(shopService, 'getInTransitOrders').mockResolvedValue([
+        {
+          id: 1,
+          reference: 'YA-REF-1',
+          shipping_number: 'non-uuid-tracking-number',
+          current_state: '4',
+          date_upd: '2026-09-11T12:00:00.000Z',
+        },
+      ] as any);
+      jest.spyOn(yaService, 'getRecentParcels').mockResolvedValue({
+        ...yaRecentParcels,
+        requests: [
+          {
+            ...yaRecentParcels.requests[0],
+            request: {
+              ...yaRecentParcels.requests[0].request,
+              info: {
+                ...yaRecentParcels.requests[0].request.info,
+                operator_request_id: 'YA-REF-1',
+              },
+            },
+          },
+        ],
+      });
+
+      const result = await service.getDataForRevise();
+
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          cargo: Cargos.YA,
+          actualCargoState: yaRecentParcels.requests[0].state.status,
+          unifiedCargoState: UnifiedOrderState.IN_TRANSIT,
+        }),
+      );
+    });
+
     it('logs an unmatched Yandex order returned by PrestaShop', async () => {
       const loggerWarn = jest.spyOn((service as any).logger, 'warn');
       jest.spyOn(shopService, 'getInTransitOrders').mockResolvedValue([
@@ -681,6 +718,31 @@ describe('AppService', () => {
       expect(result[0]).not.toHaveProperty('unifiedCargoState');
       expect(loggerWarn).toHaveBeenCalledWith(
         expect.stringContaining('"event":"yandexParcelNotFound"'),
+      );
+    });
+
+    it('reports an unmatched Yandex order during revision', async () => {
+      jest.spyOn(shopService, 'getInTransitOrders').mockResolvedValue([
+        {
+          id: 1,
+          reference: 'YA-REF-1',
+          shipping_number: '00000000-0000-0000-0000-000000000001',
+          current_state: '4',
+          date_upd: '2026-09-11T12:00:00.000Z',
+        },
+      ] as any);
+      jest.spyOn(yaService, 'getRecentParcels').mockResolvedValue({
+        ...yaRecentParcels,
+        requests: [],
+      });
+      jest.spyOn(mailService, 'sendToAdmin').mockResolvedValue(undefined);
+      jest.spyOn(botService, 'sendEmployeeMessage').mockResolvedValue({
+        ok: true,
+        result: {} as any,
+      });
+
+      await expect(service.reviseOrders()).resolves.toContain(
+        '❗ Заказ YA-REF-1 не найден в ответе Яндекс.Доставки за последние 30 дней.',
       );
     });
   });

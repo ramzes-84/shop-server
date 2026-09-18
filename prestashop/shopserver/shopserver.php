@@ -33,7 +33,7 @@ class ShopServer extends Module
     {
         $this->name = 'shopserver';
         $this->tab = 'shipping_logistics';
-        $this->version = '1.5.1';
+        $this->version = '1.5.3';
         $this->author = 'Mineral Magic';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = ['min' => '8.0.0', 'max' => _PS_VERSION_];
@@ -197,6 +197,10 @@ class ShopServer extends Module
 
     private function saveSettings(string $activeTab): string
     {
+        if ($activeTab === 'status') {
+            return '';
+        }
+
         if ($activeTab === 'delivery') {
             return $this->saveDeliverySettings();
         }
@@ -289,7 +293,19 @@ class ShopServer extends Module
             return $this->displayError(sprintf('Проверка статусов завершилась ошибкой Shop Server (HTTP %d).', $status));
         }
 
-        return $this->displayConfirmation('Проверка статусов завершена. Shop Server вернул HTTP ' . $status . '.');
+        $result = json_decode((string) $response, true);
+
+        if (!is_array($result) || count($result) === 0) {
+            return $this->displayConfirmation('Проверка статусов завершена. Изменений, предупреждений и ошибок не обнаружено.');
+        }
+
+        $messages = array_map(function ($message): string {
+            return htmlspecialchars((string) $message, ENT_QUOTES, 'UTF-8');
+        }, $result);
+
+        return $this->displayConfirmation(
+            'Проверка статусов завершена:<br>' . implode('<br>', $messages)
+        );
     }
 
     private function renderForm(string $activeTab): string

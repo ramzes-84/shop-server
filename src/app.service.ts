@@ -355,7 +355,12 @@ export class AppService {
 
     const revisingOrdersData: RevisingOrderData[] = ordersInTransit.map(
       (order) => {
-        const cargo = recognizeCargo(order.shipping_number, order.reference);
+        const hasYandexParcel = recentYaParcels.requests.some((parcel) =>
+          parcel.request.info.operator_request_id.startsWith(order.reference),
+        );
+        const cargo = hasYandexParcel
+          ? Cargos.YA
+          : recognizeCargo(order.shipping_number, order.reference);
         const unifiedState = unifyShopState(order.current_state);
         return {
           id: order.id,
@@ -526,6 +531,10 @@ export class AppService {
       if (cargoState === UnifiedOrderState.UNKNOWN) {
         errors.push(
           `❗ Не удалось проверить заказ ${order.reference}, трек: ${order.track}.`,
+        );
+      } else if (order.cargo === Cargos.YA && !order.actualCargoState) {
+        errors.push(
+          `❗ Заказ ${order.reference} не найден в ответе Яндекс.Доставки за последние 30 дней.`,
         );
       }
     }
