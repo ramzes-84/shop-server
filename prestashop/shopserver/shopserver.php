@@ -24,6 +24,10 @@ class ShopServer extends Module
     public const CONF_FIVEPOST_KEY = 'SHOPSERVER_FIVEPOST_KEY';
     public const CONF_DPD_SID = 'SHOPSERVER_DPD_SID';
     public const CONF_POCHTA_WIDGET_ID = 'SHOPSERVER_POCHTA_WIDGET_ID';
+    public const CONF_NOTIFY_WAITING_STATE = 'SHOPSERVER_NOTIFY_WAITING_STATE';
+    public const CONF_NOTIFY_WAITING_TEMPLATE = 'SHOPSERVER_NOTIFY_WAITING_TEMPLATE';
+    public const CONF_NOTIFY_DELIVERED_STATE = 'SHOPSERVER_NOTIFY_DELIVERED_STATE';
+    public const CONF_NOTIFY_DELIVERED_TEMPLATE = 'SHOPSERVER_NOTIFY_DELIVERED_TEMPLATE';
 
     private const DEFAULT_TOKEN_TTL = 7200;
     private const MIN_TOKEN_TTL = 300;
@@ -33,7 +37,7 @@ class ShopServer extends Module
     {
         $this->name = 'shopserver';
         $this->tab = 'shipping_logistics';
-        $this->version = '1.5.3';
+        $this->version = '1.6.0';
         $this->author = 'Mineral Magic';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = ['min' => '8.0.0', 'max' => _PS_VERSION_];
@@ -51,6 +55,7 @@ class ShopServer extends Module
         return parent::install()
             && $this->registerHook('displayAdminOrderTop')
             && $this->registerHook('actionFrontControllerSetMedia')
+            && $this->registerHook('actionObjectOrderHistoryAddAfter')
             && Configuration::updateValue(self::CONF_SECRET, $this->generateSecret())
             && Configuration::updateValue(self::CONF_API_URL, '')
             && Configuration::updateValue(self::CONF_TOKEN_TTL, self::DEFAULT_TOKEN_TTL)
@@ -63,7 +68,11 @@ class ShopServer extends Module
             && Configuration::updateValue(self::CONF_CARRIER_DPD, 0)
             && Configuration::updateValue(self::CONF_FIVEPOST_KEY, '')
             && Configuration::updateValue(self::CONF_DPD_SID, '')
-            && Configuration::updateValue(self::CONF_POCHTA_WIDGET_ID, '');
+            && Configuration::updateValue(self::CONF_POCHTA_WIDGET_ID, '')
+            && Configuration::updateValue(self::CONF_NOTIFY_WAITING_STATE, 0)
+            && Configuration::updateValue(self::CONF_NOTIFY_WAITING_TEMPLATE, '')
+            && Configuration::updateValue(self::CONF_NOTIFY_DELIVERED_STATE, 0)
+            && Configuration::updateValue(self::CONF_NOTIFY_DELIVERED_TEMPLATE, '');
     }
 
     public function uninstall(): bool
@@ -165,6 +174,26 @@ class ShopServer extends Module
         );
     }
 
+    public function hookActionObjectOrderHistoryAddAfter(array $params): void
+    {
+        if (empty($params['object']) || !($params['object'] instanceof OrderHistory)) {
+            return;
+        }
+
+        /** @var OrderHistory $history */
+        $history = $params['object'];
+        if (!(int) $history->id_order_state || !(int) $history->id_order) {
+            return;
+        }
+
+        $template = $this->notificationTemplateForState((int) $history->id_order_state);
+        if ($template === '') {
+            return;
+        }
+
+        $this->sendStatusNotification($history, $template);
+    }
+
     public function getContent(): string
     {
         $output = '';
@@ -209,6 +238,15 @@ class ShopServer extends Module
             Configuration::updateValue(self::CONF_FIVEPOST_KEY, trim((string) Tools::getValue(self::CONF_FIVEPOST_KEY)));
             Configuration::updateValue(self::CONF_DPD_SID, trim((string) Tools::getValue(self::CONF_DPD_SID)));
             Configuration::updateValue(self::CONF_POCHTA_WIDGET_ID, trim((string) Tools::getValue(self::CONF_POCHTA_WIDGET_ID)));
+
+            return $this->displayConfirmation('Настройки сохранены.');
+        }
+
+        if ($activeTab === 'notifications') {
+            Configuration::updateValue(self::CONF_NOTIFY_WAITING_STATE, (int) Tools::getValue(self::CONF_NOTIFY_WAITING_STATE));
+            Configuration::updateValue(self::CONF_NOTIFY_WAITING_TEMPLATE, trim((string) Tools::getValue(self::CONF_NOTIFY_WAITING_TEMPLATE)));
+            Configuration::updateValue(self::CONF_NOTIFY_DELIVERED_STATE, (int) Tools::getValue(self::CONF_NOTIFY_DELIVERED_STATE));
+            Configuration::updateValue(self::CONF_NOTIFY_DELIVERED_TEMPLATE, trim((string) Tools::getValue(self::CONF_NOTIFY_DELIVERED_TEMPLATE)));
 
             return $this->displayConfirmation('Настройки сохранены.');
         }
@@ -354,6 +392,15 @@ class ShopServer extends Module
             ];
         }
 
+        if ($activeTab === 'notifications') {
+            return [
+                ['type' => 'text', 'label' => 'ID статуса «Ожидание получения»', 'name' => self::CONF_NOTIFY_WAITING_STATE, 'class' => 'fixed-width-sm', 'desc' => 'При создании этого статуса клиенту отправляется указанный шаблон. Оставьте оба поля пустыми, чтобы отключить уведомление.'],
+                ['type' => 'text', 'label' => 'Шаблон для статуса «Ожидание получения»', 'name' => self::CONF_NOTIFY_WAITING_TEMPLATE, 'desc' => 'Имя шаблона из /mails без языкового суффикса. Например: order_changed.'],
+                ['type' => 'text', 'label' => 'ID статуса «Доставлен»', 'name' => self::CONF_NOTIFY_DELIVERED_STATE, 'class' => 'fixed-width-sm', 'desc' => 'При создании этого статуса клиенту отправляется указанный шаблон. Оставьте оба поля пустыми, чтобы отключить уведомление.'],
+                ['type' => 'text', 'label' => 'Шаблон для статуса «Доставлен»', 'name' => self::CONF_NOTIFY_DELIVERED_TEMPLATE, 'desc' => 'Имя шаблона из /mails без языкового суффикса. Например: order_changed.'],
+            ];
+        }
+
         if ($activeTab === 'status') {
             return [[
                 'type' => 'html',
@@ -436,6 +483,10 @@ class ShopServer extends Module
             self::CONF_FIVEPOST_KEY => Configuration::get(self::CONF_FIVEPOST_KEY),
             self::CONF_DPD_SID => Configuration::get(self::CONF_DPD_SID),
             self::CONF_POCHTA_WIDGET_ID => Configuration::get(self::CONF_POCHTA_WIDGET_ID),
+            self::CONF_NOTIFY_WAITING_STATE => (int) Configuration::get(self::CONF_NOTIFY_WAITING_STATE),
+            self::CONF_NOTIFY_WAITING_TEMPLATE => Configuration::get(self::CONF_NOTIFY_WAITING_TEMPLATE),
+            self::CONF_NOTIFY_DELIVERED_STATE => (int) Configuration::get(self::CONF_NOTIFY_DELIVERED_STATE),
+            self::CONF_NOTIFY_DELIVERED_TEMPLATE => Configuration::get(self::CONF_NOTIFY_DELIVERED_TEMPLATE),
             'SHOPSERVER_SECRET_READONLY' => Configuration::get(self::CONF_SECRET),
         ];
     }
@@ -444,7 +495,7 @@ class ShopServer extends Module
     {
         $tab = (string) Tools::getValue('shopserver_tab', 'server');
 
-        return in_array($tab, ['server', 'delivery', 'widgets', 'status'], true) ? $tab : 'server';
+        return in_array($tab, ['server', 'delivery', 'widgets', 'notifications', 'status'], true) ? $tab : 'server';
     }
 
     private function configurationUrl(string $tab): string
@@ -457,7 +508,7 @@ class ShopServer extends Module
 
     private function renderTabs(string $activeTab): string
     {
-        $tabs = ['server' => 'Сервер и доступ', 'delivery' => 'Доставка', 'widgets' => 'Виджеты', 'status' => 'Проверка статусов'];
+        $tabs = ['server' => 'Сервер и доступ', 'delivery' => 'Доставка', 'widgets' => 'Виджеты', 'notifications' => 'Уведомления', 'status' => 'Проверка статусов'];
         $html = '<ul class="nav nav-tabs" style="margin-bottom: 20px;">';
 
         foreach ($tabs as $tab => $title) {
@@ -471,7 +522,7 @@ class ShopServer extends Module
 
     private function tabTitle(string $tab): string
     {
-        return ['server' => 'Сервер и доступ', 'delivery' => 'Доставка', 'widgets' => 'Виджеты', 'status' => 'Проверка статусов'][$tab];
+        return ['server' => 'Сервер и доступ', 'delivery' => 'Доставка', 'widgets' => 'Виджеты', 'notifications' => 'Уведомления', 'status' => 'Проверка статусов'][$tab];
     }
 
     /**
@@ -564,6 +615,92 @@ class ShopServer extends Module
         return bin2hex(random_bytes(32));
     }
 
+    private function notificationTemplateForState(int $orderStateId): string
+    {
+        if ($orderStateId === (int) Configuration::get(self::CONF_NOTIFY_WAITING_STATE)) {
+            return trim((string) Configuration::get(self::CONF_NOTIFY_WAITING_TEMPLATE));
+        }
+
+        if ($orderStateId === (int) Configuration::get(self::CONF_NOTIFY_DELIVERED_STATE)) {
+            return trim((string) Configuration::get(self::CONF_NOTIFY_DELIVERED_TEMPLATE));
+        }
+
+        return '';
+    }
+
+    private function sendStatusNotification(OrderHistory $history, string $template): void
+    {
+        $order = new Order((int) $history->id_order);
+
+        if (!Validate::isLoadedObject($order)) {
+            PrestaShopLogger::addLog(
+                sprintf('[%s] Unable to load order or customer for status notification.', $this->name),
+                3,
+                null,
+                __CLASS__,
+                (int) $history->id
+            );
+            return;
+        }
+
+        $customer = new Customer((int) $order->id_customer);
+        if (!Validate::isLoadedObject($customer)) {
+            PrestaShopLogger::addLog(
+                sprintf('[%s] Unable to load order or customer for status notification.', $this->name),
+                3,
+                null,
+                __CLASS__,
+                (int) $history->id
+            );
+            return;
+        }
+
+        $languageId = (int) $order->id_lang ?: (int) $this->context->language->id;
+        $sent = false;
+
+        try {
+            $sent = Mail::Send(
+                $languageId,
+                $template,
+                'Обновление статуса заказа: ' . $order->reference,
+                [
+                    '{firstname}' => $customer->firstname,
+                    '{lastname}' => $customer->lastname,
+                    '{order_name}' => $order->reference,
+                    '{id_order}' => (int) $order->id,
+                ],
+                $customer->email,
+                $customer->firstname . ' ' . $customer->lastname,
+                null,
+                null,
+                null,
+                null,
+                _PS_MAIL_DIR_,
+                false,
+                (int) $order->id_shop
+            );
+        } catch (Exception $exception) {
+            PrestaShopLogger::addLog(
+                sprintf('[%s] Unable to send template "%s": %s', $this->name, $template, $exception->getMessage()),
+                3,
+                null,
+                __CLASS__,
+                (int) $history->id
+            );
+            return;
+        }
+
+        if (!$sent) {
+            PrestaShopLogger::addLog(
+                sprintf('[%s] Unable to send template "%s" for order %s.', $this->name, $template, $order->reference),
+                3,
+                null,
+                __CLASS__,
+                (int) $history->id
+            );
+        }
+    }
+
     private function configurationKeys(): array
     {
         return [
@@ -580,6 +717,10 @@ class ShopServer extends Module
             self::CONF_FIVEPOST_KEY,
             self::CONF_DPD_SID,
             self::CONF_POCHTA_WIDGET_ID,
+            self::CONF_NOTIFY_WAITING_STATE,
+            self::CONF_NOTIFY_WAITING_TEMPLATE,
+            self::CONF_NOTIFY_DELIVERED_STATE,
+            self::CONF_NOTIFY_DELIVERED_TEMPLATE,
         ];
     }
 }
