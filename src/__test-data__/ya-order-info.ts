@@ -1,8 +1,4 @@
-import {
-  PlatformStation,
-  YaOrderInfoRes,
-  YaParcelStatus,
-} from 'src/ya/dto/ya.dto';
+import { YaOrderInfoRes, YaParcelStatus } from 'src/ya/dto/ya.dto';
 
 export const yaOrderInfo: YaOrderInfoRes = {
   request_id: '00000000000000009a8f3ad7d35c6ff3-udp',
@@ -13,7 +9,7 @@ export const yaOrderInfo: YaOrderInfoRes = {
     },
     source: {
       platform_station: {
-        platform_id: PlatformStation.RND,
+        platform_id: 'source-platform-123',
       },
     },
     destination: {

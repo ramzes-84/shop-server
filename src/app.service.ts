@@ -25,6 +25,7 @@ import { checkDeliveryCost } from './utils/check-delivery-cost';
 import { FiveService } from './five/five.service';
 import { describeError, toSafeMessage } from './common/request-context';
 import { getCurrentRequestId } from './common/request-id.storage';
+import { YaSourcePlatformIds } from './auth/jwt-claims';
 
 @Injectable()
 export class AppService {
@@ -196,12 +197,26 @@ export class AppService {
     }
   }
 
-  async createYaOrder({
-    orderId,
-  }: CreateOrderQueries): Promise<TransferInterface> {
+  async createYaOrder(
+    { orderId }: CreateOrderQueries,
+    sourcePlatformIds?: YaSourcePlatformIds,
+  ): Promise<TransferInterface> {
     try {
       const { addressDetails, customerDetails, orderDetails } =
         await this.getOrderBasicInfo(orderId);
+      const sourcePlatformId =
+        orderDetails.current_state === '12'
+          ? sourcePlatformIds?.rnd
+          : orderDetails.current_state === '13'
+            ? sourcePlatformIds?.tul
+            : undefined;
+
+      if (!sourcePlatformId) {
+        throw new HttpException(
+          `Не настроен ID пункта приёма Яндекс.Доставки для статуса заказа ${orderDetails.current_state}`,
+          HttpStatus.SERVICE_UNAVAILABLE,
+        );
+      }
 
       const [shippingDetails, threadId] = await Promise.all([
         this.shopService.getOrderCarrierInfo(+orderId),
@@ -225,6 +240,7 @@ export class AppService {
         customerDetails,
         shippingDetails,
         destination,
+        sourcePlatformId,
       );
 
       const [{ request_id }, { pricing_total }] = await Promise.all([
@@ -339,7 +355,12 @@ export class AppService {
 
     const revisingOrdersData: RevisingOrderData[] = ordersInTransit.map(
       (order) => {
-        const cargo = recognizeCargo(order.shipping_number, order.reference);
+        const hasYandexParcel = recentYaParcels.requests.some((parcel) =>
+          parcel.request.info.operator_request_id.startsWith(order.reference),
+        );
+        const cargo = hasYandexParcel
+          ? Cargos.YA
+          : recognizeCargo(order.shipping_number, order.reference);
         const unifiedState = unifyShopState(order.current_state);
         return {
           id: order.id,
@@ -352,21 +373,53 @@ export class AppService {
       },
     );
 
+    this.logger.log(
+      JSON.stringify({
+        operation: 'reviseOrdersSnapshot',
+        ordersCount: revisingOrdersData.length,
+        yandexOrdersCount: revisingOrdersData.filter(
+          (order) => order.cargo === Cargos.YA,
+        ).length,
+        yandexParcelsCount: recentYaParcels.requests.length,
+      }),
+    );
+
     const allStatuses = await this.fetchBatchOfStatuses(revisingOrdersData);
 
-    revisingOrdersData.map((order, index) => {
+    revisingOrdersData.forEach((order, index) => {
       let currState: string | undefined;
       const settled = allStatuses[index];
       if (settled.status === 'fulfilled') {
         switch (order.cargo) {
           case Cargos.YA: {
-            currState = recentYaParcels.requests
-              .filter((parcel) =>
-                parcel.request.info.operator_request_id.startsWith(
-                  order.reference,
-                ),
-              )
-              .at(0)?.state.status;
+            const matchedParcels = recentYaParcels.requests.filter((parcel) =>
+              parcel.request.info.operator_request_id.startsWith(
+                order.reference,
+              ),
+            );
+            currState = matchedParcels.at(0)?.state.status;
+
+            if (matchedParcels.length === 0) {
+              this.logger.warn(
+                JSON.stringify({
+                  operation: 'reviseOrders',
+                  event: 'yandexParcelNotFound',
+                  orderId: order.id,
+                  reference: order.reference,
+                  track: order.track,
+                }),
+              );
+            } else if (matchedParcels.length > 1) {
+              this.logger.warn(
+                JSON.stringify({
+                  operation: 'reviseOrders',
+                  event: 'ambiguousYandexParcel',
+                  orderId: order.id,
+                  reference: order.reference,
+                  matchCount: matchedParcels.length,
+                }),
+              );
+            }
             break;
           }
           case Cargos.DPD: {
@@ -399,6 +452,21 @@ export class AppService {
       if (currState !== undefined) {
         order.actualCargoState = currState;
         order.unifiedCargoState = unifyParcelStatus(currState);
+
+        if (
+          order.cargo === Cargos.YA &&
+          order.unifiedCargoState === UnifiedOrderState.UNKNOWN
+        ) {
+          this.logger.warn(
+            JSON.stringify({
+              operation: 'reviseOrders',
+              event: 'unknownYandexParcelStatus',
+              orderId: order.id,
+              reference: order.reference,
+              status: currState,
+            }),
+          );
+        }
       }
     });
     return revisingOrdersData;
@@ -463,6 +531,10 @@ export class AppService {
       if (cargoState === UnifiedOrderState.UNKNOWN) {
         errors.push(
           `❗ Не удалось проверить заказ ${order.reference}, трек: ${order.track}.`,
+        );
+      } else if (order.cargo === Cargos.YA && !order.actualCargoState) {
+        errors.push(
+          `❗ Заказ ${order.reference} не найден в ответе Яндекс.Доставки за последние 30 дней.`,
         );
       }
     }

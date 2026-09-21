@@ -4,7 +4,7 @@ export function recognizeCargo(track: string, reference: string): Cargos {
   switch (true) {
     case track.startsWith('RU'):
       return Cargos.DPD;
-    case /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    case /^#?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
       track,
     ):
       return Cargos.YA;

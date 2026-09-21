@@ -3,12 +3,7 @@ import { AddressInfoResDto } from 'src/shop/dto/address-info.dto';
 import { CustomerInfoResDto } from 'src/shop/dto/customer-info.dto';
 import { OrderCarrierInfo } from 'src/shop/dto/order-carrier-info.dto';
 import { OrderInfoResDto } from 'src/shop/dto/order-info.dto';
-import { StatusesInfoResDto } from 'src/shop/dto/statuses-info.dto';
-import {
-  CreateYaOrderDto,
-  PlatformStation,
-  YaCostCalculationReqDto,
-} from 'src/ya/dto/ya.dto';
+import { CreateYaOrderDto, YaCostCalculationReqDto } from 'src/ya/dto/ya.dto';
 
 export function convertOrder(
   orderDetails: OrderInfoResDto['order'],
@@ -16,6 +11,7 @@ export function convertOrder(
   customerDetails: CustomerInfoResDto['customer'],
   shippingDetails: OrderCarrierInfo,
   destination: string,
+  sourcePlatformId: string,
 ): CreateYaOrderDto {
   const discount = calcDiscount(
     orderDetails.total_products,
@@ -69,10 +65,7 @@ export function convertOrder(
     },
     source: {
       platform_station: {
-        platform_id:
-          orderDetails.current_state === '12'
-            ? PlatformStation.RND
-            : PlatformStation.TUL,
+        platform_id: sourcePlatformId,
       },
     },
     destination: {
@@ -109,20 +102,6 @@ export function convertOrder(
 
 export function calcDiscount(total: string, discount: string) {
   return parseFloat((parseFloat(discount) / parseFloat(total)).toFixed(5));
-}
-
-export function getSourcePlatform(
-  statuses: StatusesInfoResDto['order_histories'],
-) {
-  const lastStatus = statuses[0].id_order_state;
-
-  if (lastStatus === '12') {
-    return PlatformStation.RND;
-  } else if (lastStatus === '13') {
-    return PlatformStation.TUL;
-  } else {
-    throw new Error(`Unknown last order's status: ${lastStatus}`);
-  }
 }
 
 export function convertYaOrderToCostReq(
