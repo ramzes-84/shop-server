@@ -10,6 +10,7 @@ import { MailerModule } from '@nestjs-modules/mailer';
 import { MailService } from './mail/mail.service';
 import { CashModule } from './cash/cash.module';
 import { BotModule } from './bot/bot.module';
+import { BotController } from './bot/bot.controller';
 import { DpdModule } from './dpd/dpd.module';
 import { PostModule } from './post/post.module';
 import { FiveModule } from './five/five.module';
@@ -45,7 +46,7 @@ import { FiveModule } from './five/five.module';
       inject: [ConfigService],
     }),
   ],
-  controllers: [AppController],
+  controllers: [AppController, BotController],
   providers: [AppService, MailService],
 })
 export class AppModule implements NestModule {

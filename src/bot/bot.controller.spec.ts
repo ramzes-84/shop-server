@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BotController } from './bot.controller';
 import { BotService } from './bot.service';
 import { YaService } from 'src/ya/ya.service';
+import { ShopService } from 'src/shop/shop.service';
+import { AppService } from 'src/app.service';
 import {
   TelegramMessageEntity,
   TelegramUpdate,
@@ -12,6 +14,8 @@ describe('BotController', () => {
   let controller: BotController;
   let botService: BotService;
   let yaService: YaService;
+  let shopService: ShopService;
+  let appService: AppService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -29,12 +33,27 @@ describe('BotController', () => {
             findTrackByOrderReference: jest.fn(),
           },
         },
+        {
+          provide: ShopService,
+          useValue: {
+            getOrdersForBotRegistration: jest.fn(),
+          },
+        },
+        {
+          provide: AppService,
+          useValue: {
+            createYaOrder: jest.fn(),
+            createFivePostOrder: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
     controller = module.get<BotController>(BotController);
     botService = module.get<BotService>(BotService);
     yaService = module.get<YaService>(YaService);
+    shopService = module.get<ShopService>(ShopService);
+    appService = module.get<AppService>(AppService);
   });
 
   const baseUpdate: TelegramUpdate = {
@@ -228,6 +247,184 @@ describe('BotController', () => {
 
     expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
       expect.stringContaining('Не удалось'),
+      false,
+      '123',
+    );
+  });
+
+  const registerCommandEntity: TelegramMessageEntity = {
+    offset: 0,
+    length: '/register'.length,
+    type: 'bot_command',
+  };
+
+  const registrationCandidates = [
+    {
+      id: 101,
+      reference: 'BFWGPFSMQ',
+      lastname: 'Васильева',
+      carrier: 'yandex' as const,
+    },
+    {
+      id: 102,
+      reference: 'AXQ12345Z',
+      lastname: 'Петров',
+      carrier: 'fivepost' as const,
+    },
+  ];
+
+  it('should list orders available for registration on /register', async () => {
+    jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
+      orders: registrationCandidates,
+      yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
+      fivePostSenderLocation: 'loc-1',
+    });
+
+    const update: TelegramUpdate = {
+      ...baseUpdate,
+      message: {
+        ...baseUpdate.message!,
+        text: '/register',
+        entities: [registerCommandEntity],
+      },
+    };
+
+    await controller.handleWebhook(update);
+
+    expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+      expect.stringContaining('1. BFWGPFSMQ Васильева'),
+      false,
+      '123',
+    );
+  });
+
+  it('should exclude orders with unsupported carriers from the registration list', async () => {
+    jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
+      orders: [
+        { id: 201, reference: 'ZZZ111', lastname: 'Сидоров', carrier: 'dpd' },
+      ],
+      yaSourcePlatformIds: {},
+      fivePostSenderLocation: undefined,
+    });
+
+    const update: TelegramUpdate = {
+      ...baseUpdate,
+      message: {
+        ...baseUpdate.message!,
+        text: '/register',
+        entities: [registerCommandEntity],
+      },
+    };
+
+    await controller.handleWebhook(update);
+
+    expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Нет заказов'),
+      false,
+      '123',
+    );
+  });
+
+  it('should register the selected Yandex order by list number', async () => {
+    jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
+      orders: registrationCandidates,
+      yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
+      fivePostSenderLocation: 'loc-1',
+    });
+    jest.spyOn(appService, 'createYaOrder').mockResolvedValue({
+      ok: true,
+      data: { sharing_url: 'https://dostavka.yandex.ru/route/EXAMPLE' },
+    });
+
+    await controller.handleWebhook({
+      ...baseUpdate,
+      message: {
+        ...baseUpdate.message!,
+        text: '/register',
+        entities: [registerCommandEntity],
+      },
+    });
+    jest.clearAllMocks();
+
+    await controller.handleWebhook({
+      ...baseUpdate,
+      message: { ...baseUpdate.message!, text: '1' },
+    });
+
+    expect(appService.createYaOrder).toHaveBeenCalledWith(
+      { orderId: '101' },
+      { rnd: 'rnd-1', tul: 'tul-1' },
+    );
+    expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+      expect.stringContaining('BFWGPFSMQ'),
+      false,
+      '123',
+    );
+  });
+
+  it('should register the selected 5Post order by list number', async () => {
+    jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
+      orders: registrationCandidates,
+      yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
+      fivePostSenderLocation: 'loc-1',
+    });
+    jest.spyOn(appService, 'createFivePostOrder').mockResolvedValue({
+      ok: true,
+      data: { track: 'TRACK-1' },
+    });
+
+    await controller.handleWebhook({
+      ...baseUpdate,
+      message: {
+        ...baseUpdate.message!,
+        text: '/register',
+        entities: [registerCommandEntity],
+      },
+    });
+    jest.clearAllMocks();
+
+    await controller.handleWebhook({
+      ...baseUpdate,
+      message: { ...baseUpdate.message!, text: '2' },
+    });
+
+    expect(appService.createFivePostOrder).toHaveBeenCalledWith(
+      { orderId: '102' },
+      'loc-1',
+    );
+    expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+      expect.stringContaining('AXQ12345Z'),
+      false,
+      '123',
+    );
+  });
+
+  it('should reject an out-of-range order number', async () => {
+    jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
+      orders: registrationCandidates,
+      yaSourcePlatformIds: {},
+      fivePostSenderLocation: undefined,
+    });
+
+    await controller.handleWebhook({
+      ...baseUpdate,
+      message: {
+        ...baseUpdate.message!,
+        text: '/register',
+        entities: [registerCommandEntity],
+      },
+    });
+    jest.clearAllMocks();
+
+    await controller.handleWebhook({
+      ...baseUpdate,
+      message: { ...baseUpdate.message!, text: '99' },
+    });
+
+    expect(appService.createYaOrder).not.toHaveBeenCalled();
+    expect(appService.createFivePostOrder).not.toHaveBeenCalled();
+    expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Некорректный номер'),
       false,
       '123',
     );

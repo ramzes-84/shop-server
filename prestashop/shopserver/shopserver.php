@@ -15,6 +15,7 @@ class ShopServer extends Module
     public const CONF_API_URL = 'SHOPSERVER_API_URL';
     public const CONF_TOKEN_TTL = 'SHOPSERVER_TOKEN_TTL';
     public const CONF_CRON_KEY = 'SHOPSERVER_CRON_KEY';
+    public const CONF_BOT_KEY = 'SHOPSERVER_BOT_KEY';
     public const CONF_YA_SOURCE_PLATFORM_ID_RND = 'SHOPSERVER_YA_SOURCE_PLATFORM_ID_RND';
     public const CONF_YA_SOURCE_PLATFORM_ID_TUL = 'SHOPSERVER_YA_SOURCE_PLATFORM_ID_TUL';
     public const CONF_FIVEPOST_SENDER_LOCATION = 'SHOPSERVER_FIVEPOST_SENDER_LOCATION';
@@ -38,7 +39,7 @@ class ShopServer extends Module
     {
         $this->name = 'shopserver';
         $this->tab = 'shipping_logistics';
-        $this->version = '1.7.0';
+        $this->version = '1.8.0';
         $this->author = 'Mineral Magic';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = ['min' => '8.0.0', 'max' => _PS_VERSION_];
@@ -61,6 +62,7 @@ class ShopServer extends Module
             && Configuration::updateValue(self::CONF_API_URL, '')
             && Configuration::updateValue(self::CONF_TOKEN_TTL, self::DEFAULT_TOKEN_TTL)
             && Configuration::updateValue(self::CONF_CRON_KEY, $this->generateSecret())
+            && Configuration::updateValue(self::CONF_BOT_KEY, $this->generateSecret())
             && Configuration::updateValue(self::CONF_YA_SOURCE_PLATFORM_ID_RND, '')
             && Configuration::updateValue(self::CONF_YA_SOURCE_PLATFORM_ID_TUL, '')
             && Configuration::updateValue(self::CONF_FIVEPOST_SENDER_LOCATION, '')
@@ -213,6 +215,13 @@ class ShopServer extends Module
             Configuration::updateValue(self::CONF_CRON_KEY, $this->generateSecret());
             $output .= $this->displayConfirmation(
                 'Ключ CRON перевыпущен. Обновите заголовок X-ShopServer-Cron-Key в сервисе расписания.'
+            );
+        }
+
+        if (Tools::isSubmit('submitShopServerRegenerateBotKey')) {
+            Configuration::updateValue(self::CONF_BOT_KEY, $this->generateSecret());
+            $output .= $this->displayConfirmation(
+                'Ключ бота перевыпущен. Обновите переменную SHOPSERVER_BOT_KEY на сервере.'
             );
         }
 
@@ -442,6 +451,13 @@ class ShopServer extends Module
                         'readonly' => true,
                         'desc' => 'Скопируйте это значение в переменную окружения сервера. Кнопка ниже выпускает новый секрет.',
                     ],
+                    [
+                        'type' => 'text',
+                        'label' => 'SHOPSERVER_BOT_KEY',
+                        'name' => 'SHOPSERVER_BOT_KEY_READONLY',
+                        'readonly' => true,
+                        'desc' => 'Ключ, которым Telegram-бот подтверждает себя при запросе списка заказов на регистрацию. Скопируйте в переменную окружения сервера.',
+                    ],
         ];
     }
 
@@ -460,6 +476,13 @@ class ShopServer extends Module
                         'type' => 'submit',
                         'title' => 'Перевыпустить ключ CRON',
                         'name' => 'submitShopServerRegenerateCronKey',
+                        'icon' => 'process-icon-refresh',
+                        'class' => 'btn btn-default pull-right',
+                    ],
+                    [
+                        'type' => 'submit',
+                        'title' => 'Перевыпустить ключ бота',
+                        'name' => 'submitShopServerRegenerateBotKey',
                         'icon' => 'process-icon-refresh',
                         'class' => 'btn btn-default pull-right',
                     ],
@@ -488,6 +511,7 @@ class ShopServer extends Module
             self::CONF_YA_SOURCE_PLATFORM_ID_TUL => Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_TUL),
             self::CONF_FIVEPOST_SENDER_LOCATION => Configuration::get(self::CONF_FIVEPOST_SENDER_LOCATION),
             'SHOPSERVER_CRON_KEY_READONLY' => Configuration::get(self::CONF_CRON_KEY),
+            'SHOPSERVER_BOT_KEY_READONLY' => Configuration::get(self::CONF_BOT_KEY),
             self::CONF_CARRIER_YANDEX => (int) Configuration::get(self::CONF_CARRIER_YANDEX),
             self::CONF_CARRIER_FIVEPOST => (int) Configuration::get(self::CONF_CARRIER_FIVEPOST),
             self::CONF_CARRIER_POST => (int) Configuration::get(self::CONF_CARRIER_POST),
@@ -569,6 +593,56 @@ class ShopServer extends Module
         }
 
         return $this->carrierTypesByReference()[(int) $carrier->id_reference] ?? '';
+    }
+
+    /**
+     * Заказы, готовые к регистрации отправки ботом: reference, фамилия получателя
+     * и тип перевозчика (определяется так же, как на странице заказа, по id_reference).
+     *
+     * @param int[] $orderStateIds
+     */
+    public function ordersForBotRegistration(array $orderStateIds): array
+    {
+        $stateIds = array_values(array_unique(array_filter(array_map('intval', $orderStateIds))));
+
+        $orders = [];
+
+        if ($stateIds) {
+            $rows = Db::getInstance()->executeS(
+                'SELECT o.id_order, o.reference, o.id_address_delivery, o.id_carrier'
+                . ' FROM `' . _DB_PREFIX_ . 'orders` o'
+                . ' WHERE o.current_state IN (' . implode(',', $stateIds) . ')'
+                . ' ORDER BY o.date_add ASC'
+            );
+
+            $carrierTypesByReference = $this->carrierTypesByReference();
+
+            foreach ((array) $rows as $row) {
+                $carrier = new Carrier((int) $row['id_carrier']);
+                $carrierType = Validate::isLoadedObject($carrier)
+                    ? ($carrierTypesByReference[(int) $carrier->id_reference] ?? '')
+                    : '';
+
+                $address = new Address((int) $row['id_address_delivery']);
+                $lastname = Validate::isLoadedObject($address) ? (string) $address->lastname : '';
+
+                $orders[] = [
+                    'id' => (int) $row['id_order'],
+                    'reference' => (string) $row['reference'],
+                    'lastname' => $lastname,
+                    'carrier' => $carrierType,
+                ];
+            }
+        }
+
+        return [
+            'orders' => $orders,
+            'yaSourcePlatformIds' => [
+                'rnd' => (string) Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_RND),
+                'tul' => (string) Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_TUL),
+            ],
+            'fivePostSenderLocation' => (string) Configuration::get(self::CONF_FIVEPOST_SENDER_LOCATION),
+        ];
     }
 
     /**
@@ -720,6 +794,7 @@ class ShopServer extends Module
             self::CONF_API_URL,
             self::CONF_TOKEN_TTL,
             self::CONF_CRON_KEY,
+            self::CONF_BOT_KEY,
             self::CONF_YA_SOURCE_PLATFORM_ID_RND,
             self::CONF_YA_SOURCE_PLATFORM_ID_TUL,
             self::CONF_FIVEPOST_SENDER_LOCATION,

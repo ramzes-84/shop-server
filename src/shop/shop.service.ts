@@ -12,6 +12,10 @@ import { StatusesInfoResDto } from './dto/statuses-info.dto';
 import { OrderCarrierInfoResDto } from './dto/order-carrier-info.dto';
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 import { InTransitOrders } from './dto/in-transit-orders.dto';
+import {
+  BotOrdersForRegistration,
+  BotOrdersForRegistrationRes,
+} from './dto/bot-orders.dto';
 
 @Injectable()
 export class ShopService {
@@ -19,6 +23,7 @@ export class ShopService {
   private readonly tokenBase64 = Buffer.from(`${this.token}:`).toString(
     'base64',
   );
+  private readonly botKey = process.env.SHOPSERVER_BOT_KEY;
   private readonly endpoint = ServicesUrl.SHOP;
 
   async getOrderInfo(id: number) {
@@ -91,6 +96,31 @@ export class ShopService {
     );
     const data = await this.fetchData<InTransitOrders>(url);
     return data.orders;
+  }
+
+  /**
+   * Технический эндпоинт модуля PrestaShop (не webservice API): авторизация общим
+   * ключом бота, а не Basic-токеном. Тип перевозчика вычисляется на стороне модуля
+   * по id_reference — единственному стабильному источнику этого сопоставления.
+   */
+  async getOrdersForBotRegistration(): Promise<BotOrdersForRegistration> {
+    const url = `${ServicesUrl.SHOP_MODULE}/botorders`;
+    const response = await fetchWithTimeout(url, {
+      method: 'GET',
+      headers: {
+        'X-ShopServer-Bot-Key': this.botKey ?? '',
+      },
+    });
+
+    if (!response.ok) {
+      throw new HttpException(
+        `Failed to fetch bot orders from Shop: ${response.statusText}`,
+        response.status,
+      );
+    }
+
+    const body: BotOrdersForRegistrationRes = await response.json();
+    return body.data;
   }
 
   async fetchData<T>(
