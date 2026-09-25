@@ -1,5 +1,6 @@
 import { FiveService } from './five.service';
 import fetch from 'node-fetch';
+import { CreateFivePostOrdersRequest } from './dto/create-order.dto';
 
 jest.mock('node-fetch');
 const mockedFetch = fetch as unknown as jest.Mock;
@@ -114,5 +115,45 @@ describe('FiveService', () => {
     });
 
     await expect(service.getOrderStatus(['b1'])).rejects.toThrow(/Rate limit/);
+  });
+
+  test('createOrders posts the documented v3 request and returns its result', async () => {
+    mockedFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ jwt: fakeJwt }),
+      status: 200,
+    });
+    const created = [
+      {
+        created: true,
+        orderId: 'five-order-id',
+        senderOrderId: 'ORDER-1',
+        cargoes: [
+          {
+            senderCargoId: 'ORDER-1',
+            barcode: 'five-barcode',
+          },
+        ],
+      },
+    ];
+    mockedFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => created,
+      status: 200,
+    });
+    const request = { partnerOrders: [] } as CreateFivePostOrdersRequest;
+
+    await expect(service.createOrders(request)).resolves.toEqual(created);
+    expect(mockedFetch).toHaveBeenLastCalledWith(
+      'https://api-omni.x5.ru/api/v3/orders',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify(request),
+        headers: expect.objectContaining({
+          authorization: `Bearer ${fakeJwt}`,
+          'content-type': 'application/json',
+        }),
+      }),
+    );
   });
 });

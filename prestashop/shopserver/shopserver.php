@@ -17,6 +17,7 @@ class ShopServer extends Module
     public const CONF_CRON_KEY = 'SHOPSERVER_CRON_KEY';
     public const CONF_YA_SOURCE_PLATFORM_ID_RND = 'SHOPSERVER_YA_SOURCE_PLATFORM_ID_RND';
     public const CONF_YA_SOURCE_PLATFORM_ID_TUL = 'SHOPSERVER_YA_SOURCE_PLATFORM_ID_TUL';
+    public const CONF_FIVEPOST_SENDER_LOCATION = 'SHOPSERVER_FIVEPOST_SENDER_LOCATION';
     public const CONF_CARRIER_YANDEX = 'SHOPSERVER_CARRIER_YANDEX';
     public const CONF_CARRIER_FIVEPOST = 'SHOPSERVER_CARRIER_FIVEPOST';
     public const CONF_CARRIER_POST = 'SHOPSERVER_CARRIER_POST';
@@ -37,7 +38,7 @@ class ShopServer extends Module
     {
         $this->name = 'shopserver';
         $this->tab = 'shipping_logistics';
-        $this->version = '1.6.0';
+        $this->version = '1.7.0';
         $this->author = 'Mineral Magic';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = ['min' => '8.0.0', 'max' => _PS_VERSION_];
@@ -62,6 +63,7 @@ class ShopServer extends Module
             && Configuration::updateValue(self::CONF_CRON_KEY, $this->generateSecret())
             && Configuration::updateValue(self::CONF_YA_SOURCE_PLATFORM_ID_RND, '')
             && Configuration::updateValue(self::CONF_YA_SOURCE_PLATFORM_ID_TUL, '')
+            && Configuration::updateValue(self::CONF_FIVEPOST_SENDER_LOCATION, '')
             && Configuration::updateValue(self::CONF_CARRIER_YANDEX, 0)
             && Configuration::updateValue(self::CONF_CARRIER_FIVEPOST, 0)
             && Configuration::updateValue(self::CONF_CARRIER_POST, 0)
@@ -114,7 +116,8 @@ class ShopServer extends Module
             $this->tokenTtl(),
             $secret,
             (string) Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_RND),
-            (string) Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_TUL)
+            (string) Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_TUL),
+            (string) Configuration::get(self::CONF_FIVEPOST_SENDER_LOCATION)
         );
 
         $config = [
@@ -280,15 +283,22 @@ class ShopServer extends Module
     {
         $yaSourcePlatformIdRnd = trim((string) Tools::getValue(self::CONF_YA_SOURCE_PLATFORM_ID_RND));
         $yaSourcePlatformIdTul = trim((string) Tools::getValue(self::CONF_YA_SOURCE_PLATFORM_ID_TUL));
+        $fivePostSenderLocation = trim((string) Tools::getValue(self::CONF_FIVEPOST_SENDER_LOCATION));
+        $fivePostCarrier = (int) Tools::getValue(self::CONF_CARRIER_FIVEPOST);
 
         if ($yaSourcePlatformIdRnd === '' || $yaSourcePlatformIdTul === '') {
             return $this->displayError('Укажите ID пунктов приёма Яндекс.Доставки для Ростова и Тулы.');
         }
 
+        if ($fivePostCarrier !== 0 && $fivePostSenderLocation === '') {
+            return $this->displayError('Укажите ID склада отправителя 5Post.');
+        }
+
         Configuration::updateValue(self::CONF_YA_SOURCE_PLATFORM_ID_RND, $yaSourcePlatformIdRnd);
         Configuration::updateValue(self::CONF_YA_SOURCE_PLATFORM_ID_TUL, $yaSourcePlatformIdTul);
+        Configuration::updateValue(self::CONF_FIVEPOST_SENDER_LOCATION, $fivePostSenderLocation);
         Configuration::updateValue(self::CONF_CARRIER_YANDEX, (int) Tools::getValue(self::CONF_CARRIER_YANDEX));
-        Configuration::updateValue(self::CONF_CARRIER_FIVEPOST, (int) Tools::getValue(self::CONF_CARRIER_FIVEPOST));
+        Configuration::updateValue(self::CONF_CARRIER_FIVEPOST, $fivePostCarrier);
         Configuration::updateValue(self::CONF_CARRIER_POST, (int) Tools::getValue(self::CONF_CARRIER_POST));
         Configuration::updateValue(self::CONF_CARRIER_DPD, (int) Tools::getValue(self::CONF_CARRIER_DPD));
 
@@ -377,6 +387,7 @@ class ShopServer extends Module
             return [
                 ['type' => 'text', 'label' => 'ID пункта приёма Яндекс.Доставки, Ростов', 'name' => self::CONF_YA_SOURCE_PLATFORM_ID_RND, 'desc' => 'platform_id пункта для заказов со статусом 12.', 'required' => true],
                 ['type' => 'text', 'label' => 'ID пункта приёма Яндекс.Доставки, Тула', 'name' => self::CONF_YA_SOURCE_PLATFORM_ID_TUL, 'desc' => 'platform_id пункта для заказов со статусом 13.', 'required' => true],
+                ['type' => 'text', 'label' => 'ID склада отправителя 5Post', 'name' => self::CONF_FIVEPOST_SENDER_LOCATION, 'desc' => 'partnerLocationId склада, выданный 5Post. Обязателен при выбранном перевозчике 5Post.'],
                 ['type' => 'select', 'label' => 'Перевозчик Яндекс.Доставка', 'name' => self::CONF_CARRIER_YANDEX, 'options' => ['query' => $carrierOptions, 'id' => 'id', 'name' => 'name']],
                 ['type' => 'select', 'label' => 'Перевозчик 5Post', 'name' => self::CONF_CARRIER_FIVEPOST, 'options' => ['query' => $carrierOptions, 'id' => 'id', 'name' => 'name']],
                 ['type' => 'select', 'label' => 'Перевозчик Почта России', 'name' => self::CONF_CARRIER_POST, 'options' => ['query' => $carrierOptions, 'id' => 'id', 'name' => 'name']],
@@ -475,6 +486,7 @@ class ShopServer extends Module
             self::CONF_TOKEN_TTL => $this->tokenTtl(),
             self::CONF_YA_SOURCE_PLATFORM_ID_RND => Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_RND),
             self::CONF_YA_SOURCE_PLATFORM_ID_TUL => Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_TUL),
+            self::CONF_FIVEPOST_SENDER_LOCATION => Configuration::get(self::CONF_FIVEPOST_SENDER_LOCATION),
             'SHOPSERVER_CRON_KEY_READONLY' => Configuration::get(self::CONF_CRON_KEY),
             self::CONF_CARRIER_YANDEX => (int) Configuration::get(self::CONF_CARRIER_YANDEX),
             self::CONF_CARRIER_FIVEPOST => (int) Configuration::get(self::CONF_CARRIER_FIVEPOST),
@@ -710,6 +722,7 @@ class ShopServer extends Module
             self::CONF_CRON_KEY,
             self::CONF_YA_SOURCE_PLATFORM_ID_RND,
             self::CONF_YA_SOURCE_PLATFORM_ID_TUL,
+            self::CONF_FIVEPOST_SENDER_LOCATION,
             self::CONF_CARRIER_YANDEX,
             self::CONF_CARRIER_FIVEPOST,
             self::CONF_CARRIER_POST,

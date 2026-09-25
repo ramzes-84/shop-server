@@ -15,6 +15,7 @@ export interface JwtPayload {
   email?: string;
   scope?: string;
   yaSourcePlatformIds?: YaSourcePlatformIds;
+  fivePostSenderLocation?: string;
   iss: string;
   aud: string;
   iat: number;
@@ -27,4 +28,5 @@ export interface AuthenticatedEmployee {
   email?: string;
   scope?: string;
   yaSourcePlatformIds?: YaSourcePlatformIds;
+  fivePostSenderLocation?: string;
 }

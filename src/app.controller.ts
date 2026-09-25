@@ -41,6 +41,18 @@ export class AppController {
     );
   }
 
+  @Post('fivepost/create')
+  @UseGuards(AuthGuard('jwt'), EmployeeJwtGuard)
+  fivePostOrderCreate(
+    @Body() body: CreateOrderQueries,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.appService.createFivePostOrder(
+      body,
+      request.user.fivePostSenderLocation,
+    );
+  }
+
   @Post('cash/create')
   @UseGuards(AuthGuard('jwt'), EmployeeJwtGuard)
   async cashInvoiceCreate(@Body() body: CreateCashRequest) {

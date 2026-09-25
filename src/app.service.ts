@@ -26,6 +26,7 @@ import { FiveService } from './five/five.service';
 import { describeError, toSafeMessage } from './common/request-context';
 import { getCurrentRequestId } from './common/request-id.storage';
 import { YaSourcePlatformIds } from './auth/jwt-claims';
+import { convertFivePostOrder } from './utils/convert-five-post-order';
 
 @Injectable()
 export class AppService {
@@ -264,6 +265,64 @@ export class AppService {
       };
     } catch (error) {
       return this.failure('createYaOrder', error, { orderId });
+    }
+  }
+
+  async createFivePostOrder(
+    { orderId }: CreateOrderQueries,
+    senderLocation?: string,
+  ): Promise<TransferInterface> {
+    try {
+      const { addressDetails, customerDetails, orderDetails } =
+        await this.getOrderBasicInfo(orderId);
+      const [shippingDetails, threadId] = await Promise.all([
+        this.shopService.getOrderCarrierInfo(+orderId),
+        this.shopService.getMessagesThread(+orderId),
+      ]);
+      const receiverLocation = findPointId(
+        await this.shopService.getOrderMessages(threadId),
+      );
+
+      if (!receiverLocation) {
+        return {
+          ok: false,
+          data: {
+            message: 'Пункт выдачи 5Post не найден в переписке по заказу',
+          },
+        };
+      }
+
+      const createdOrders = await this.fiveService.createOrders(
+        convertFivePostOrder(
+          orderDetails,
+          addressDetails,
+          customerDetails,
+          shippingDetails,
+          receiverLocation,
+          senderLocation ?? '',
+        ),
+      );
+      const createdOrder = createdOrders[0];
+
+      if (!createdOrder.created) {
+        const details = createdOrder.errors
+          ?.map((e) => `${e.code}: ${e.message}`)
+          .join('; ');
+        throw new Error(
+          details
+            ? `5Post не подтвердил создание отправки: ${details}`
+            : '5Post не подтвердил создание отправки',
+        );
+      }
+
+      return {
+        ok: true,
+        data: {
+          track: createdOrder.cargoes[0]?.barcode ?? orderDetails.reference,
+        },
+      };
+    } catch (error) {
+      return this.failure('createFivePostOrder', error, { orderId });
     }
   }
 

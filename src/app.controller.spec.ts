@@ -22,6 +22,7 @@ describe('AppController', () => {
           useValue: {
             getHello: jest.fn(),
             createYaOrder: jest.fn(),
+            createFivePostOrder: jest.fn(),
             getYaOrderHistory: jest.fn(),
             getOrderInfo: jest.fn(),
             createCashInvoice: jest.fn(),
@@ -78,6 +79,26 @@ describe('AppController', () => {
         rnd: 'rnd-platform-123',
         tul: 'tul-platform-123',
       });
+    });
+  });
+
+  describe('fivePostOrderCreate', () => {
+    it('forwards the order ID and signed sender location to AppService', async () => {
+      const mockResponse = { ok: true, data: { track: 'five-barcode' } };
+      jest
+        .spyOn(service, 'createFivePostOrder')
+        .mockResolvedValue(mockResponse as TransferInterface);
+      const query: CreateOrderQueries = { orderId: '1' };
+
+      await expect(
+        controller.fivePostOrderCreate(query, {
+          user: { id: '1', fivePostSenderLocation: 'fivepost-warehouse-123' },
+        } as any),
+      ).resolves.toBe(mockResponse);
+      expect(service.createFivePostOrder).toHaveBeenCalledWith(
+        query,
+        'fivepost-warehouse-123',
+      );
     });
   });
 

@@ -6,6 +6,10 @@ import type {
   GetOrderStatusRequestItem,
   GetOrderStatusResponseItem,
 } from './dto/get-order-status.dto';
+import type {
+  CreateFivePostOrderResponse,
+  CreateFivePostOrdersRequest,
+} from './dto/create-order.dto';
 
 @Injectable()
 export class FiveService {
@@ -156,6 +160,28 @@ export class FiveService {
     }
 
     return res;
+  }
+
+  public async createOrders(
+    order: CreateFivePostOrdersRequest,
+  ): Promise<CreateFivePostOrderResponse[]> {
+    const res = await this.requestWithAuth('/api/v3/orders', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(order),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Failed to create 5Post order: ${res.status} ${text}`);
+    }
+
+    const createdOrders = (await res.json()) as CreateFivePostOrderResponse[];
+    if (!Array.isArray(createdOrders) || createdOrders.length === 0) {
+      throw new Error('Invalid 5Post order creation response');
+    }
+
+    return createdOrders;
   }
 
   /**

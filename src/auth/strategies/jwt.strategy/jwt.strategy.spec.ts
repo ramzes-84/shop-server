@@ -81,6 +81,18 @@ describe('JwtStrategy', () => {
       });
     });
 
+    it('should preserve the configured 5Post sender location', () => {
+      expect(
+        strategy.validate(
+          buildPayload({ fivePostSenderLocation: 'fivepost-warehouse-123' }),
+        ),
+      ).toEqual(
+        expect.objectContaining({
+          fivePostSenderLocation: 'fivepost-warehouse-123',
+        }),
+      );
+    });
+
     it('should throw UnauthorizedException when sub is missing', () => {
       expect(() => strategy.validate(buildPayload({ sub: undefined }))).toThrow(
         UnauthorizedException,

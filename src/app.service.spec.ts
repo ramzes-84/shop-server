@@ -155,6 +155,7 @@ describe('AppService', () => {
           provide: FiveService,
           useValue: {
             getOrderStatus: jest.fn(),
+            createOrders: jest.fn(),
             requestWithAuth: jest.fn(),
             getToken: jest.fn(),
           },
@@ -420,6 +421,83 @@ describe('AppService', () => {
         },
       });
       expect(shopService.getOrderCarrierInfo).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createFivePostOrder', () => {
+    it('creates a 5Post shipment using the pickup point from the order message', async () => {
+      const basicInfo = buildBasicOrderInfo();
+      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
+      jest
+        .spyOn(shopService, 'getOrderCarrierInfo')
+        .mockResolvedValue(shippingDetails.order_carriers[0]);
+      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(5);
+      jest
+        .spyOn(shopService, 'getOrderMessages')
+        .mockResolvedValue(orderMessages);
+      findPointIdMock.mockReturnValue('receiver-location');
+      fiveService.createOrders.mockResolvedValue([
+        {
+          created: true,
+          senderOrderId: basicInfo.orderDetails.reference,
+          cargoes: [
+            {
+              senderCargoId: basicInfo.orderDetails.reference,
+              barcode: 'five-barcode',
+            },
+          ],
+        },
+      ]);
+
+      await expect(
+        service.createFivePostOrder({ orderId: '1' }, 'sender-location'),
+      ).resolves.toEqual({
+        ok: true,
+        data: { track: 'five-barcode' },
+      });
+      expect(fiveService.createOrders).toHaveBeenCalledWith(
+        expect.objectContaining({
+          partnerOrders: [
+            expect.objectContaining({
+              senderLocation: 'sender-location',
+              receiverLocation: 'receiver-location',
+            }),
+          ],
+        }),
+      );
+    });
+
+    it('surfaces 5Post error details when the order is not created', async () => {
+      const basicInfo = buildBasicOrderInfo();
+      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
+      jest
+        .spyOn(shopService, 'getOrderCarrierInfo')
+        .mockResolvedValue(shippingDetails.order_carriers[0]);
+      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(5);
+      jest
+        .spyOn(shopService, 'getOrderMessages')
+        .mockResolvedValue(orderMessages);
+      findPointIdMock.mockReturnValue('receiver-location');
+      fiveService.createOrders.mockResolvedValue([
+        {
+          created: false,
+          senderOrderId: basicInfo.orderDetails.reference,
+          cargoes: [],
+          errors: [
+            { code: 20, message: 'Заказ с таким senderOrderId уже существует' },
+          ],
+        },
+      ]);
+
+      await expect(
+        service.createFivePostOrder({ orderId: '1' }, 'sender-location'),
+      ).resolves.toEqual({
+        ok: false,
+        data: {
+          message:
+            '5Post не подтвердил создание отправки: 20: Заказ с таким senderOrderId уже существует',
+        },
+      });
     });
   });
 

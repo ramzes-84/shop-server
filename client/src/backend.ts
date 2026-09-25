@@ -53,6 +53,7 @@ type TransferInterface = {
 
 const enum Endpoints {
   YA_CREATE = '/yandex/create',
+  FIVE_POST_CREATE = '/fivepost/create',
   INVOICE = '/cash/create',
 }
 
@@ -413,7 +414,12 @@ async function createInvoice(config: ShopServerConfig) {
 async function createOrder(config: ShopServerConfig) {
   if (!confirm('Вы уверены, что хотите создать заказ?')) return;
 
-  await runAction(config, 'Регистрация отправки', Endpoints.YA_CREATE, {
+  const endpoint =
+    config.carrier === 'fivepost'
+      ? Endpoints.FIVE_POST_CREATE
+      : Endpoints.YA_CREATE;
+
+  await runAction(config, 'Регистрация отправки', endpoint, {
     orderId: config.orderId,
   });
 }
