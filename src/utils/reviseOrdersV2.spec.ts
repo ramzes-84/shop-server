@@ -7,6 +7,7 @@ import { unifyParcelStatus, unifyShopState } from './reviseOrdersV2';
 describe('unifyParcelStatus', () => {
   it.each([
     YaParcelStatus.CREATED,
+    YaParcelStatus.DELIVERY_TIME_INTERVALS_UPDATED,
     DpdParselStatus.OnRoad,
     PostParcelStatus.LeftSortingCenter,
   ])('maps %s to IN_TRANSIT', (status) => {

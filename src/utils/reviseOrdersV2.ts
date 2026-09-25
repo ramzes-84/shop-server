@@ -22,6 +22,7 @@ export function unifyParcelStatus(status: string) {
     case YaParcelStatus.DELIVERY_AT_START:
     case YaParcelStatus.DELIVERY_AT_START_SORT:
     case YaParcelStatus.DELIVERY_TRANSPORTATION:
+    case YaParcelStatus.DELIVERY_TIME_INTERVALS_UPDATED:
     case DpdParselStatus.OnTerminal:
     case DpdParselStatus.OnTerminalPickup:
     case DpdParselStatus.OnRoad:
