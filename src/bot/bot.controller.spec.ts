@@ -448,6 +448,75 @@ describe('BotController', () => {
     );
   });
 
+  it('should register all candidates sequentially when "0" is selected', async () => {
+    jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
+      orders: registrationCandidates,
+      yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
+      fivePostSenderLocation: 'loc-1',
+      dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
+    });
+    jest.spyOn(appService, 'createYaOrder').mockResolvedValue({
+      ok: true,
+      data: { sharing_url: 'https://dostavka.yandex.ru/route/EXAMPLE' },
+    });
+    jest.spyOn(appService, 'createFivePostOrder').mockResolvedValue({
+      ok: false,
+      data: { message: '5Post недоступен' },
+    });
+    jest.spyOn(appService, 'createDpdOrder').mockResolvedValue({
+      ok: true,
+      data: { track: '01010001MOW', status: 'OK' },
+    });
+
+    await controller.handleWebhook({
+      ...baseUpdate,
+      message: {
+        ...baseUpdate.message!,
+        text: '/register',
+        entities: [registerCommandEntity],
+      },
+    });
+    jest.clearAllMocks();
+
+    await controller.handleWebhook({
+      ...baseUpdate,
+      message: { ...baseUpdate.message!, text: '0' },
+    });
+
+    expect(appService.createYaOrder).toHaveBeenCalledWith(
+      { orderId: '101' },
+      { rnd: 'rnd-1', tul: 'tul-1' },
+    );
+    expect(appService.createFivePostOrder).toHaveBeenCalledWith(
+      { orderId: '102' },
+      'loc-1',
+    );
+    expect(appService.createDpdOrder).toHaveBeenCalledWith(
+      { orderId: '103' },
+      { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
+    );
+    expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Начинаю регистрацию заказов: 3'),
+      false,
+      '123',
+    );
+    expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+      expect.stringContaining('✅ BFWGPFSMQ'),
+      false,
+      '123',
+    );
+    expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+      expect.stringContaining('❌ AXQ12345Z: 5Post недоступен'),
+      false,
+      '123',
+    );
+    expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+      expect.stringContaining('✅ DPD987654'),
+      false,
+      '123',
+    );
+  });
+
   it('should reject an out-of-range order number', async () => {
     jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
       orders: registrationCandidates,

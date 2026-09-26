@@ -12,6 +12,7 @@ const YA_COMMAND_ONLY_RE = /^\/?ya\s*$/i;
 const YA_COMMAND = '/ya';
 const REGISTER_COMMAND_ONLY_RE = /^\/?register\s*$/i;
 const REGISTER_COMMAND = '/register';
+const REGISTER_ALL_CODE = 0;
 
 type BotCommandInfo = {
   command: string;
@@ -81,11 +82,11 @@ export class BotController {
   }
 
   private buildRegistrationList(candidates: BotOrderCandidate[]): string {
-    return candidates
-      .map((order, index) =>
-        `${index + 1}. ${order.reference} ${order.lastname}`.trim(),
-      )
-      .join('\n');
+    const lines = candidates.map((order, index) =>
+      `${index + 1}. ${order.reference} ${order.lastname}`.trim(),
+    );
+
+    return [`${REGISTER_ALL_CODE}. Зарегистрировать всё`, ...lines].join('\n');
   }
 
   private async sendOrdersForRegistration(chatId: string) {
@@ -138,6 +139,58 @@ export class BotController {
     }
   }
 
+  private async registerOneOrder(
+    order: BotOrderCandidate,
+    pending: PendingRegistration,
+  ) {
+    const orderId = String(order.id);
+
+    return order.carrier === 'yandex'
+      ? await this.appService.createYaOrder(
+          { orderId },
+          pending.yaSourcePlatformIds,
+        )
+      : order.carrier === 'fivepost'
+        ? await this.appService.createFivePostOrder(
+            { orderId },
+            pending.fivePostSenderLocation,
+          )
+        : await this.appService.createDpdOrder(
+            { orderId },
+            pending.dpdSourceTerminalIds,
+          );
+  }
+
+  private async registerAllOrders(
+    chatId: string,
+    pending: PendingRegistration,
+  ) {
+    await this.botService.sendEmployeeMessage(
+      `Начинаю регистрацию заказов: ${pending.candidates.length} шт.`,
+      false,
+      chatId,
+    );
+
+    // Последовательно: параллельные запросы к Яндексу/5Post/DPD рискуют упереться в их лимиты.
+    const summaryLines: string[] = [];
+
+    for (const order of pending.candidates) {
+      const result = await this.registerOneOrder(order, pending);
+
+      summaryLines.push(
+        result.ok
+          ? `✅ ${order.reference}`
+          : `❌ ${order.reference}: ${result.data?.message ?? 'неизвестная ошибка'}`,
+      );
+    }
+
+    await this.botService.sendEmployeeMessage(
+      `Регистрация завершена:\n${summaryLines.join('\n')}`,
+      false,
+      chatId,
+    );
+  }
+
   private async registerSelectedOrder(chatId: string, text: string) {
     const pending = this.pendingRegistrations.get(chatId);
     this.pendingRegistrations.delete(chatId);
@@ -150,7 +203,7 @@ export class BotController {
 
     if (
       !Number.isInteger(index) ||
-      index < 1 ||
+      index < REGISTER_ALL_CODE ||
       index > pending.candidates.length
     ) {
       await this.botService.sendEmployeeMessage(
@@ -161,24 +214,13 @@ export class BotController {
       return;
     }
 
-    const order = pending.candidates[index - 1];
-    const orderId = String(order.id);
+    if (index === REGISTER_ALL_CODE) {
+      await this.registerAllOrders(chatId, pending);
+      return;
+    }
 
-    const result =
-      order.carrier === 'yandex'
-        ? await this.appService.createYaOrder(
-            { orderId },
-            pending.yaSourcePlatformIds,
-          )
-        : order.carrier === 'fivepost'
-          ? await this.appService.createFivePostOrder(
-              { orderId },
-              pending.fivePostSenderLocation,
-            )
-          : await this.appService.createDpdOrder(
-              { orderId },
-              pending.dpdSourceTerminalIds,
-            );
+    const order = pending.candidates[index - 1];
+    const result = await this.registerOneOrder(order, pending);
 
     if (result.ok) {
       await this.botService.sendEmployeeMessage(
