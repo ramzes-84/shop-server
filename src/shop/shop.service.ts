@@ -9,7 +9,10 @@ import {
 import { AddressInfoResDto } from './dto/address-info.dto';
 import { CustomerInfoResDto } from './dto/customer-info.dto';
 import { StatusesInfoResDto } from './dto/statuses-info.dto';
-import { OrderCarrierInfoResDto } from './dto/order-carrier-info.dto';
+import {
+  OrderCarrierInfo,
+  OrderCarrierInfoResDto,
+} from './dto/order-carrier-info.dto';
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 import { InTransitOrders } from './dto/in-transit-orders.dto';
 import {
@@ -161,6 +164,36 @@ export class ShopService {
     }
 
     return data;
+  }
+
+  /**
+   * Read-modify-write по webservice: PrestaShop требует полный XML ресурса на PUT,
+   * поэтому переданный order_carrier должен быть только что получен через
+   * getOrderCarrierInfo. Именно это (а не BO) вызывает у PrestaShop
+   * actionObjectOrderCarrierUpdateAfter, на который подписан модуль для письма с треком.
+   */
+  async updateOrderCarrierTracking(
+    orderCarrier: OrderCarrierInfo,
+    trackingNumber: string,
+  ) {
+    const url = new URL(`${this.endpoint}/order_carriers/${orderCarrier.id}`);
+    const payload = `<?xml version="1.0" encoding="UTF-8"?>
+<prestashop xmlns:xlink="http://www.w3.org/1999/xlink">
+  <order_carrier>
+    <id>${orderCarrier.id}</id>
+    <id_order>${orderCarrier.id_order}</id_order>
+    <id_carrier>${orderCarrier.id_carrier}</id_carrier>
+    <id_order_invoice>${orderCarrier.id_order_invoice}</id_order_invoice>
+    <weight>${orderCarrier.weight}</weight>
+    <shipping_cost_tax_excl>${orderCarrier.shipping_cost_tax_excl}</shipping_cost_tax_excl>
+    <shipping_cost_tax_incl>${orderCarrier.shipping_cost_tax_incl}</shipping_cost_tax_incl>
+    <tracking_number>${this.escapeXml(trackingNumber)}</tracking_number>
+  </order_carrier>
+</prestashop>`;
+
+    await this.fetchData<string>(url, RequestMethod.PUT, true, payload, {
+      'Content-Type': 'application/xml',
+    });
   }
 
   async updateOrderStatus(orderId: number, orderStateId: number) {

@@ -30,6 +30,7 @@ class ShopServer extends Module
     public const CONF_NOTIFY_WAITING_TEMPLATE = 'SHOPSERVER_NOTIFY_WAITING_TEMPLATE';
     public const CONF_NOTIFY_DELIVERED_STATE = 'SHOPSERVER_NOTIFY_DELIVERED_STATE';
     public const CONF_NOTIFY_DELIVERED_TEMPLATE = 'SHOPSERVER_NOTIFY_DELIVERED_TEMPLATE';
+    public const CONF_NOTIFY_TRACKING_TEMPLATE = 'SHOPSERVER_NOTIFY_TRACKING_TEMPLATE';
 
     private const DEFAULT_TOKEN_TTL = 7200;
     private const MIN_TOKEN_TTL = 300;
@@ -39,7 +40,7 @@ class ShopServer extends Module
     {
         $this->name = 'shopserver';
         $this->tab = 'shipping_logistics';
-        $this->version = '1.8.0';
+        $this->version = '1.9.0';
         $this->author = 'Mineral Magic';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = ['min' => '8.0.0', 'max' => _PS_VERSION_];
@@ -58,6 +59,7 @@ class ShopServer extends Module
             && $this->registerHook('displayAdminOrderTop')
             && $this->registerHook('actionFrontControllerSetMedia')
             && $this->registerHook('actionObjectOrderHistoryAddAfter')
+            && $this->registerHook('actionObjectOrderCarrierUpdateAfter')
             && Configuration::updateValue(self::CONF_SECRET, $this->generateSecret())
             && Configuration::updateValue(self::CONF_API_URL, '')
             && Configuration::updateValue(self::CONF_TOKEN_TTL, self::DEFAULT_TOKEN_TTL)
@@ -76,7 +78,8 @@ class ShopServer extends Module
             && Configuration::updateValue(self::CONF_NOTIFY_WAITING_STATE, 0)
             && Configuration::updateValue(self::CONF_NOTIFY_WAITING_TEMPLATE, '')
             && Configuration::updateValue(self::CONF_NOTIFY_DELIVERED_STATE, 0)
-            && Configuration::updateValue(self::CONF_NOTIFY_DELIVERED_TEMPLATE, '');
+            && Configuration::updateValue(self::CONF_NOTIFY_DELIVERED_TEMPLATE, '')
+            && Configuration::updateValue(self::CONF_NOTIFY_TRACKING_TEMPLATE, '');
     }
 
     public function uninstall(): bool
@@ -199,6 +202,33 @@ class ShopServer extends Module
         $this->sendStatusNotification($history, $template);
     }
 
+    /**
+     * Срабатывает и на правку в БО, и на PUT через webservice — так сервер может
+     * записать трек созданной отправки через API, сохранив автоматическое письмо
+     * клиенту, которое раньше отправлялось только при ручной вставке трека в БО.
+     */
+    public function hookActionObjectOrderCarrierUpdateAfter(array $params): void
+    {
+        if (empty($params['object']) || !($params['object'] instanceof OrderCarrier)) {
+            return;
+        }
+
+        /** @var OrderCarrier $orderCarrier */
+        $orderCarrier = $params['object'];
+        $trackingNumber = trim((string) $orderCarrier->tracking_number);
+
+        if ($trackingNumber === '' || !(int) $orderCarrier->id_order) {
+            return;
+        }
+
+        $template = trim((string) Configuration::get(self::CONF_NOTIFY_TRACKING_TEMPLATE));
+        if ($template === '') {
+            return;
+        }
+
+        $this->sendTrackingNotification($orderCarrier, $trackingNumber, $template);
+    }
+
     public function getContent(): string
     {
         $output = '';
@@ -259,6 +289,7 @@ class ShopServer extends Module
             Configuration::updateValue(self::CONF_NOTIFY_WAITING_TEMPLATE, trim((string) Tools::getValue(self::CONF_NOTIFY_WAITING_TEMPLATE)));
             Configuration::updateValue(self::CONF_NOTIFY_DELIVERED_STATE, (int) Tools::getValue(self::CONF_NOTIFY_DELIVERED_STATE));
             Configuration::updateValue(self::CONF_NOTIFY_DELIVERED_TEMPLATE, trim((string) Tools::getValue(self::CONF_NOTIFY_DELIVERED_TEMPLATE)));
+            Configuration::updateValue(self::CONF_NOTIFY_TRACKING_TEMPLATE, trim((string) Tools::getValue(self::CONF_NOTIFY_TRACKING_TEMPLATE)));
 
             return $this->displayConfirmation('Настройки сохранены.');
         }
@@ -418,6 +449,7 @@ class ShopServer extends Module
                 ['type' => 'text', 'label' => 'Шаблон для статуса «Ожидание получения»', 'name' => self::CONF_NOTIFY_WAITING_TEMPLATE, 'desc' => 'Имя шаблона из /mails без языкового суффикса. Например: order_changed.'],
                 ['type' => 'text', 'label' => 'ID статуса «Доставлен»', 'name' => self::CONF_NOTIFY_DELIVERED_STATE, 'class' => 'fixed-width-sm', 'desc' => 'При создании этого статуса клиенту отправляется указанный шаблон. Оставьте оба поля пустыми, чтобы отключить уведомление.'],
                 ['type' => 'text', 'label' => 'Шаблон для статуса «Доставлен»', 'name' => self::CONF_NOTIFY_DELIVERED_TEMPLATE, 'desc' => 'Имя шаблона из /mails без языкового суффикса. Например: order_changed.'],
+                ['type' => 'text', 'label' => 'Шаблон при получении трек-номера', 'name' => self::CONF_NOTIFY_TRACKING_TEMPLATE, 'desc' => 'Отправляется, когда сервер записывает трек отправки в заказ через API (Яндекс.Доставка, 5Post) — так же, как при ручной вставке трека в этом заказе. В шаблон дополнительно передаются {tracking_number} и {follow_url}. Оставьте пустым, чтобы отключить уведомление.'],
             ];
         }
 
@@ -523,6 +555,7 @@ class ShopServer extends Module
             self::CONF_NOTIFY_WAITING_TEMPLATE => Configuration::get(self::CONF_NOTIFY_WAITING_TEMPLATE),
             self::CONF_NOTIFY_DELIVERED_STATE => (int) Configuration::get(self::CONF_NOTIFY_DELIVERED_STATE),
             self::CONF_NOTIFY_DELIVERED_TEMPLATE => Configuration::get(self::CONF_NOTIFY_DELIVERED_TEMPLATE),
+            self::CONF_NOTIFY_TRACKING_TEMPLATE => Configuration::get(self::CONF_NOTIFY_TRACKING_TEMPLATE),
             'SHOPSERVER_SECRET_READONLY' => Configuration::get(self::CONF_SECRET),
         ];
     }
@@ -787,6 +820,86 @@ class ShopServer extends Module
         }
     }
 
+    private function sendTrackingNotification(OrderCarrier $orderCarrier, string $trackingNumber, string $template): void
+    {
+        $order = new Order((int) $orderCarrier->id_order);
+
+        if (!Validate::isLoadedObject($order)) {
+            PrestaShopLogger::addLog(
+                sprintf('[%s] Unable to load order for tracking notification.', $this->name),
+                3,
+                null,
+                __CLASS__,
+                (int) $orderCarrier->id
+            );
+            return;
+        }
+
+        $customer = new Customer((int) $order->id_customer);
+        if (!Validate::isLoadedObject($customer)) {
+            PrestaShopLogger::addLog(
+                sprintf('[%s] Unable to load customer for tracking notification.', $this->name),
+                3,
+                null,
+                __CLASS__,
+                (int) $orderCarrier->id
+            );
+            return;
+        }
+
+        $carrier = new Carrier((int) $orderCarrier->id_carrier);
+        $followUrl = Validate::isLoadedObject($carrier) && $carrier->url
+            ? str_replace('@', $trackingNumber, $carrier->url)
+            : '';
+
+        $languageId = (int) $order->id_lang ?: (int) $this->context->language->id;
+        $sent = false;
+
+        try {
+            $sent = Mail::Send(
+                $languageId,
+                $template,
+                'Ваш заказ отправлен: ' . $order->reference,
+                [
+                    '{firstname}' => $customer->firstname,
+                    '{lastname}' => $customer->lastname,
+                    '{order_name}' => $order->reference,
+                    '{id_order}' => (int) $order->id,
+                    '{tracking_number}' => $trackingNumber,
+                    '{follow_url}' => $followUrl,
+                ],
+                $customer->email,
+                $customer->firstname . ' ' . $customer->lastname,
+                null,
+                null,
+                null,
+                null,
+                _PS_MAIL_DIR_,
+                false,
+                (int) $order->id_shop
+            );
+        } catch (Exception $exception) {
+            PrestaShopLogger::addLog(
+                sprintf('[%s] Unable to send template "%s": %s', $this->name, $template, $exception->getMessage()),
+                3,
+                null,
+                __CLASS__,
+                (int) $orderCarrier->id
+            );
+            return;
+        }
+
+        if (!$sent) {
+            PrestaShopLogger::addLog(
+                sprintf('[%s] Unable to send template "%s" for order %s.', $this->name, $template, $order->reference),
+                3,
+                null,
+                __CLASS__,
+                (int) $orderCarrier->id
+            );
+        }
+    }
+
     private function configurationKeys(): array
     {
         return [
@@ -809,6 +922,7 @@ class ShopServer extends Module
             self::CONF_NOTIFY_WAITING_TEMPLATE,
             self::CONF_NOTIFY_DELIVERED_STATE,
             self::CONF_NOTIFY_DELIVERED_TEMPLATE,
+            self::CONF_NOTIFY_TRACKING_TEMPLATE,
         ];
     }
 }

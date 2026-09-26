@@ -104,6 +104,7 @@ describe('AppService', () => {
             getMessagesThread: jest.fn(),
             getOrderMessages: jest.fn(),
             updateOrderStatus: jest.fn(),
+            updateOrderCarrierTracking: jest.fn(),
             addMessageToThread: jest.fn(),
             getInTransitOrders: jest.fn(),
           },
@@ -376,10 +377,62 @@ describe('AppService', () => {
         'source-platform-123',
       );
       expect(yaService.createYaOrder).toHaveBeenCalledWith(mockYaOrderData);
+      expect(shopService.updateOrderCarrierTracking).toHaveBeenCalledWith(
+        mockShippingDetails.order_carriers[0],
+        'cfdd10a3-8622-4195-8721-215ec900daf1',
+      );
       expect(result).toEqual({
         ok: true,
         data: { sharing_url: mockOrderInfo.sharing_url },
       });
+    }, 10000);
+
+    it('notifies employees but still succeeds when writing the tracking number fails', async () => {
+      const mockShippingDetails = { ...shippingDetails };
+      const mockYaOrderData: CreateYaOrderDto = { ...orderConverterResult };
+      const mockYaOrderId: YaOrderCreationRes = { request_id: '123' };
+      const mockOrderInfo: YaOrderInfoRes = { ...yaOrderInfo };
+
+      jest.spyOn(shopService, 'getOrderInfo').mockResolvedValue(orderDetails);
+      jest
+        .spyOn(shopService, 'getAddressInfo')
+        .mockResolvedValue(addressDetails);
+      jest
+        .spyOn(shopService, 'getCustomerInfo')
+        .mockResolvedValue(customerDetails);
+      jest
+        .spyOn(shopService, 'getOrderCarrierInfo')
+        .mockResolvedValue(mockShippingDetails.order_carriers[0]);
+      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(5);
+      jest
+        .spyOn(shopService, 'getOrderMessages')
+        .mockResolvedValue(orderMessages);
+      findPointIdMock.mockReturnValue('destination');
+      jest.spyOn(yaService, 'createYaOrder').mockResolvedValue(mockYaOrderId);
+      jest.spyOn(yaService, 'getOrderInfo').mockResolvedValue(mockOrderInfo);
+      jest
+        .spyOn(yaService, 'getParcelCost')
+        .mockResolvedValue({ pricing_total: '123.17 RUB' });
+      convertOrderMock.mockReturnValue(mockYaOrderData);
+      jest
+        .spyOn(shopService, 'updateOrderCarrierTracking')
+        .mockRejectedValue(new Error('Shop API unavailable'));
+      jest
+        .spyOn(botService, 'sendEmployeeMessage')
+        .mockResolvedValue(undefined as any);
+
+      const result = await service.createYaOrder(
+        { orderId: '1' },
+        { rnd: 'rnd-platform-123', tul: 'source-platform-123' },
+      );
+
+      expect(result).toEqual({
+        ok: true,
+        data: { sharing_url: mockOrderInfo.sharing_url },
+      });
+      expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+        expect.stringContaining('не удалось записать трек-номер'),
+      );
     }, 10000);
 
     it('should return an error if something goes wrong', async () => {
@@ -464,6 +517,10 @@ describe('AppService', () => {
             }),
           ],
         }),
+      );
+      expect(shopService.updateOrderCarrierTracking).toHaveBeenCalledWith(
+        shippingDetails.order_carriers[0],
+        'five-barcode',
       );
     });
 

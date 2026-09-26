@@ -27,6 +27,7 @@ import { describeError, toSafeMessage } from './common/request-context';
 import { getCurrentRequestId } from './common/request-id.storage';
 import { YaSourcePlatformIds } from './auth/jwt-claims';
 import { convertFivePostOrder } from './utils/convert-five-post-order';
+import { OrderCarrierInfo } from './shop/dto/order-carrier-info.dto';
 
 @Injectable()
 export class AppService {
@@ -198,6 +199,41 @@ export class AppService {
     }
   }
 
+  /**
+   * Пишет трек в order_carrier через webservice: PrestaShop сам вызывает
+   * actionObjectOrderCarrierUpdateAfter, и модуль отправляет клиенту письмо с
+   * треком — так же, как при ручной вставке в админке. Ошибка записи не должна
+   * рушить создание отправки: сотрудник всё ещё получает трек в буфер обмена.
+   */
+  private async writeTrackingNumber(
+    shippingDetails: OrderCarrierInfo,
+    trackNumber: string,
+    reference: string,
+  ) {
+    try {
+      await this.shopService.updateOrderCarrierTracking(
+        shippingDetails,
+        trackNumber,
+      );
+    } catch (error) {
+      const reason =
+        error instanceof Error ? error.message : String(error ?? 'Unknown');
+      this.logger.warn(
+        JSON.stringify({
+          operation: 'writeTrackingNumber',
+          event: 'failed',
+          reference,
+          reason,
+        }),
+      );
+      await this.botService
+        .sendEmployeeMessage(
+          `⚠️ ${reference}: не удалось записать трек-номер в PrestaShop (${reason}). Трек: ${trackNumber}`,
+        )
+        .catch(() => undefined);
+    }
+  }
+
   async createYaOrder(
     { orderId }: CreateOrderQueries,
     sourcePlatformIds?: YaSourcePlatformIds,
@@ -259,6 +295,16 @@ export class AppService {
 
       await new Promise((resolve) => setTimeout(resolve, 5000));
       const orderInfo = await this.yaService.getOrderInfo(request_id);
+      const trackNumber = orderInfo.sharing_url?.split('/').at(-1) ?? '';
+
+      if (trackNumber) {
+        await this.writeTrackingNumber(
+          shippingDetails,
+          trackNumber,
+          orderDetails.reference,
+        );
+      }
+
       return {
         ok: true,
         data: { sharing_url: orderInfo.sharing_url },
@@ -315,10 +361,19 @@ export class AppService {
         );
       }
 
+      const trackNumber =
+        createdOrder.cargoes[0]?.barcode ?? orderDetails.reference;
+
+      await this.writeTrackingNumber(
+        shippingDetails,
+        trackNumber,
+        orderDetails.reference,
+      );
+
       return {
         ok: true,
         data: {
-          track: createdOrder.cargoes[0]?.barcode ?? orderDetails.reference,
+          track: trackNumber,
         },
       };
     } catch (error) {

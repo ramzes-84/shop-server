@@ -234,4 +234,52 @@ describe('ShopService', () => {
       ).rejects.toThrow(HttpException);
     });
   });
+
+  describe('updateOrderCarrierTracking', () => {
+    const orderCarrier = {
+      id: 1,
+      id_order: '10',
+      id_carrier: '2',
+      id_order_invoice: '3',
+      weight: '1.500000',
+      shipping_cost_tax_excl: '100.000000',
+      shipping_cost_tax_incl: '120.000000',
+      tracking_number: '',
+      date_add: '2024-01-01 00:00:00',
+    };
+
+    it('should PUT the full order_carrier with the new tracking number', async () => {
+      (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+        new Response('<prestashop></prestashop>', {
+          headers: { 'content-type': 'text/xml' },
+        }),
+      );
+
+      await service.updateOrderCarrierTracking(orderCarrier, 'TRACK-123');
+
+      expect(fetch).toHaveBeenCalledWith(
+        'https://mineralmagic.ru/api/order_carriers/1',
+        expect.objectContaining({
+          method: 'PUT',
+          headers: expect.objectContaining({
+            Authorization: `Basic ${Buffer.from('test-token:').toString('base64')}`,
+            'Content-Type': 'application/xml',
+          }),
+          body: expect.stringContaining(
+            '<tracking_number>TRACK-123</tracking_number>',
+          ),
+        }),
+      );
+    });
+
+    it('should throw an error if the update fails', async () => {
+      (fetch as jest.MockedFunction<typeof fetch>).mockResolvedValue(
+        new Response('Bad Request', { status: 400 }),
+      );
+
+      await expect(
+        service.updateOrderCarrierTracking(orderCarrier, 'TRACK-123'),
+      ).rejects.toThrow(HttpException);
+    });
+  });
 });
