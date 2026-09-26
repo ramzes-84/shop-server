@@ -11,6 +11,7 @@ export class BotOrdersForRegistration {
   orders: BotOrderCandidate[];
   yaSourcePlatformIds: { rnd?: string; tul?: string };
   fivePostSenderLocation?: string;
+  dpdSourceTerminalIds: { rnd?: string; tul?: string };
 }
 
 export class BotOrdersForRegistrationRes {

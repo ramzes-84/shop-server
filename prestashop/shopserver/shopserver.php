@@ -19,6 +19,8 @@ class ShopServer extends Module
     public const CONF_YA_SOURCE_PLATFORM_ID_RND = 'SHOPSERVER_YA_SOURCE_PLATFORM_ID_RND';
     public const CONF_YA_SOURCE_PLATFORM_ID_TUL = 'SHOPSERVER_YA_SOURCE_PLATFORM_ID_TUL';
     public const CONF_FIVEPOST_SENDER_LOCATION = 'SHOPSERVER_FIVEPOST_SENDER_LOCATION';
+    public const CONF_DPD_SOURCE_TERMINAL_RND = 'SHOPSERVER_DPD_SOURCE_TERMINAL_RND';
+    public const CONF_DPD_SOURCE_TERMINAL_TUL = 'SHOPSERVER_DPD_SOURCE_TERMINAL_TUL';
     public const CONF_CARRIER_YANDEX = 'SHOPSERVER_CARRIER_YANDEX';
     public const CONF_CARRIER_FIVEPOST = 'SHOPSERVER_CARRIER_FIVEPOST';
     public const CONF_CARRIER_POST = 'SHOPSERVER_CARRIER_POST';
@@ -40,7 +42,7 @@ class ShopServer extends Module
     {
         $this->name = 'shopserver';
         $this->tab = 'shipping_logistics';
-        $this->version = '1.9.0';
+        $this->version = '1.11.0';
         $this->author = 'Mineral Magic';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = ['min' => '8.0.0', 'max' => _PS_VERSION_];
@@ -68,6 +70,8 @@ class ShopServer extends Module
             && Configuration::updateValue(self::CONF_YA_SOURCE_PLATFORM_ID_RND, '')
             && Configuration::updateValue(self::CONF_YA_SOURCE_PLATFORM_ID_TUL, '')
             && Configuration::updateValue(self::CONF_FIVEPOST_SENDER_LOCATION, '')
+            && Configuration::updateValue(self::CONF_DPD_SOURCE_TERMINAL_RND, '')
+            && Configuration::updateValue(self::CONF_DPD_SOURCE_TERMINAL_TUL, '')
             && Configuration::updateValue(self::CONF_CARRIER_YANDEX, 0)
             && Configuration::updateValue(self::CONF_CARRIER_FIVEPOST, 0)
             && Configuration::updateValue(self::CONF_CARRIER_POST, 0)
@@ -122,7 +126,9 @@ class ShopServer extends Module
             $secret,
             (string) Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_RND),
             (string) Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_TUL),
-            (string) Configuration::get(self::CONF_FIVEPOST_SENDER_LOCATION)
+            (string) Configuration::get(self::CONF_FIVEPOST_SENDER_LOCATION),
+            (string) Configuration::get(self::CONF_DPD_SOURCE_TERMINAL_RND),
+            (string) Configuration::get(self::CONF_DPD_SOURCE_TERMINAL_TUL)
         );
 
         $config = [
@@ -132,6 +138,7 @@ class ShopServer extends Module
             'carrier' => $this->resolveCarrierType($order),
             'fivePostKey' => (string) Configuration::get(self::CONF_FIVEPOST_KEY),
             'pochtaWidgetId' => (string) Configuration::get(self::CONF_POCHTA_WIDGET_ID),
+            'dpdSid' => (string) Configuration::get(self::CONF_DPD_SID),
         ];
 
         $this->context->smarty->assign([
@@ -325,6 +332,9 @@ class ShopServer extends Module
         $yaSourcePlatformIdTul = trim((string) Tools::getValue(self::CONF_YA_SOURCE_PLATFORM_ID_TUL));
         $fivePostSenderLocation = trim((string) Tools::getValue(self::CONF_FIVEPOST_SENDER_LOCATION));
         $fivePostCarrier = (int) Tools::getValue(self::CONF_CARRIER_FIVEPOST);
+        $dpdSourceTerminalRnd = trim((string) Tools::getValue(self::CONF_DPD_SOURCE_TERMINAL_RND));
+        $dpdSourceTerminalTul = trim((string) Tools::getValue(self::CONF_DPD_SOURCE_TERMINAL_TUL));
+        $dpdCarrier = (int) Tools::getValue(self::CONF_CARRIER_DPD);
 
         if ($yaSourcePlatformIdRnd === '' || $yaSourcePlatformIdTul === '') {
             return $this->displayError('Укажите ID пунктов приёма Яндекс.Доставки для Ростова и Тулы.');
@@ -334,13 +344,19 @@ class ShopServer extends Module
             return $this->displayError('Укажите ID склада отправителя 5Post.');
         }
 
+        if ($dpdCarrier !== 0 && ($dpdSourceTerminalRnd === '' || $dpdSourceTerminalTul === '')) {
+            return $this->displayError('Укажите терминалы отправки DPD для Ростова и Тулы.');
+        }
+
         Configuration::updateValue(self::CONF_YA_SOURCE_PLATFORM_ID_RND, $yaSourcePlatformIdRnd);
         Configuration::updateValue(self::CONF_YA_SOURCE_PLATFORM_ID_TUL, $yaSourcePlatformIdTul);
         Configuration::updateValue(self::CONF_FIVEPOST_SENDER_LOCATION, $fivePostSenderLocation);
+        Configuration::updateValue(self::CONF_DPD_SOURCE_TERMINAL_RND, $dpdSourceTerminalRnd);
+        Configuration::updateValue(self::CONF_DPD_SOURCE_TERMINAL_TUL, $dpdSourceTerminalTul);
         Configuration::updateValue(self::CONF_CARRIER_YANDEX, (int) Tools::getValue(self::CONF_CARRIER_YANDEX));
         Configuration::updateValue(self::CONF_CARRIER_FIVEPOST, $fivePostCarrier);
         Configuration::updateValue(self::CONF_CARRIER_POST, (int) Tools::getValue(self::CONF_CARRIER_POST));
-        Configuration::updateValue(self::CONF_CARRIER_DPD, (int) Tools::getValue(self::CONF_CARRIER_DPD));
+        Configuration::updateValue(self::CONF_CARRIER_DPD, $dpdCarrier);
 
         return $this->displayConfirmation('Настройки сохранены.');
     }
@@ -428,6 +444,8 @@ class ShopServer extends Module
                 ['type' => 'text', 'label' => 'ID пункта приёма Яндекс.Доставки, Ростов', 'name' => self::CONF_YA_SOURCE_PLATFORM_ID_RND, 'desc' => 'platform_id пункта для заказов со статусом 12.', 'required' => true],
                 ['type' => 'text', 'label' => 'ID пункта приёма Яндекс.Доставки, Тула', 'name' => self::CONF_YA_SOURCE_PLATFORM_ID_TUL, 'desc' => 'platform_id пункта для заказов со статусом 13.', 'required' => true],
                 ['type' => 'text', 'label' => 'ID склада отправителя 5Post', 'name' => self::CONF_FIVEPOST_SENDER_LOCATION, 'desc' => 'partnerLocationId склада, выданный 5Post. Обязателен при выбранном перевозчике 5Post.'],
+                ['type' => 'text', 'label' => 'Терминал отправки DPD, Ростов', 'name' => self::CONF_DPD_SOURCE_TERMINAL_RND, 'desc' => 'Код терминала DPD, куда сотрудник отвозит отправления для заказов со статусом 12. Обязателен при выбранном перевозчике DPD.'],
+                ['type' => 'text', 'label' => 'Терминал отправки DPD, Тула', 'name' => self::CONF_DPD_SOURCE_TERMINAL_TUL, 'desc' => 'Код терминала DPD, куда сотрудник отвозит отправления для заказов со статусом 13. Обязателен при выбранном перевозчике DPD.'],
                 ['type' => 'select', 'label' => 'Перевозчик Яндекс.Доставка', 'name' => self::CONF_CARRIER_YANDEX, 'options' => ['query' => $carrierOptions, 'id' => 'id', 'name' => 'name']],
                 ['type' => 'select', 'label' => 'Перевозчик 5Post', 'name' => self::CONF_CARRIER_FIVEPOST, 'options' => ['query' => $carrierOptions, 'id' => 'id', 'name' => 'name']],
                 ['type' => 'select', 'label' => 'Перевозчик Почта России', 'name' => self::CONF_CARRIER_POST, 'options' => ['query' => $carrierOptions, 'id' => 'id', 'name' => 'name']],
@@ -542,6 +560,8 @@ class ShopServer extends Module
             self::CONF_YA_SOURCE_PLATFORM_ID_RND => Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_RND),
             self::CONF_YA_SOURCE_PLATFORM_ID_TUL => Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_TUL),
             self::CONF_FIVEPOST_SENDER_LOCATION => Configuration::get(self::CONF_FIVEPOST_SENDER_LOCATION),
+            self::CONF_DPD_SOURCE_TERMINAL_RND => Configuration::get(self::CONF_DPD_SOURCE_TERMINAL_RND),
+            self::CONF_DPD_SOURCE_TERMINAL_TUL => Configuration::get(self::CONF_DPD_SOURCE_TERMINAL_TUL),
             'SHOPSERVER_CRON_KEY_READONLY' => Configuration::get(self::CONF_CRON_KEY),
             'SHOPSERVER_BOT_KEY_READONLY' => Configuration::get(self::CONF_BOT_KEY),
             self::CONF_CARRIER_YANDEX => (int) Configuration::get(self::CONF_CARRIER_YANDEX),
@@ -675,6 +695,10 @@ class ShopServer extends Module
                 'tul' => (string) Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_TUL),
             ],
             'fivePostSenderLocation' => (string) Configuration::get(self::CONF_FIVEPOST_SENDER_LOCATION),
+            'dpdSourceTerminalIds' => [
+                'rnd' => (string) Configuration::get(self::CONF_DPD_SOURCE_TERMINAL_RND),
+                'tul' => (string) Configuration::get(self::CONF_DPD_SOURCE_TERMINAL_TUL),
+            ],
         ];
     }
 
@@ -911,6 +935,8 @@ class ShopServer extends Module
             self::CONF_YA_SOURCE_PLATFORM_ID_RND,
             self::CONF_YA_SOURCE_PLATFORM_ID_TUL,
             self::CONF_FIVEPOST_SENDER_LOCATION,
+            self::CONF_DPD_SOURCE_TERMINAL_RND,
+            self::CONF_DPD_SOURCE_TERMINAL_TUL,
             self::CONF_CARRIER_YANDEX,
             self::CONF_CARRIER_FIVEPOST,
             self::CONF_CARRIER_POST,

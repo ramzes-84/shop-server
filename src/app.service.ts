@@ -2,7 +2,11 @@ import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ShopService } from './shop/shop.service';
 import { YaService } from './ya/ya.service';
 import { CreateYaOrderDto } from './ya/dto/ya.dto';
-import { convertOrder, convertYaOrderToCostReq } from './utils/convertOrder';
+import {
+  convertOrder,
+  convertOrderToDpd,
+  convertYaOrderToCostReq,
+} from './utils/convertOrder';
 import { parseYaHistoryToHtml } from './utils/parseYaHistoryToHtml';
 import { CreateCashRequest, CreateOrderQueries } from './validation/yandex';
 import { MailService } from './mail/mail.service';
@@ -25,7 +29,7 @@ import { checkDeliveryCost } from './utils/check-delivery-cost';
 import { FiveService } from './five/five.service';
 import { describeError, toSafeMessage } from './common/request-context';
 import { getCurrentRequestId } from './common/request-id.storage';
-import { YaSourcePlatformIds } from './auth/jwt-claims';
+import { YaSourcePlatformIds, DpdSourceTerminalIds } from './auth/jwt-claims';
 import { convertFivePostOrder } from './utils/convert-five-post-order';
 import { OrderCarrierInfo } from './shop/dto/order-carrier-info.dto';
 
@@ -381,6 +385,110 @@ export class AppService {
     }
   }
 
+  async createDpdOrder(
+    { orderId }: CreateOrderQueries,
+    sourceTerminalIds?: DpdSourceTerminalIds,
+  ): Promise<TransferInterface> {
+    try {
+      const { addressDetails, customerDetails, orderDetails } =
+        await this.getOrderBasicInfo(orderId);
+      const sourceTerminalId =
+        orderDetails.current_state === '12'
+          ? sourceTerminalIds?.rnd
+          : orderDetails.current_state === '13'
+            ? sourceTerminalIds?.tul
+            : undefined;
+
+      if (!sourceTerminalId) {
+        throw new HttpException(
+          `Не настроен терминал отправки DPD для статуса заказа ${orderDetails.current_state}`,
+          HttpStatus.SERVICE_UNAVAILABLE,
+        );
+      }
+
+      const [shippingDetails, threadId] = await Promise.all([
+        this.shopService.getOrderCarrierInfo(+orderId),
+        this.shopService.getMessagesThread(+orderId),
+      ]);
+      const destination = findPointId(
+        await this.shopService.getOrderMessages(threadId),
+      );
+
+      if (!destination) {
+        return {
+          ok: false,
+          data: { message: 'Пункт выдачи DPD не найден в переписке по заказу' },
+        };
+      }
+
+      const { header, order } = convertOrderToDpd(
+        orderDetails,
+        addressDetails,
+        customerDetails,
+        shippingDetails,
+        destination,
+        sourceTerminalId,
+      );
+
+      const createdOrder = await this.dpdService.createOrder({
+        auth: {
+          clientNumber: +this.dpdService.clientNumber,
+          clientKey: this.dpdService.token,
+        },
+        header,
+        order,
+      });
+
+      if (
+        createdOrder.status !== 'OK' &&
+        createdOrder.status !== 'OrderPending'
+      ) {
+        throw new Error(
+          createdOrder.errorMessage
+            ? `DPD не подтвердил создание отправки: ${createdOrder.errorMessage}`
+            : `DPD не подтвердил создание отправки (статус ${createdOrder.status})`,
+        );
+      }
+
+      const trackNumber = createdOrder.orderNum;
+
+      if (trackNumber) {
+        await this.writeTrackingNumber(
+          shippingDetails,
+          trackNumber,
+          orderDetails.reference,
+        );
+      }
+
+      const codAmount = Number(
+        order[0].extraService
+          ?.find((service) => service.esCode === 'НПП')
+          ?.param?.find((param) => param.name === 'sum_npp')?.value ?? 0,
+      );
+      const message = [
+        createdOrder.status === 'OrderPending'
+          ? 'Заказ принят DPD, номер отправления появится после ручной обработки'
+          : undefined,
+        codAmount > 0
+          ? `Клиент не оплатил заказ полностью — DPD соберёт наложенный платёж ${codAmount.toFixed(2)} ₽ при вручении.`
+          : undefined,
+      ]
+        .filter(Boolean)
+        .join(' ');
+
+      return {
+        ok: true,
+        data: {
+          track: trackNumber ?? null,
+          status: createdOrder.status,
+          message: message || undefined,
+        },
+      };
+    } catch (error) {
+      return this.failure('createDpdOrder', error, { orderId });
+    }
+  }
+
   async getYaOrderHistory(id: string) {
     const response = await this.yaService.getHistoryById(id);
     if (typeof response === 'string') {
@@ -502,6 +610,8 @@ export class AppService {
 
     revisingOrdersData.forEach((order, index) => {
       let currState: string | undefined;
+      // DPD повторно использует те же newState на обратном пути к магазину — без isReturn нельзя отличить от движения к клиенту.
+      let isDpdReturn = false;
       const settled = allStatuses[index];
       if (settled.status === 'fulfilled') {
         switch (order.cargo) {
@@ -538,7 +648,16 @@ export class AppService {
           }
           case Cargos.DPD: {
             if ('return' in settled.value) {
-              currState = settled.value.return.states.at(-1).newState;
+              // Документация DPD: порядок массива не гарантирован, актуальное состояние
+              // выбирается по transitionTime.
+              const latestState = [...settled.value.return.states]
+                .sort(
+                  (a, b) =>
+                    Date.parse(a.transitionTime) - Date.parse(b.transitionTime),
+                )
+                .at(-1);
+              currState = latestState?.newState;
+              isDpdReturn = latestState?.isReturn === true;
             }
             break;
           }
@@ -565,7 +684,9 @@ export class AppService {
 
       if (currState !== undefined) {
         order.actualCargoState = currState;
-        order.unifiedCargoState = unifyParcelStatus(currState);
+        order.unifiedCargoState = isDpdReturn
+          ? UnifiedOrderState.RETURNING
+          : unifyParcelStatus(currState);
 
         if (
           order.cargo === Cargos.YA &&
@@ -618,8 +739,7 @@ export class AppService {
       if (
         cargoState &&
         shopState !== cargoState &&
-        cargoState !== UnifiedOrderState.UNKNOWN &&
-        order.cargo !== Cargos.DPD
+        cargoState !== UnifiedOrderState.UNKNOWN
       ) {
         if (!this.canAutoTransition(shopState, cargoState)) {
           errors.push(

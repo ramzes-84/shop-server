@@ -9,7 +9,7 @@ import {
   YaOrderCreationRes,
   YaOrderInfoRes,
 } from './ya/dto/ya.dto';
-import { convertOrder } from './utils/convertOrder';
+import { convertOrder, convertOrderToDpd } from './utils/convertOrder';
 import {
   addressDetails,
   customerDetails,
@@ -51,6 +51,9 @@ const checkDeliveryCostMock = checkDeliveryCost as jest.MockedFunction<
 const convertOrderMock = convertOrder as jest.MockedFunction<
   typeof convertOrder
 >;
+const convertOrderToDpdMock = convertOrderToDpd as jest.MockedFunction<
+  typeof convertOrderToDpd
+>;
 const convertOrderShopToCashMock =
   convertOrderShopToCash as jest.MockedFunction<typeof convertOrderShopToCash>;
 const generateCashInvoiceMessageMock =
@@ -88,6 +91,7 @@ describe('AppService', () => {
   let cashService: CashService;
   let fiveService: any;
   let postService: any;
+  let dpdService: any;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -142,6 +146,9 @@ describe('AppService', () => {
           provide: DpdService,
           useValue: {
             createOrder: jest.fn(),
+            getStatesByDPDOrder: jest.fn(),
+            clientNumber: '1000000000',
+            token: 'dpd-secret',
           },
         },
         {
@@ -172,6 +179,7 @@ describe('AppService', () => {
     cashService = module.get<CashService>(CashService);
     fiveService = module.get<any>(FiveService);
     postService = module.get<any>(PostService);
+    dpdService = module.get<any>(DpdService);
   });
 
   afterEach(() => {
@@ -558,6 +566,238 @@ describe('AppService', () => {
     });
   });
 
+  describe('createDpdOrder', () => {
+    const dpdSourceTerminalIds = {
+      rnd: 'terminal-rnd-1',
+      tul: 'terminal-tul-1',
+    };
+
+    it('creates a DPD shipment using the pickup point from the order message', async () => {
+      const basicInfo = buildBasicOrderInfo();
+      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
+      jest
+        .spyOn(shopService, 'getOrderCarrierInfo')
+        .mockResolvedValue(shippingDetails.order_carriers[0]);
+      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(5);
+      jest
+        .spyOn(shopService, 'getOrderMessages')
+        .mockResolvedValue(orderMessages);
+      findPointIdMock.mockReturnValue('destination-terminal');
+      convertOrderToDpdMock.mockReturnValue({
+        header: {} as any,
+        order: [{} as any],
+      });
+      dpdService.createOrder.mockResolvedValue({
+        orderNumberInternal: basicInfo.orderDetails.reference,
+        orderNum: '01010001MOW',
+        status: 'OK',
+      });
+
+      await expect(
+        service.createDpdOrder({ orderId: '1' }, dpdSourceTerminalIds),
+      ).resolves.toEqual({
+        ok: true,
+        data: { track: '01010001MOW', status: 'OK', message: undefined },
+      });
+      expect(convertOrderToDpdMock).toHaveBeenCalledWith(
+        basicInfo.orderDetails,
+        basicInfo.addressDetails,
+        basicInfo.customerDetails,
+        shippingDetails.order_carriers[0],
+        'destination-terminal',
+        'terminal-tul-1',
+      );
+      expect(dpdService.createOrder).toHaveBeenCalledWith(
+        expect.objectContaining({
+          auth: { clientNumber: 1000000000, clientKey: 'dpd-secret' },
+        }),
+      );
+      expect(shopService.updateOrderCarrierTracking).toHaveBeenCalledWith(
+        shippingDetails.order_carriers[0],
+        '01010001MOW',
+      );
+    });
+
+    it('resolves the Rostov source terminal for order status 12', async () => {
+      const basicInfo = {
+        ...buildBasicOrderInfo(),
+        orderDetails: { ...orderDetails, current_state: '12' },
+      };
+      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
+      jest
+        .spyOn(shopService, 'getOrderCarrierInfo')
+        .mockResolvedValue(shippingDetails.order_carriers[0]);
+      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(5);
+      jest
+        .spyOn(shopService, 'getOrderMessages')
+        .mockResolvedValue(orderMessages);
+      findPointIdMock.mockReturnValue('destination-terminal');
+      convertOrderToDpdMock.mockReturnValue({
+        header: {} as any,
+        order: [{} as any],
+      });
+      dpdService.createOrder.mockResolvedValue({
+        orderNum: '01010001MOW',
+        status: 'OK',
+      });
+
+      await service.createDpdOrder({ orderId: '1' }, dpdSourceTerminalIds);
+
+      expect(convertOrderToDpdMock).toHaveBeenCalledWith(
+        basicInfo.orderDetails,
+        basicInfo.addressDetails,
+        basicInfo.customerDetails,
+        shippingDetails.order_carriers[0],
+        'destination-terminal',
+        'terminal-rnd-1',
+      );
+    });
+
+    it('returns a failure when no DPD source terminal is configured for the order status', async () => {
+      const basicInfo = buildBasicOrderInfo();
+      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
+
+      await expect(
+        service.createDpdOrder({ orderId: '1' }, { rnd: 'terminal-rnd-1' }),
+      ).resolves.toEqual({
+        ok: false,
+        data: {
+          message: 'Не настроен терминал отправки DPD для статуса заказа 13',
+        },
+      });
+      expect(dpdService.createOrder).not.toHaveBeenCalled();
+    });
+
+    it('does not write a tracking number while the order is pending manual DPD processing', async () => {
+      const basicInfo = buildBasicOrderInfo();
+      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
+      jest
+        .spyOn(shopService, 'getOrderCarrierInfo')
+        .mockResolvedValue(shippingDetails.order_carriers[0]);
+      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(5);
+      jest
+        .spyOn(shopService, 'getOrderMessages')
+        .mockResolvedValue(orderMessages);
+      findPointIdMock.mockReturnValue('destination-terminal');
+      convertOrderToDpdMock.mockReturnValue({
+        header: {} as any,
+        order: [{} as any],
+      });
+      dpdService.createOrder.mockResolvedValue({ status: 'OrderPending' });
+
+      await expect(
+        service.createDpdOrder({ orderId: '1' }, dpdSourceTerminalIds),
+      ).resolves.toEqual({
+        ok: true,
+        data: {
+          track: null,
+          status: 'OrderPending',
+          message:
+            'Заказ принят DPD, номер отправления появится после ручной обработки',
+        },
+      });
+      expect(shopService.updateOrderCarrierTracking).not.toHaveBeenCalled();
+    });
+
+    it('returns a failure when DPD rejects the order', async () => {
+      const basicInfo = buildBasicOrderInfo();
+      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
+      jest
+        .spyOn(shopService, 'getOrderCarrierInfo')
+        .mockResolvedValue(shippingDetails.order_carriers[0]);
+      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(5);
+      jest
+        .spyOn(shopService, 'getOrderMessages')
+        .mockResolvedValue(orderMessages);
+      findPointIdMock.mockReturnValue('destination-terminal');
+      convertOrderToDpdMock.mockReturnValue({
+        header: {} as any,
+        order: [{} as any],
+      });
+      dpdService.createOrder.mockResolvedValue({
+        status: 'OrderError',
+        errorMessage: 'Не указан индекс получателя',
+      });
+
+      await expect(
+        service.createDpdOrder({ orderId: '1' }, dpdSourceTerminalIds),
+      ).resolves.toEqual({
+        ok: false,
+        data: {
+          message:
+            'DPD не подтвердил создание отправки: Не указан индекс получателя',
+        },
+      });
+      expect(shopService.updateOrderCarrierTracking).not.toHaveBeenCalled();
+    });
+
+    it('returns a failure when no DPD pickup point is found in the order messages', async () => {
+      const basicInfo = buildBasicOrderInfo();
+      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
+      jest
+        .spyOn(shopService, 'getOrderCarrierInfo')
+        .mockResolvedValue(shippingDetails.order_carriers[0]);
+      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(5);
+      jest
+        .spyOn(shopService, 'getOrderMessages')
+        .mockResolvedValue(orderMessages);
+      findPointIdMock.mockReturnValue(undefined);
+
+      await expect(
+        service.createDpdOrder({ orderId: '1' }, dpdSourceTerminalIds),
+      ).resolves.toEqual({
+        ok: false,
+        data: { message: 'Пункт выдачи DPD не найден в переписке по заказу' },
+      });
+      expect(dpdService.createOrder).not.toHaveBeenCalled();
+    });
+
+    it('warns the employee about a cash-on-delivery amount when the order is not fully paid', async () => {
+      const basicInfo = buildBasicOrderInfo();
+      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
+      jest
+        .spyOn(shopService, 'getOrderCarrierInfo')
+        .mockResolvedValue(shippingDetails.order_carriers[0]);
+      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(5);
+      jest
+        .spyOn(shopService, 'getOrderMessages')
+        .mockResolvedValue(orderMessages);
+      findPointIdMock.mockReturnValue('destination-terminal');
+      convertOrderToDpdMock.mockReturnValue({
+        header: {} as any,
+        order: [
+          {
+            extraService: [
+              {
+                esCode: 'НПП',
+                param: [{ name: 'sum_npp', value: '1603.47' }],
+              },
+            ],
+          } as any,
+        ],
+      });
+      dpdService.createOrder.mockResolvedValue({
+        orderNum: '01010001MOW',
+        status: 'OK',
+      });
+
+      const result = await service.createDpdOrder(
+        { orderId: '1' },
+        dpdSourceTerminalIds,
+      );
+
+      expect(result).toEqual({
+        ok: true,
+        data: {
+          track: '01010001MOW',
+          status: 'OK',
+          message:
+            'Клиент не оплатил заказ полностью — DPD соберёт наложенный платёж 1603.47 ₽ при вручении.',
+        },
+      });
+    });
+  });
+
   describe('getYaOrderHistory', () => {
     it('should return order history for a given ID', async () => {
       const mockHistoryData = { ...yaOrderHistory };
@@ -753,6 +993,11 @@ describe('AppService', () => {
         expect.any(Array),
         expect.any(Array),
       );
+      expect(syncSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ reference: 'REF-DPD' }),
+        expect.any(Array),
+        expect.any(Array),
+      );
       expect(mailService.sendToAdmin).toHaveBeenCalledWith(
         'Status updates',
         expect.stringContaining('AUTO REF-AUTO'),
@@ -878,6 +1123,92 @@ describe('AppService', () => {
 
       await expect(service.reviseOrders()).resolves.toContain(
         '❗ Заказ YA-REF-1 не найден в ответе Яндекс.Доставки за последние 30 дней.',
+      );
+    });
+
+    it('resolves the DPD cargo state using the chronologically latest state, not array order', async () => {
+      jest.spyOn(shopService, 'getInTransitOrders').mockResolvedValue([
+        {
+          id: 2,
+          reference: 'DPD-REF-1',
+          shipping_number: 'RU113491901',
+          current_state: '4',
+          date_upd: '2026-09-11T12:00:00.000Z',
+        },
+      ] as any);
+      jest.spyOn(yaService, 'getRecentParcels').mockResolvedValue({
+        ...yaRecentParcels,
+        requests: [],
+      });
+      jest.spyOn(dpdService, 'getStatesByDPDOrder').mockResolvedValue({
+        return: {
+          docId: 1,
+          docDate: '2026-09-10',
+          clientNumber: 1000000000,
+          resultComplete: true,
+          states: [
+            { newState: 'Delivered', transitionTime: '2026-09-12T10:00:00' },
+            {
+              newState: 'OnTerminalDelivery',
+              transitionTime: '2026-09-11T10:00:00',
+            },
+          ],
+        },
+      } as any);
+
+      const result = await service.getDataForRevise();
+
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          cargo: Cargos.DPD,
+          actualCargoState: 'Delivered',
+          unifiedCargoState: UnifiedOrderState.DELIVERED,
+        }),
+      );
+    });
+
+    it('treats a DPD state flagged isReturn as RETURNING regardless of the raw newState', async () => {
+      jest.spyOn(shopService, 'getInTransitOrders').mockResolvedValue([
+        {
+          id: 3,
+          reference: 'DPD-REF-2',
+          shipping_number: 'RU113491902',
+          current_state: '4',
+          date_upd: '2026-09-11T12:00:00.000Z',
+        },
+      ] as any);
+      jest.spyOn(yaService, 'getRecentParcels').mockResolvedValue({
+        ...yaRecentParcels,
+        requests: [],
+      });
+      jest.spyOn(dpdService, 'getStatesByDPDOrder').mockResolvedValue({
+        return: {
+          docId: 1,
+          docDate: '2026-09-10',
+          clientNumber: 1000000000,
+          resultComplete: true,
+          states: [
+            {
+              newState: 'OnTerminalDelivery',
+              transitionTime: '2026-09-11T10:00:00',
+            },
+            {
+              newState: 'OnTerminalDelivery',
+              transitionTime: '2026-09-13T10:00:00',
+              isReturn: true,
+            },
+          ],
+        },
+      } as any);
+
+      const result = await service.getDataForRevise();
+
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          cargo: Cargos.DPD,
+          actualCargoState: 'OnTerminalDelivery',
+          unifiedCargoState: UnifiedOrderState.RETURNING,
+        }),
       );
     });
   });

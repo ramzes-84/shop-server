@@ -6,7 +6,7 @@ import { TelegramMessage, TelegramUpdate } from './dto/telegram-update.dto';
 import { ShopService } from 'src/shop/shop.service';
 import { BotOrderCandidate } from 'src/shop/dto/bot-orders.dto';
 import { AppService } from 'src/app.service';
-import { YaSourcePlatformIds } from 'src/auth/jwt-claims';
+import { DpdSourceTerminalIds, YaSourcePlatformIds } from 'src/auth/jwt-claims';
 
 const YA_COMMAND_ONLY_RE = /^\/?ya\s*$/i;
 const YA_COMMAND = '/ya';
@@ -22,6 +22,7 @@ type PendingRegistration = {
   candidates: BotOrderCandidate[];
   yaSourcePlatformIds: YaSourcePlatformIds;
   fivePostSenderLocation?: string;
+  dpdSourceTerminalIds: DpdSourceTerminalIds;
 };
 
 @Controller('bot')
@@ -89,17 +90,24 @@ export class BotController {
 
   private async sendOrdersForRegistration(chatId: string) {
     try {
-      const { orders, yaSourcePlatformIds, fivePostSenderLocation } =
-        await this.shopService.getOrdersForBotRegistration();
+      const {
+        orders,
+        yaSourcePlatformIds,
+        fivePostSenderLocation,
+        dpdSourceTerminalIds,
+      } = await this.shopService.getOrdersForBotRegistration();
 
-      // Регистрация пока поддержана только для Яндекс.Доставки и 5Post — остальные не показываем.
+      // Почта России пока не поддержана через бота — остальные не показываем.
       const candidates = orders.filter(
-        (order) => order.carrier === 'yandex' || order.carrier === 'fivepost',
+        (order) =>
+          order.carrier === 'yandex' ||
+          order.carrier === 'fivepost' ||
+          order.carrier === 'dpd',
       );
 
       if (!candidates.length) {
         await this.botService.sendEmployeeMessage(
-          'Нет заказов, доступных для регистрации в Яндекс.Доставке или 5Post.',
+          'Нет заказов, доступных для регистрации в Яндекс.Доставке, 5Post или DPD.',
           false,
           chatId,
         );
@@ -110,6 +118,7 @@ export class BotController {
         candidates,
         yaSourcePlatformIds,
         fivePostSenderLocation,
+        dpdSourceTerminalIds,
       });
 
       await this.botService.sendEmployeeMessage(
@@ -161,10 +170,15 @@ export class BotController {
             { orderId },
             pending.yaSourcePlatformIds,
           )
-        : await this.appService.createFivePostOrder(
-            { orderId },
-            pending.fivePostSenderLocation,
-          );
+        : order.carrier === 'fivepost'
+          ? await this.appService.createFivePostOrder(
+              { orderId },
+              pending.fivePostSenderLocation,
+            )
+          : await this.appService.createDpdOrder(
+              { orderId },
+              pending.dpdSourceTerminalIds,
+            );
 
     if (result.ok) {
       await this.botService.sendEmployeeMessage(

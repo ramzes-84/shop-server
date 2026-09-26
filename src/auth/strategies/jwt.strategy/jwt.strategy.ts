@@ -38,6 +38,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       scope: payload.scope,
       yaSourcePlatformIds: payload.yaSourcePlatformIds,
       fivePostSenderLocation: payload.fivePostSenderLocation,
+      dpdSourceTerminalIds: payload.dpdSourceTerminalIds,
     };
   }
 }

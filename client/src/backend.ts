@@ -4,7 +4,7 @@
  * через window.shopServerConfig — из DOM ничего не вычитывается.
  */
 
-type ShopServerCarrier = '' | 'yandex' | 'fivepost' | 'post';
+type ShopServerCarrier = '' | 'yandex' | 'fivepost' | 'post' | 'dpd';
 
 type ShopServerConfig = {
   apiUrl: string;
@@ -13,6 +13,7 @@ type ShopServerConfig = {
   carrier: ShopServerCarrier;
   fivePostKey: string;
   pochtaWidgetId: string;
+  dpdSid: string;
 };
 
 // Расширение глобального Window: значения приходят из модуля PrestaShop и из inline-скриптов виджетов.
@@ -46,6 +47,11 @@ type PostPointData = {
   addressTo: string;
 };
 
+type DpdPointData = {
+  addressString: string;
+  departmentCode: string;
+};
+
 type TransferInterface = {
   ok: boolean;
   data: Record<string, unknown>;
@@ -54,6 +60,7 @@ type TransferInterface = {
 const enum Endpoints {
   YA_CREATE = '/yandex/create',
   FIVE_POST_CREATE = '/fivepost/create',
+  DPD_CREATE = '/dpd/create',
   INVOICE = '/cash/create',
 }
 
@@ -66,6 +73,8 @@ const REQUEST_TIMEOUT_MS = 15_000;
 const YA_WIDGET_SRC = 'https://ndd-widget.landpro.site/widget.js';
 const FIVEPOST_WIDGET_SRC = 'https://fivepost.ru/static/5post-widget-v1.0.js';
 const POST_WIDGET_SRC = 'https://widget.pochta.ru/map/widget/widget.js';
+const DPD_WIDGET_SRC =
+  'https://chooser.dpd.ru/dpdchooser.js?nocache=1499949132826';
 
 const SESSION_EXPIRED_MESSAGE =
   'Сессия истекла. Обновите страницу заказа и повторите действие.';
@@ -252,6 +261,11 @@ function openMap(config: ShopServerConfig) {
 
   if (config.carrier === 'post') {
     void openPostMap(config.pochtaWidgetId);
+    return;
+  }
+
+  if (config.carrier === 'dpd') {
+    void openDpdMap(config.dpdSid);
   }
 }
 
@@ -360,9 +374,52 @@ async function openPostMap(widgetId: string) {
   dialog.append(script);
 }
 
+async function openDpdMap(sid: string) {
+  const { dialog, closeButton } = buildDialog();
+
+  const mapId = `dpd-map-${Date.now()}`;
+  const consoleId = `dpd-console-${Date.now()}`;
+
+  const container = document.createElement('div');
+  container.id = mapId;
+  container.className = 'shopserver-dialog-map';
+
+  const consoleContainer = document.createElement('div');
+  consoleContainer.id = consoleId;
+  consoleContainer.className = 'shopserver-dialog-info';
+
+  dialog.append(container, consoleContainer, closeButton);
+  document.body.append(dialog);
+
+  try {
+    await loadScript(DPD_WIDGET_SRC);
+  } catch {
+    container.textContent = 'Не удалось загрузить карту пунктов DPD';
+    return;
+  }
+
+  const script = document.createElement('script');
+  script.text = buildDpdWidgetAdminScript(mapId, consoleId, sid);
+  dialog.append(script);
+}
+
 function buildPostWidgetAdminScript(containerId: string, widgetId: string) {
   return `ecomStartWidget({id: ${Number(widgetId) || 0}, callbackFunction: saveDestination, containerId: ${JSON.stringify(containerId)}})`;
 }
+
+const buildDpdWidgetAdminScript = (
+  chooserId: string,
+  consoleId: string,
+  sid: string,
+) => `
+var chooser = new DPDChooser(${JSON.stringify(chooserId)}, {type: "dpdclient", address: "Тула", choose: 1, sid: ${JSON.stringify(sid)}});
+chooser.onError(function (error, code) {
+  document.getElementById(${JSON.stringify(consoleId)}).textContent = "Ошибка чузера (" + error + ") код " + code;
+});
+chooser.onChoose(function (dep) {
+  saveDestination(dep);
+});
+`;
 
 // Вызывается по имени из inline-скриптов виджетов — статический анализ этого не видит.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -376,6 +433,8 @@ function saveDestination(data: unknown) {
     messageElement.value = `Уточните, удобно ли Вам будет получить заказ в пункте Five Post по адресу: ${data.fullAddress} [ID: ${data.id}]?`;
   } else if (isPostPointDataAdmin(data)) {
     messageElement.value = `Уточните, удобно ли Вам будет получить заказ в почтомате №${data.indexTo} по адресу: ${data.cityTo}, ${data.addressTo}? Другие точки здесь: https://www.pochta.ru/offices?filters%5B%5D=POCHTOMAT (для данного способа подходят только почтоматы, не отделения почты).`;
+  } else if (isDpdPointDataAdmin(data)) {
+    messageElement.value = `Уточните, удобно ли Вам будет получить заказ в пункте DPD по адресу: ${data.addressString} [ID: ${data.departmentCode}]?`;
   }
 }
 
@@ -417,7 +476,9 @@ async function createOrder(config: ShopServerConfig) {
   const endpoint =
     config.carrier === 'fivepost'
       ? Endpoints.FIVE_POST_CREATE
-      : Endpoints.YA_CREATE;
+      : config.carrier === 'dpd'
+        ? Endpoints.DPD_CREATE
+        : Endpoints.YA_CREATE;
 
   await runAction(config, 'Регистрация отправки', endpoint, {
     orderId: config.orderId,
@@ -504,6 +565,11 @@ async function showSuccess(action: string, body: TransferInterface) {
       message: 'Трек-номер скопирован в буфер обмена.',
       value: trackNumber,
     });
+    return;
+  }
+
+  if (typeof body.data.message === 'string' && body.data.message) {
+    showNotice({ type: 'success', message: body.data.message });
     return;
   }
 
@@ -707,5 +773,13 @@ function isPostPointDataAdmin(data: unknown): data is PostPointData {
     typeof data.indexTo === 'string' &&
     typeof data.cityTo === 'string' &&
     typeof data.addressTo === 'string'
+  );
+}
+
+function isDpdPointDataAdmin(data: unknown): data is DpdPointData {
+  return (
+    isRecordAdmin(data) &&
+    typeof data.addressString === 'string' &&
+    typeof data.departmentCode === 'string'
   );
 }

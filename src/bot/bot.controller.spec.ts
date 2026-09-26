@@ -44,6 +44,7 @@ describe('BotController', () => {
           useValue: {
             createYaOrder: jest.fn(),
             createFivePostOrder: jest.fn(),
+            createDpdOrder: jest.fn(),
           },
         },
       ],
@@ -271,6 +272,12 @@ describe('BotController', () => {
       lastname: 'Петров',
       carrier: 'fivepost' as const,
     },
+    {
+      id: 103,
+      reference: 'DPD987654',
+      lastname: 'Смирнов',
+      carrier: 'dpd' as const,
+    },
   ];
 
   it('should list orders available for registration on /register', async () => {
@@ -278,6 +285,7 @@ describe('BotController', () => {
       orders: registrationCandidates,
       yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
       fivePostSenderLocation: 'loc-1',
+      dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
     });
 
     const update: TelegramUpdate = {
@@ -301,10 +309,11 @@ describe('BotController', () => {
   it('should exclude orders with unsupported carriers from the registration list', async () => {
     jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
       orders: [
-        { id: 201, reference: 'ZZZ111', lastname: 'Сидоров', carrier: 'dpd' },
+        { id: 201, reference: 'ZZZ111', lastname: 'Сидоров', carrier: 'post' },
       ],
       yaSourcePlatformIds: {},
       fivePostSenderLocation: undefined,
+      dpdSourceTerminalIds: {},
     });
 
     const update: TelegramUpdate = {
@@ -330,6 +339,7 @@ describe('BotController', () => {
       orders: registrationCandidates,
       yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
       fivePostSenderLocation: 'loc-1',
+      dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
     });
     jest.spyOn(appService, 'createYaOrder').mockResolvedValue({
       ok: true,
@@ -367,6 +377,7 @@ describe('BotController', () => {
       orders: registrationCandidates,
       yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
       fivePostSenderLocation: 'loc-1',
+      dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
     });
     jest.spyOn(appService, 'createFivePostOrder').mockResolvedValue({
       ok: true,
@@ -399,11 +410,50 @@ describe('BotController', () => {
     );
   });
 
+  it('should register the selected DPD order by list number', async () => {
+    jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
+      orders: registrationCandidates,
+      yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
+      fivePostSenderLocation: 'loc-1',
+      dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
+    });
+    jest.spyOn(appService, 'createDpdOrder').mockResolvedValue({
+      ok: true,
+      data: { track: '01010001MOW', status: 'OK' },
+    });
+
+    await controller.handleWebhook({
+      ...baseUpdate,
+      message: {
+        ...baseUpdate.message!,
+        text: '/register',
+        entities: [registerCommandEntity],
+      },
+    });
+    jest.clearAllMocks();
+
+    await controller.handleWebhook({
+      ...baseUpdate,
+      message: { ...baseUpdate.message!, text: '3' },
+    });
+
+    expect(appService.createDpdOrder).toHaveBeenCalledWith(
+      { orderId: '103' },
+      { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
+    );
+    expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+      expect.stringContaining('DPD987654'),
+      false,
+      '123',
+    );
+  });
+
   it('should reject an out-of-range order number', async () => {
     jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
       orders: registrationCandidates,
       yaSourcePlatformIds: {},
       fivePostSenderLocation: undefined,
+      dpdSourceTerminalIds: {},
     });
 
     await controller.handleWebhook({
@@ -423,6 +473,7 @@ describe('BotController', () => {
 
     expect(appService.createYaOrder).not.toHaveBeenCalled();
     expect(appService.createFivePostOrder).not.toHaveBeenCalled();
+    expect(appService.createDpdOrder).not.toHaveBeenCalled();
     expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
       expect.stringContaining('Некорректный номер'),
       false,

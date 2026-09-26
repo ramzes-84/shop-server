@@ -10,12 +10,19 @@ export interface YaSourcePlatformIds {
   tul?: string;
 }
 
+/** Терминалы отправки DPD (Ростов/Тула) — настраиваются в модуле, не хранятся на сервере. */
+export interface DpdSourceTerminalIds {
+  rnd?: string;
+  tul?: string;
+}
+
 export interface JwtPayload {
   sub: string;
   email?: string;
   scope?: string;
   yaSourcePlatformIds?: YaSourcePlatformIds;
   fivePostSenderLocation?: string;
+  dpdSourceTerminalIds?: DpdSourceTerminalIds;
   iss: string;
   aud: string;
   iat: number;
@@ -29,4 +36,5 @@ export interface AuthenticatedEmployee {
   scope?: string;
   yaSourcePlatformIds?: YaSourcePlatformIds;
   fivePostSenderLocation?: string;
+  dpdSourceTerminalIds?: DpdSourceTerminalIds;
 }

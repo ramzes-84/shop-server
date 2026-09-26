@@ -75,4 +75,101 @@ describe('DpdService', () => {
       'dpd fail',
     );
   });
+
+  describe('createOrder', () => {
+    const orderRequest = {
+      auth: { clientNumber: 1234, clientKey: 'secret' },
+      header: {
+        datePickup: '2026-09-26',
+        senderAddress: { name: 'Shop', terminalCode: '2N83' },
+        pickupTimePeriod: '9-18',
+      },
+      order: [
+        {
+          orderNumberInternal: 'REF-1',
+          serviceCode: 'PCL',
+          serviceVariant: 'ТТ',
+          cargoNumPack: 1,
+          cargoWeight: 0.15,
+          cargoRegistered: false,
+          cargoCategory: 'Косметика',
+          receiverAddress: { name: 'Client', terminalCode: 'M91' },
+          unitLoad: [{ descript: 'Товар', count: 1 }],
+        },
+      ],
+    } as any;
+
+    it('sends the request under the "orders" tag and normalizes the "return" array', async () => {
+      const creationResponse = {
+        return: [
+          {
+            orderNumberInternal: 'REF-1',
+            orderNum: '01010001MOW',
+            status: 'OK',
+          },
+        ],
+      } as any;
+      createClientMock.mockImplementation((endpoint, options, cb) => {
+        const callback = typeof options === 'function' ? options : cb;
+        const client = {
+          createOrder2: (args: any, done: (err: any, res?: any) => void) => {
+            expect(args).toEqual({ orders: orderRequest });
+            done(null, creationResponse);
+          },
+        } as any;
+        callback?.(null, client);
+      });
+
+      const result = await service.createOrder(orderRequest);
+
+      expect(result).toEqual({
+        orderNumberInternal: 'REF-1',
+        orderNum: '01010001MOW',
+        status: 'OK',
+      });
+      expect(createClientMock).toHaveBeenCalledWith(
+        service.createEndpoint,
+        { wsdl_options: { timeout: expect.any(Number) } },
+        expect.any(Function),
+      );
+    });
+
+    it('normalizes a bare object "return" (single order) into an array', async () => {
+      const creationResponse = {
+        return: { orderNumberInternal: 'REF-1', status: 'OrderPending' },
+      } as any;
+      createClientMock.mockImplementation((_endpoint, options, cb) => {
+        const callback = typeof options === 'function' ? options : cb;
+        const client = {
+          createOrder2: (_args: any, done: (err: any, res?: any) => void) => {
+            done(null, creationResponse);
+          },
+        } as any;
+        callback?.(null, client);
+      });
+
+      const result = await service.createOrder(orderRequest);
+
+      expect(result).toEqual({
+        orderNumberInternal: 'REF-1',
+        status: 'OrderPending',
+      });
+    });
+
+    it('rejects when createOrder2 call errors', async () => {
+      createClientMock.mockImplementation((_endpoint, options, cb) => {
+        const callback = typeof options === 'function' ? options : cb;
+        const client = {
+          createOrder2: (_args: any, done: (err: any) => void) => {
+            done(new Error('dpd create fail'));
+          },
+        } as any;
+        callback?.(null, client);
+      });
+
+      await expect(service.createOrder(orderRequest)).rejects.toThrow(
+        'dpd create fail',
+      );
+    });
+  });
 });

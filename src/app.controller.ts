@@ -53,6 +53,18 @@ export class AppController {
     );
   }
 
+  @Post('dpd/create')
+  @UseGuards(AuthGuard('jwt'), EmployeeJwtGuard)
+  dpdOrderCreate(
+    @Body() body: CreateOrderQueries,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.appService.createDpdOrder(
+      body,
+      request.user.dpdSourceTerminalIds,
+    );
+  }
+
   @Post('cash/create')
   @UseGuards(AuthGuard('jwt'), EmployeeJwtGuard)
   async cashInvoiceCreate(@Body() body: CreateCashRequest) {
