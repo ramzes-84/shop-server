@@ -143,8 +143,9 @@ export class BotController {
   }
 
   private buildRegistrationList(candidates: BotOrderCandidate[]): string {
-    const lines = candidates.map((order, index) =>
-      `${index + 1}. ${order.reference} ${order.lastname}`.trim(),
+    const lines = candidates.map(
+      (order, index) =>
+        `${index + 1}. ${order.reference} ${order.lastname} | Трек: ${order.trackingNumber?.trim() || 'нет'}`,
     );
 
     return [`${REGISTER_ALL_CODE}. Зарегистрировать всё`, ...lines].join('\n');
@@ -281,6 +282,7 @@ export class BotController {
     }
 
     const order = pending.candidates[index - 1];
+    this.clearPendingRegistration(chatId);
     const result = await this.registerOneOrder(order, pending);
 
     if (result.ok) {
@@ -297,31 +299,7 @@ export class BotController {
       );
     }
 
-    // Успешно зарегистрированный заказ убираем из списка, неудачный оставляем — можно повторить.
-    const remainingCandidates = result.ok
-      ? pending.candidates.filter((candidate) => candidate.id !== order.id)
-      : pending.candidates;
-
-    if (!remainingCandidates.length) {
-      this.clearPendingRegistration(chatId);
-      await this.botService.sendEmployeeMessage(
-        'Все заказы из списка обработаны.',
-        false,
-        chatId,
-      );
-      return;
-    }
-
-    this.setPendingRegistration(chatId, {
-      ...pending,
-      candidates: remainingCandidates,
-    });
-
-    await this.botService.sendEmployeeMessage(
-      `Выберите следующий заказ для регистрации:\n${this.buildRegistrationList(remainingCandidates)}`,
-      false,
-      chatId,
-    );
+    await this.sendOrdersForRegistration(chatId);
   }
 
   private extractBotCommand(message: TelegramMessage): BotCommandInfo | null {

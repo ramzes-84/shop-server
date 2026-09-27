@@ -42,7 +42,7 @@ class ShopServer extends Module
     {
         $this->name = 'shopserver';
         $this->tab = 'shipping_logistics';
-        $this->version = '1.11.0';
+        $this->version = '1.12.0';
         $this->author = 'Mineral Magic';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = ['min' => '8.0.0', 'max' => _PS_VERSION_];
@@ -649,8 +649,8 @@ class ShopServer extends Module
     }
 
     /**
-     * Заказы, готовые к регистрации отправки ботом: reference, фамилия получателя
-     * и тип перевозчика (определяется так же, как на странице заказа, по id_reference).
+        * Заказы, готовые к регистрации отправки ботом: reference, фамилия получателя,
+        * трек последней записи order_carrier и тип перевозчика по id_reference.
      *
      * @param int[] $orderStateIds
      */
@@ -662,7 +662,9 @@ class ShopServer extends Module
 
         if ($stateIds) {
             $rows = Db::getInstance()->executeS(
-                'SELECT o.id_order, o.reference, o.id_address_delivery, o.id_carrier'
+                'SELECT o.id_order, o.reference, o.id_address_delivery, o.id_carrier,'
+                . ' (SELECT oc.tracking_number FROM `' . _DB_PREFIX_ . 'order_carrier` oc'
+                . ' WHERE oc.id_order = o.id_order ORDER BY oc.id_order_carrier DESC LIMIT 1) AS tracking_number'
                 . ' FROM `' . _DB_PREFIX_ . 'orders` o'
                 . ' WHERE o.current_state IN (' . implode(',', $stateIds) . ')'
                 . ' ORDER BY o.date_add ASC'
@@ -684,6 +686,7 @@ class ShopServer extends Module
                     'reference' => (string) $row['reference'],
                     'lastname' => $lastname,
                     'carrier' => $carrierType,
+                    'trackingNumber' => trim((string) $row['tracking_number']),
                 ];
             }
         }

@@ -442,7 +442,10 @@ describe('BotController', () => {
 
   it('should list orders available for registration on /register', async () => {
     jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
-      orders: registrationCandidates,
+      orders: [
+        { ...registrationCandidates[0], trackingNumber: 'YA-123' },
+        ...registrationCandidates.slice(1),
+      ],
       yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
       fivePostSenderLocation: 'loc-1',
       dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
@@ -460,7 +463,12 @@ describe('BotController', () => {
     await controller.handleWebhook(update);
 
     expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
-      expect.stringContaining('1. BFWGPFSMQ Васильева'),
+      expect.stringContaining('1. BFWGPFSMQ Васильева | Трек: YA-123'),
+      false,
+      '123',
+    );
+    expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+      expect.stringContaining('2. AXQ12345Z Петров | Трек: нет'),
       false,
       '123',
     );
@@ -608,13 +616,25 @@ describe('BotController', () => {
     );
   });
 
-  it('should re-offer the remaining list after a single successful registration', async () => {
-    jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
-      orders: registrationCandidates,
-      yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
-      fivePostSenderLocation: 'loc-1',
-      dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
-    });
+  it('should reload the list from the shop after a single registration', async () => {
+    jest
+      .spyOn(shopService, 'getOrdersForBotRegistration')
+      .mockResolvedValueOnce({
+        orders: registrationCandidates,
+        yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
+        fivePostSenderLocation: 'loc-1',
+        dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
+      })
+      .mockResolvedValue({
+        orders: [
+          { ...registrationCandidates[0], trackingNumber: 'YA-NEW' },
+          { ...registrationCandidates[1], trackingNumber: 'TRACK-EXTERNAL' },
+          registrationCandidates[2],
+        ],
+        yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
+        fivePostSenderLocation: 'loc-2',
+        dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
+      });
     jest.spyOn(appService, 'createYaOrder').mockResolvedValue({
       ok: true,
       data: { sharing_url: 'https://dostavka.yandex.ru/route/EXAMPLE' },
@@ -639,14 +659,13 @@ describe('BotController', () => {
       message: { ...baseUpdate.message!, text: '1' },
     });
 
-    // Список пересчитан заново: BFWGPFSMQ выбыл, номера 1/2 указывают на 5Post и DPD.
     expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
-      expect.stringContaining('Выберите следующий заказ'),
+      expect.stringContaining('1. BFWGPFSMQ Васильева | Трек: YA-NEW'),
       false,
       '123',
     );
     expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
-      expect.not.stringContaining('BFWGPFSMQ'),
+      expect.stringContaining('2. AXQ12345Z Петров | Трек: TRACK-EXTERNAL'),
       false,
       '123',
     );
@@ -654,22 +673,30 @@ describe('BotController', () => {
 
     await controller.handleWebhook({
       ...baseUpdate,
-      message: { ...baseUpdate.message!, text: '1' },
+      message: { ...baseUpdate.message!, text: '2' },
     });
 
     expect(appService.createFivePostOrder).toHaveBeenCalledWith(
       { orderId: '102' },
-      'loc-1',
+      'loc-2',
     );
   });
 
-  it('should clear the session once every order has been processed', async () => {
-    jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
-      orders: [registrationCandidates[0]],
-      yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
-      fivePostSenderLocation: 'loc-1',
-      dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
-    });
+  it('should clear the session when the shop has no more orders', async () => {
+    jest
+      .spyOn(shopService, 'getOrdersForBotRegistration')
+      .mockResolvedValueOnce({
+        orders: [registrationCandidates[0]],
+        yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
+        fivePostSenderLocation: 'loc-1',
+        dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
+      })
+      .mockResolvedValue({
+        orders: [],
+        yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
+        fivePostSenderLocation: 'loc-1',
+        dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
+      });
     jest.spyOn(appService, 'createYaOrder').mockResolvedValue({
       ok: true,
       data: { sharing_url: 'https://dostavka.yandex.ru/route/EXAMPLE' },
@@ -691,7 +718,7 @@ describe('BotController', () => {
     });
 
     expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
-      expect.stringContaining('Все заказы из списка обработаны'),
+      expect.stringContaining('Нет заказов'),
       false,
       '123',
     );

@@ -5,6 +5,7 @@ export class BotOrderCandidate {
   reference: string;
   lastname: string;
   carrier: BotOrderCarrier;
+  trackingNumber?: string;
 }
 
 export class BotOrdersForRegistration {
