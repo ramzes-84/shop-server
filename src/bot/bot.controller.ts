@@ -13,17 +13,23 @@ const YA_COMMAND = '/ya';
 const REGISTER_COMMAND_ONLY_RE = /^\/?register\s*$/i;
 const REGISTER_COMMAND = '/register';
 const REGISTER_ALL_CODE = 0;
+const REGISTRATION_SESSION_TTL_MS = 10 * 60 * 1000;
+const YA_SESSION_TTL_MS = 10 * 60 * 1000;
 
 type BotCommandInfo = {
   command: string;
   hasTrailingText: boolean;
 };
 
-type PendingRegistration = {
+type PendingRegistrationData = {
   candidates: BotOrderCandidate[];
   yaSourcePlatformIds: YaSourcePlatformIds;
   fivePostSenderLocation?: string;
   dpdSourceTerminalIds: DpdSourceTerminalIds;
+};
+
+type PendingRegistration = PendingRegistrationData & {
+  timeout: NodeJS.Timeout;
 };
 
 @Controller('bot')
@@ -35,12 +41,67 @@ export class BotController {
     private readonly appService: AppService,
   ) {}
 
-  private readonly pendingYaReferences = new Set<string>();
+  private readonly pendingYaReferences = new Map<string, NodeJS.Timeout>();
   // Список кандидатов на регистрацию по chatId, без персистентности между рестартами.
+  // Сессия живёт REGISTRATION_SESSION_TTL_MS от последнего ответа менеджера, потом сгорает сама.
   private readonly pendingRegistrations = new Map<
     string,
     PendingRegistration
   >();
+
+  private setPendingYaReference(chatId: string) {
+    this.clearPendingYaReference(chatId);
+
+    const timeout = setTimeout(() => {
+      this.pendingYaReferences.delete(chatId);
+      void this.botService.sendEmployeeMessage(
+        'Ожидание кода заказа истекло (10 минут). Отправьте /ya заново.',
+        false,
+        chatId,
+      );
+    }, YA_SESSION_TTL_MS);
+    timeout.unref();
+
+    this.pendingYaReferences.set(chatId, timeout);
+  }
+
+  private clearPendingYaReference(chatId: string) {
+    const timeout = this.pendingYaReferences.get(chatId);
+
+    if (timeout) {
+      clearTimeout(timeout);
+      this.pendingYaReferences.delete(chatId);
+    }
+  }
+
+  private setPendingRegistration(
+    chatId: string,
+    data: PendingRegistrationData,
+  ) {
+    this.clearPendingRegistration(chatId);
+
+    const timeout = setTimeout(() => {
+      this.pendingRegistrations.delete(chatId);
+      void this.botService.sendEmployeeMessage(
+        'Сессия регистрации заказов истекла (10 минут без ответа). Отправьте /register заново.',
+        false,
+        chatId,
+      );
+    }, REGISTRATION_SESSION_TTL_MS);
+    // Не держит процесс живым ради самого себя — таймер лишь чистит память чата.
+    timeout.unref();
+
+    this.pendingRegistrations.set(chatId, { ...data, timeout });
+  }
+
+  private clearPendingRegistration(chatId: string) {
+    const pending = this.pendingRegistrations.get(chatId);
+
+    if (pending) {
+      clearTimeout(pending.timeout);
+      this.pendingRegistrations.delete(chatId);
+    }
+  }
 
   private buildTrackResponse(trackInfo: YaTrackInfo): string {
     const routeId = trackInfo.sharingUrl?.split('/').at(-1);
@@ -115,7 +176,7 @@ export class BotController {
         return;
       }
 
-      this.pendingRegistrations.set(chatId, {
+      this.setPendingRegistration(chatId, {
         candidates,
         yaSourcePlatformIds,
         fivePostSenderLocation,
@@ -193,7 +254,6 @@ export class BotController {
 
   private async registerSelectedOrder(chatId: string, text: string) {
     const pending = this.pendingRegistrations.get(chatId);
-    this.pendingRegistrations.delete(chatId);
 
     if (!pending) {
       return;
@@ -207,7 +267,7 @@ export class BotController {
       index > pending.candidates.length
     ) {
       await this.botService.sendEmployeeMessage(
-        'Некорректный номер заказа. Отправьте /register и повторите выбор.',
+        'Некорректный номер заказа. Отправьте номер из списка ещё раз.',
         false,
         chatId,
       );
@@ -215,6 +275,7 @@ export class BotController {
     }
 
     if (index === REGISTER_ALL_CODE) {
+      this.clearPendingRegistration(chatId);
       await this.registerAllOrders(chatId, pending);
       return;
     }
@@ -235,6 +296,32 @@ export class BotController {
         chatId,
       );
     }
+
+    // Успешно зарегистрированный заказ убираем из списка, неудачный оставляем — можно повторить.
+    const remainingCandidates = result.ok
+      ? pending.candidates.filter((candidate) => candidate.id !== order.id)
+      : pending.candidates;
+
+    if (!remainingCandidates.length) {
+      this.clearPendingRegistration(chatId);
+      await this.botService.sendEmployeeMessage(
+        'Все заказы из списка обработаны.',
+        false,
+        chatId,
+      );
+      return;
+    }
+
+    this.setPendingRegistration(chatId, {
+      ...pending,
+      candidates: remainingCandidates,
+    });
+
+    await this.botService.sendEmployeeMessage(
+      `Выберите следующий заказ для регистрации:\n${this.buildRegistrationList(remainingCandidates)}`,
+      false,
+      chatId,
+    );
   }
 
   private extractBotCommand(message: TelegramMessage): BotCommandInfo | null {
@@ -293,7 +380,8 @@ export class BotController {
       (!botCommand && REGISTER_COMMAND_ONLY_RE.test(text));
 
     if (isYaPromptCommand) {
-      this.pendingYaReferences.add(chatId);
+      this.clearPendingRegistration(chatId);
+      this.setPendingYaReference(chatId);
       await this.botService.sendEmployeeMessage(
         'Введите код заказа, и я найду информацию.',
         false,
@@ -303,12 +391,14 @@ export class BotController {
     }
 
     if (isRegisterCommand) {
+      this.clearPendingYaReference(chatId);
+      this.clearPendingRegistration(chatId);
       await this.sendOrdersForRegistration(chatId);
       return { ok: true };
     }
 
     if (awaitingReference) {
-      this.pendingYaReferences.delete(chatId);
+      this.clearPendingYaReference(chatId);
       await this.sendTrackInfo(text, chatId, text);
       return { ok: true };
     }

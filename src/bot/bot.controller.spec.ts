@@ -253,6 +253,63 @@ describe('BotController', () => {
     );
   });
 
+  it('should expire an unanswered YA prompt after 10 minutes', async () => {
+    jest.useFakeTimers();
+
+    try {
+      await controller.handleWebhook({
+        ...baseUpdate,
+        message: {
+          ...baseUpdate.message!,
+          text: '/ya',
+          entities: [yaCommandEntity],
+        },
+      });
+      jest.clearAllMocks();
+
+      jest.advanceTimersByTime(10 * 60 * 1000);
+
+      expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+        expect.stringContaining('Ожидание кода заказа истекло'),
+        false,
+        '123',
+      );
+      jest.clearAllMocks();
+
+      await controller.handleWebhook(baseUpdate);
+
+      expect(yaService.findTrackByOrderReference).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('should cancel the YA expiry notice once the reference is received', async () => {
+    jest.useFakeTimers();
+
+    try {
+      await controller.handleWebhook({
+        ...baseUpdate,
+        message: {
+          ...baseUpdate.message!,
+          text: '/ya',
+          entities: [yaCommandEntity],
+        },
+      });
+      jest
+        .spyOn(yaService, 'findTrackByOrderReference')
+        .mockRejectedValue(new Error('not found'));
+
+      await controller.handleWebhook(baseUpdate);
+      jest.clearAllMocks();
+      jest.advanceTimersByTime(10 * 60 * 1000);
+
+      expect(botService.sendEmployeeMessage).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   const registerCommandEntity: TelegramMessageEntity = {
     offset: 0,
     length: '/register'.length,
@@ -279,6 +336,109 @@ describe('BotController', () => {
       carrier: 'dpd' as const,
     },
   ];
+
+  it('should replace a YA prompt with registration', async () => {
+    jest.useFakeTimers();
+
+    try {
+      jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
+        orders: registrationCandidates,
+        yaSourcePlatformIds: {},
+        fivePostSenderLocation: undefined,
+        dpdSourceTerminalIds: {},
+      });
+      jest.spyOn(appService, 'createYaOrder').mockResolvedValue({
+        ok: true,
+        data: { sharing_url: 'https://dostavka.yandex.ru/route/EXAMPLE' },
+      });
+
+      await controller.handleWebhook({
+        ...baseUpdate,
+        message: {
+          ...baseUpdate.message!,
+          text: '/ya',
+          entities: [yaCommandEntity],
+        },
+      });
+      await controller.handleWebhook({
+        ...baseUpdate,
+        message: {
+          ...baseUpdate.message!,
+          text: '/register',
+          entities: [registerCommandEntity],
+        },
+      });
+      jest.clearAllMocks();
+
+      await controller.handleWebhook({
+        ...baseUpdate,
+        message: { ...baseUpdate.message!, text: '1' },
+      });
+
+      expect(yaService.findTrackByOrderReference).not.toHaveBeenCalled();
+      expect(appService.createYaOrder).toHaveBeenCalledWith(
+        { orderId: '101' },
+        {},
+      );
+      jest.clearAllMocks();
+      jest.advanceTimersByTime(10 * 60 * 1000);
+      expect(botService.sendEmployeeMessage).not.toHaveBeenCalledWith(
+        expect.stringContaining('Ожидание кода заказа истекло'),
+        false,
+        '123',
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('should replace registration with a YA prompt', async () => {
+    jest.useFakeTimers();
+
+    try {
+      jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
+        orders: registrationCandidates,
+        yaSourcePlatformIds: {},
+        fivePostSenderLocation: undefined,
+        dpdSourceTerminalIds: {},
+      });
+      jest.spyOn(yaService, 'findTrackByOrderReference').mockResolvedValue({
+        reference: '0001',
+        requestId: 'req-1',
+        trackNumber: 'TRACK-0001',
+        sharingUrl: undefined,
+        status: YaParcelStatus.CREATED,
+      });
+
+      await controller.handleWebhook({
+        ...baseUpdate,
+        message: {
+          ...baseUpdate.message!,
+          text: '/register',
+          entities: [registerCommandEntity],
+        },
+      });
+      await controller.handleWebhook({
+        ...baseUpdate,
+        message: {
+          ...baseUpdate.message!,
+          text: '/ya',
+          entities: [yaCommandEntity],
+        },
+      });
+      jest.clearAllMocks();
+
+      await controller.handleWebhook(baseUpdate);
+
+      expect(yaService.findTrackByOrderReference).toHaveBeenCalledWith('0001');
+      expect(appService.createYaOrder).not.toHaveBeenCalled();
+      jest.clearAllMocks();
+      jest.advanceTimersByTime(10 * 60 * 1000);
+      expect(botService.sendEmployeeMessage).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 
   it('should list orders available for registration on /register', async () => {
     jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
@@ -446,6 +606,146 @@ describe('BotController', () => {
       false,
       '123',
     );
+  });
+
+  it('should re-offer the remaining list after a single successful registration', async () => {
+    jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
+      orders: registrationCandidates,
+      yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
+      fivePostSenderLocation: 'loc-1',
+      dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
+    });
+    jest.spyOn(appService, 'createYaOrder').mockResolvedValue({
+      ok: true,
+      data: { sharing_url: 'https://dostavka.yandex.ru/route/EXAMPLE' },
+    });
+    jest.spyOn(appService, 'createFivePostOrder').mockResolvedValue({
+      ok: true,
+      data: { track: 'TRACK-1' },
+    });
+
+    await controller.handleWebhook({
+      ...baseUpdate,
+      message: {
+        ...baseUpdate.message!,
+        text: '/register',
+        entities: [registerCommandEntity],
+      },
+    });
+    jest.clearAllMocks();
+
+    await controller.handleWebhook({
+      ...baseUpdate,
+      message: { ...baseUpdate.message!, text: '1' },
+    });
+
+    // Список пересчитан заново: BFWGPFSMQ выбыл, номера 1/2 указывают на 5Post и DPD.
+    expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Выберите следующий заказ'),
+      false,
+      '123',
+    );
+    expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+      expect.not.stringContaining('BFWGPFSMQ'),
+      false,
+      '123',
+    );
+    jest.clearAllMocks();
+
+    await controller.handleWebhook({
+      ...baseUpdate,
+      message: { ...baseUpdate.message!, text: '1' },
+    });
+
+    expect(appService.createFivePostOrder).toHaveBeenCalledWith(
+      { orderId: '102' },
+      'loc-1',
+    );
+  });
+
+  it('should clear the session once every order has been processed', async () => {
+    jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
+      orders: [registrationCandidates[0]],
+      yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
+      fivePostSenderLocation: 'loc-1',
+      dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
+    });
+    jest.spyOn(appService, 'createYaOrder').mockResolvedValue({
+      ok: true,
+      data: { sharing_url: 'https://dostavka.yandex.ru/route/EXAMPLE' },
+    });
+
+    await controller.handleWebhook({
+      ...baseUpdate,
+      message: {
+        ...baseUpdate.message!,
+        text: '/register',
+        entities: [registerCommandEntity],
+      },
+    });
+    jest.clearAllMocks();
+
+    await controller.handleWebhook({
+      ...baseUpdate,
+      message: { ...baseUpdate.message!, text: '1' },
+    });
+
+    expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Все заказы из списка обработаны'),
+      false,
+      '123',
+    );
+    jest.clearAllMocks();
+
+    // Сессии больше нет — число трактуется как обычное необработанное сообщение.
+    await controller.handleWebhook({
+      ...baseUpdate,
+      message: { ...baseUpdate.message!, text: '1' },
+    });
+
+    expect(appService.createYaOrder).not.toHaveBeenCalled();
+    expect(botService.sendEmployeeMessage).not.toHaveBeenCalled();
+  });
+
+  it('should expire the registration session after 10 minutes of inactivity', async () => {
+    jest.useFakeTimers();
+
+    try {
+      jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
+        orders: registrationCandidates,
+        yaSourcePlatformIds: {},
+        fivePostSenderLocation: undefined,
+        dpdSourceTerminalIds: {},
+      });
+
+      await controller.handleWebhook({
+        ...baseUpdate,
+        message: {
+          ...baseUpdate.message!,
+          text: '/register',
+          entities: [registerCommandEntity],
+        },
+      });
+      jest.clearAllMocks();
+
+      jest.advanceTimersByTime(10 * 60 * 1000);
+
+      expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
+        expect.stringContaining('истекла'),
+        false,
+        '123',
+      );
+      jest.clearAllMocks();
+
+      await controller.handleWebhook({
+        ...baseUpdate,
+        message: { ...baseUpdate.message!, text: '1' },
+      });
+
+      expect(appService.createYaOrder).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('should register all candidates sequentially when "0" is selected', async () => {
