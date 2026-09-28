@@ -70,6 +70,40 @@ describe('BotController', () => {
     },
   };
 
+  const groupUpdate = (
+    text: string,
+    replyMessageId?: number,
+    entities?: TelegramMessageEntity[],
+  ): TelegramUpdate => ({
+    ...baseUpdate,
+    message: {
+      ...baseUpdate.message!,
+      chat: { id: -100, type: 'supergroup' },
+      text,
+      reply_to_message:
+        replyMessageId === undefined
+          ? undefined
+          : { message_id: replyMessageId },
+      entities,
+    },
+  });
+
+  const sentMessage = (messageId: number) => ({
+    ok: true as const,
+    result: {
+      message_id: messageId,
+      from: {
+        id: 9,
+        is_bot: true,
+        first_name: 'Bot',
+        username: 'ShopHelperBot',
+      },
+      chat: { id: -100, title: 'Managers', type: 'supergroup' },
+      date: 0,
+      text: 'list',
+    },
+  });
+
   const yaCommandEntity: TelegramMessageEntity = {
     offset: 0,
     length: 3,
@@ -171,6 +205,36 @@ describe('BotController', () => {
       false,
       '123',
     );
+  });
+
+  it('should accept a group YA reference only as a reply to the bot prompt', async () => {
+    jest
+      .mocked(botService.sendEmployeeMessage)
+      .mockResolvedValue(sentMessage(77));
+    jest.spyOn(yaService, 'findTrackByOrderReference').mockResolvedValue({
+      reference: '0001',
+      requestId: 'req-1',
+      trackNumber: 'TRACK-0001',
+      sharingUrl: undefined,
+      status: YaParcelStatus.CREATED,
+    });
+
+    await controller.handleWebhook(groupUpdate('ya'));
+    expect(botService.sendEmployeeMessage).not.toHaveBeenCalled();
+
+    await controller.handleWebhook(
+      groupUpdate('/ya', undefined, [yaCommandEntity]),
+    );
+    jest.clearAllMocks();
+    await controller.handleWebhook(groupUpdate('0001'));
+    await controller.handleWebhook(groupUpdate('0001', 76));
+
+    expect(yaService.findTrackByOrderReference).not.toHaveBeenCalled();
+    expect(botService.sendEmployeeMessage).not.toHaveBeenCalled();
+
+    await controller.handleWebhook(groupUpdate('0001', 77));
+
+    expect(yaService.findTrackByOrderReference).toHaveBeenCalledWith('0001');
   });
 
   it('should use next message as reference after prompt', async () => {
@@ -336,6 +400,53 @@ describe('BotController', () => {
       carrier: 'dpd' as const,
     },
   ];
+
+  it('should accept a group order number only as a reply to the current list', async () => {
+    let nextMessageId = 77;
+    jest
+      .mocked(botService.sendEmployeeMessage)
+      .mockImplementation(async () => sentMessage(nextMessageId++));
+    jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
+      orders: registrationCandidates,
+      yaSourcePlatformIds: {},
+      fivePostSenderLocation: 'loc-1',
+      dpdSourceTerminalIds: {},
+    });
+    jest.spyOn(appService, 'createYaOrder').mockResolvedValue({
+      ok: true,
+      data: { sharing_url: 'https://dostavka.yandex.ru/route/EXAMPLE' },
+    });
+    jest.spyOn(appService, 'createFivePostOrder').mockResolvedValue({
+      ok: true,
+      data: { track: 'TRACK-1' },
+    });
+
+    await controller.handleWebhook(
+      groupUpdate('/register', undefined, [registerCommandEntity]),
+    );
+    jest.clearAllMocks();
+
+    await controller.handleWebhook(groupUpdate('1'));
+    await controller.handleWebhook(groupUpdate('0', 76));
+    await controller.handleWebhook(groupUpdate('hello', 77));
+
+    expect(appService.createYaOrder).not.toHaveBeenCalled();
+    expect(botService.sendEmployeeMessage).not.toHaveBeenCalled();
+
+    await controller.handleWebhook(groupUpdate('1', 77));
+    expect(appService.createYaOrder).toHaveBeenCalledTimes(1);
+    expect(shopService.getOrdersForBotRegistration).toHaveBeenCalledTimes(1);
+    jest.clearAllMocks();
+
+    await controller.handleWebhook(groupUpdate('2', 77));
+    expect(appService.createFivePostOrder).not.toHaveBeenCalled();
+
+    await controller.handleWebhook(groupUpdate('2', 79));
+    expect(appService.createFivePostOrder).toHaveBeenCalledWith(
+      { orderId: '102' },
+      'loc-1',
+    );
+  });
 
   it('should replace a YA prompt with registration', async () => {
     jest.useFakeTimers();

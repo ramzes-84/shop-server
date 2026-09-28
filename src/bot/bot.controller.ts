@@ -30,6 +30,12 @@ type PendingRegistrationData = {
 
 type PendingRegistration = PendingRegistrationData & {
   timeout: NodeJS.Timeout;
+  listMessageId?: number;
+};
+
+type PendingYaReference = {
+  timeout: NodeJS.Timeout;
+  promptMessageId?: number;
 };
 
 @Controller('bot')
@@ -41,7 +47,7 @@ export class BotController {
     private readonly appService: AppService,
   ) {}
 
-  private readonly pendingYaReferences = new Map<string, NodeJS.Timeout>();
+  private readonly pendingYaReferences = new Map<string, PendingYaReference>();
   // Список кандидатов на регистрацию по chatId, без персистентности между рестартами.
   // Сессия живёт REGISTRATION_SESSION_TTL_MS от последнего ответа менеджера, потом сгорает сама.
   private readonly pendingRegistrations = new Map<
@@ -49,7 +55,7 @@ export class BotController {
     PendingRegistration
   >();
 
-  private setPendingYaReference(chatId: string) {
+  private setPendingYaReference(chatId: string, promptMessageId?: number) {
     this.clearPendingYaReference(chatId);
 
     const timeout = setTimeout(() => {
@@ -62,14 +68,14 @@ export class BotController {
     }, YA_SESSION_TTL_MS);
     timeout.unref();
 
-    this.pendingYaReferences.set(chatId, timeout);
+    this.pendingYaReferences.set(chatId, { timeout, promptMessageId });
   }
 
   private clearPendingYaReference(chatId: string) {
-    const timeout = this.pendingYaReferences.get(chatId);
+    const pending = this.pendingYaReferences.get(chatId);
 
-    if (timeout) {
-      clearTimeout(timeout);
+    if (pending) {
+      clearTimeout(pending.timeout);
       this.pendingYaReferences.delete(chatId);
     }
   }
@@ -77,6 +83,7 @@ export class BotController {
   private setPendingRegistration(
     chatId: string,
     data: PendingRegistrationData,
+    listMessageId?: number,
   ) {
     this.clearPendingRegistration(chatId);
 
@@ -91,7 +98,7 @@ export class BotController {
     // Не держит процесс живым ради самого себя — таймер лишь чистит память чата.
     timeout.unref();
 
-    this.pendingRegistrations.set(chatId, { ...data, timeout });
+    this.pendingRegistrations.set(chatId, { ...data, timeout, listMessageId });
   }
 
   private clearPendingRegistration(chatId: string) {
@@ -151,7 +158,7 @@ export class BotController {
     return [`${REGISTER_ALL_CODE}. Зарегистрировать всё`, ...lines].join('\n');
   }
 
-  private async sendOrdersForRegistration(chatId: string) {
+  private async sendOrdersForRegistration(chatId: string, isGroup: boolean) {
     try {
       const {
         orders,
@@ -177,12 +184,27 @@ export class BotController {
         return;
       }
 
-      this.setPendingRegistration(chatId, {
+      const data = {
         candidates,
         yaSourcePlatformIds,
         fivePostSenderLocation,
         dpdSourceTerminalIds,
-      });
+      };
+
+      if (isGroup) {
+        const sent = await this.botService.sendEmployeeMessage(
+          `Выберите номер заказа для регистрации:\n${this.buildRegistrationList(candidates)}`,
+          false,
+          chatId,
+        );
+
+        if (sent?.ok) {
+          this.setPendingRegistration(chatId, data, sent.result.message_id);
+        }
+        return;
+      }
+
+      this.setPendingRegistration(chatId, data);
 
       await this.botService.sendEmployeeMessage(
         `Выберите номер заказа для регистрации:\n${this.buildRegistrationList(candidates)}`,
@@ -253,7 +275,11 @@ export class BotController {
     );
   }
 
-  private async registerSelectedOrder(chatId: string, text: string) {
+  private async registerSelectedOrder(
+    chatId: string,
+    text: string,
+    isGroup: boolean,
+  ) {
     const pending = this.pendingRegistrations.get(chatId);
 
     if (!pending) {
@@ -299,7 +325,7 @@ export class BotController {
       );
     }
 
-    await this.sendOrdersForRegistration(chatId);
+    await this.sendOrdersForRegistration(chatId, isGroup);
   }
 
   private extractBotCommand(message: TelegramMessage): BotCommandInfo | null {
@@ -350,39 +376,70 @@ export class BotController {
       (!!botCommand &&
         botCommand.command === YA_COMMAND &&
         !botCommand.hasTrailingText) ||
-      (!botCommand && YA_COMMAND_ONLY_RE.test(text));
+      (message.chat.type === 'private' &&
+        !botCommand &&
+        YA_COMMAND_ONLY_RE.test(text));
     const isRegisterCommand =
       (!!botCommand &&
         botCommand.command === REGISTER_COMMAND &&
         !botCommand.hasTrailingText) ||
-      (!botCommand && REGISTER_COMMAND_ONLY_RE.test(text));
+      (message.chat.type === 'private' &&
+        !botCommand &&
+        REGISTER_COMMAND_ONLY_RE.test(text));
 
     if (isYaPromptCommand) {
       this.clearPendingRegistration(chatId);
-      this.setPendingYaReference(chatId);
-      await this.botService.sendEmployeeMessage(
+      if (message.chat.type === 'private') {
+        this.setPendingYaReference(chatId);
+      }
+      const sent = await this.botService.sendEmployeeMessage(
         'Введите код заказа, и я найду информацию.',
         false,
         chatId,
       );
+      if (message.chat.type !== 'private' && sent?.ok) {
+        this.setPendingYaReference(chatId, sent.result.message_id);
+      }
       return { ok: true };
     }
 
     if (isRegisterCommand) {
       this.clearPendingYaReference(chatId);
       this.clearPendingRegistration(chatId);
-      await this.sendOrdersForRegistration(chatId);
+      await this.sendOrdersForRegistration(
+        chatId,
+        message.chat.type !== 'private',
+      );
       return { ok: true };
     }
 
     if (awaitingReference) {
+      if (
+        message.chat.type !== 'private' &&
+        message.reply_to_message?.message_id !==
+          this.pendingYaReferences.get(chatId)?.promptMessageId
+      ) {
+        return { ok: true };
+      }
       this.clearPendingYaReference(chatId);
       await this.sendTrackInfo(text, chatId, text);
       return { ok: true };
     }
 
     if (awaitingRegistration) {
-      await this.registerSelectedOrder(chatId, text);
+      if (
+        message.chat.type !== 'private' &&
+        (message.reply_to_message?.message_id !==
+          this.pendingRegistrations.get(chatId)?.listMessageId ||
+          !/^\d+$/.test(text))
+      ) {
+        return { ok: true };
+      }
+      await this.registerSelectedOrder(
+        chatId,
+        text,
+        message.chat.type !== 'private',
+      );
       return { ok: true };
     }
 
