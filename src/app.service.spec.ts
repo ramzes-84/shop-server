@@ -731,6 +731,68 @@ describe('AppService', () => {
       expect(shopService.updateOrderCarrierTracking).not.toHaveBeenCalled();
     });
 
+    it('warns the employee to check DPD manually instead of retrying when the order is a duplicate', async () => {
+      const basicInfo = buildBasicOrderInfo();
+      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
+      jest
+        .spyOn(shopService, 'getOrderCarrierInfo')
+        .mockResolvedValue(shippingDetails.order_carriers[0]);
+      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(5);
+      jest
+        .spyOn(shopService, 'getOrderMessages')
+        .mockResolvedValue(orderMessages);
+      findPointIdMock.mockReturnValue('destination-terminal');
+      convertOrderToDpdMock.mockReturnValue({
+        header: {} as any,
+        order: [{} as any],
+      });
+      dpdService.createOrder.mockResolvedValue({ status: 'OrderDuplicate' });
+
+      await expect(
+        service.createDpdOrder({ orderId: '1' }, dpdSourceTerminalIds),
+      ).resolves.toEqual({
+        ok: false,
+        data: {
+          message: expect.stringContaining(
+            `DPD сообщает, что заказ ${basicInfo.orderDetails.reference} уже зарегистрирован`,
+          ),
+        },
+      });
+      expect(shopService.updateOrderCarrierTracking).not.toHaveBeenCalled();
+    });
+
+    it('shows a safe message and suggests checking DPD manually when the connection is aborted mid-request', async () => {
+      const basicInfo = buildBasicOrderInfo();
+      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
+      jest
+        .spyOn(shopService, 'getOrderCarrierInfo')
+        .mockResolvedValue(shippingDetails.order_carriers[0]);
+      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(5);
+      jest
+        .spyOn(shopService, 'getOrderMessages')
+        .mockResolvedValue(orderMessages);
+      findPointIdMock.mockReturnValue('destination-terminal');
+      convertOrderToDpdMock.mockReturnValue({
+        header: {} as any,
+        order: [{} as any],
+      });
+      const axiosError = new Error('stream has been aborted');
+      axiosError.name = 'AxiosError';
+      dpdService.createOrder.mockRejectedValue(axiosError);
+
+      await expect(
+        service.createDpdOrder({ orderId: '1' }, dpdSourceTerminalIds),
+      ).resolves.toEqual({
+        ok: false,
+        data: {
+          message: expect.stringContaining(
+            `проверьте заказ ${basicInfo.orderDetails.reference} в личном кабинете DPD`,
+          ),
+        },
+      });
+      expect(shopService.updateOrderCarrierTracking).not.toHaveBeenCalled();
+    });
+
     it('returns a failure when no DPD pickup point is found in the order messages', async () => {
       const basicInfo = buildBasicOrderInfo();
       jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);

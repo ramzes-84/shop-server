@@ -15,6 +15,7 @@ import { convertOrderShopToCash } from './utils/convert-order-shop-to-cash';
 import { generateCashInvoiceMessage } from './utils/messages';
 import { BotService } from './bot/bot.service';
 import { DpdService } from './dpd/dpd.service';
+import { CreatingOrderRequest, DpdOrderResult } from './dpd/dto/dpd.dto';
 import {
   Cargos,
   RevisingOrderData,
@@ -430,14 +431,26 @@ export class AppService {
         sourceTerminalId,
       );
 
-      const createdOrder = await this.dpdService.createOrder({
-        auth: {
-          clientNumber: +this.dpdService.clientNumber,
-          clientKey: this.dpdService.token,
+      const createdOrder = await this.createDpdOrderSafely(
+        {
+          auth: {
+            clientNumber: +this.dpdService.clientNumber,
+            clientKey: this.dpdService.token,
+          },
+          header,
+          order,
         },
-        header,
-        order,
-      });
+        orderDetails.reference,
+      );
+
+      if (createdOrder.status === 'OrderDuplicate') {
+        return {
+          ok: false,
+          data: {
+            message: `DPD сообщает, что заказ ${orderDetails.reference} уже зарегистрирован — возможно, из-за прерванного соединения при предыдущей попытке. Найдите трек-номер в личном кабинете DPD по этому номеру заказа и впишите его вручную — повторная регистрация создаст дубль.`,
+          },
+        };
+      }
 
       if (
         createdOrder.status !== 'OK' &&
@@ -487,6 +500,41 @@ export class AppService {
     } catch (error) {
       return this.failure('createDpdOrder', error, { orderId });
     }
+  }
+
+  /**
+   * SOAP-вызов createOrder2 иногда прерывается сетью до получения ответа (axios
+   * "stream has been aborted") — DPD при этом мог уже создать заказ. Глухая повторная
+   * попытка рискует создать дубль, поэтому в этом случае сотрудник должен увидеть явное
+   * предупреждение, а не сырую ошибку axios.
+   */
+  private async createDpdOrderSafely(
+    request: CreatingOrderRequest,
+    reference: string,
+  ): Promise<DpdOrderResult> {
+    try {
+      return await this.dpdService.createOrder(request);
+    } catch (error) {
+      if (this.isTransientNetworkError(error)) {
+        throw new Error(
+          `Соединение с DPD прервалось, не дождавшись подтверждения. Отправка могла всё же зарегистрироваться — проверьте заказ ${reference} в личном кабинете DPD, прежде чем повторять попытку.`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  private isTransientNetworkError(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+
+    return (
+      error.name === 'AxiosError' ||
+      /stream has been aborted|ECONNRESET|ECONNABORTED|socket hang up|EPIPE/i.test(
+        error.message,
+      )
+    );
   }
 
   async getYaOrderHistory(id: string) {

@@ -18,6 +18,12 @@ export class DpdService {
   createEndpoint = ServicesUrl.DPD + 'order2?wsdl';
   clientNumber = process.env.DPD_CLIENT!;
 
+  // createOrder2 обрабатывает адрес и формирует данные для чека (54-ФЗ) — заметно
+  // дольше, чем чтение статусов. При стандартном таймауте (10 с) соединение иногда
+  // рвётся до получения ответа (axios "stream has been aborted"), хотя DPD успевает
+  // создать заказ — сотрудник получает ошибку про несуществующую отправку.
+  private readonly createOrderTimeoutMs = 30_000;
+
   async getStatesByDPDOrder(dpdOrderNr: string): Promise<DpdStatesResDTO> {
     const args: DpdRequestDTO<TrackingRequest> = {
       request: {
@@ -60,7 +66,7 @@ export class DpdService {
     return new Promise((resolve, reject) => {
       soap.createClient(
         this.createEndpoint,
-        { wsdl_options: { timeout: EXTERNAL_REQUEST_TIMEOUT_MS } },
+        { wsdl_options: { timeout: this.createOrderTimeoutMs } },
         (err, client) => {
           if (err) {
             return reject(err);
@@ -78,7 +84,7 @@ export class DpdService {
                 : [result.return];
               resolve(results[0]);
             },
-            { timeout: EXTERNAL_REQUEST_TIMEOUT_MS },
+            { timeout: this.createOrderTimeoutMs },
           );
         },
       );
