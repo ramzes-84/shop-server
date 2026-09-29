@@ -146,6 +146,7 @@ describe('AppService', () => {
           provide: DpdService,
           useValue: {
             createOrder: jest.fn(),
+            getOrderStatus: jest.fn(),
             getStatesByDPDOrder: jest.fn(),
             clientNumber: '1000000000',
             token: 'dpd-secret',
@@ -761,7 +762,7 @@ describe('AppService', () => {
       expect(shopService.updateOrderCarrierTracking).not.toHaveBeenCalled();
     });
 
-    it('shows a safe message and suggests checking DPD manually when the connection is aborted mid-request', async () => {
+    it('shows a safe message and suggests checking DPD manually when reconciliation also fails', async () => {
       const basicInfo = buildBasicOrderInfo();
       jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
       jest
@@ -779,6 +780,7 @@ describe('AppService', () => {
       const axiosError = new Error('stream has been aborted');
       axiosError.name = 'AxiosError';
       dpdService.createOrder.mockRejectedValue(axiosError);
+      dpdService.getOrderStatus.mockRejectedValue(new Error('no-data-found'));
 
       await expect(
         service.createDpdOrder({ orderId: '1' }, dpdSourceTerminalIds),
@@ -791,6 +793,107 @@ describe('AppService', () => {
         },
       });
       expect(shopService.updateOrderCarrierTracking).not.toHaveBeenCalled();
+    });
+
+    it('recovers the track number via getOrderStatus when DPD created the order despite the aborted connection', async () => {
+      const basicInfo = buildBasicOrderInfo();
+      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
+      jest
+        .spyOn(shopService, 'getOrderCarrierInfo')
+        .mockResolvedValue(shippingDetails.order_carriers[0]);
+      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(5);
+      jest
+        .spyOn(shopService, 'getOrderMessages')
+        .mockResolvedValue(orderMessages);
+      findPointIdMock.mockReturnValue('destination-terminal');
+      convertOrderToDpdMock.mockReturnValue({
+        header: {} as any,
+        order: [{} as any],
+      });
+      const axiosError = new Error('stream has been aborted');
+      axiosError.name = 'AxiosError';
+      dpdService.createOrder.mockRejectedValueOnce(axiosError);
+      dpdService.getOrderStatus.mockResolvedValue([
+        {
+          orderNumberInternal: 'TESTREFERENCE',
+          orderNum: '01010001MOW',
+          status: 'OK',
+        },
+      ]);
+
+      await expect(
+        service.createDpdOrder({ orderId: '1' }, dpdSourceTerminalIds),
+      ).resolves.toEqual({
+        ok: true,
+        data: { track: '01010001MOW', status: 'OK', message: undefined },
+      });
+      expect(dpdService.createOrder).toHaveBeenCalledTimes(1);
+      expect(shopService.updateOrderCarrierTracking).toHaveBeenCalledWith(
+        shippingDetails.order_carriers[0],
+        '01010001MOW',
+      );
+    });
+
+    it('safely retries createOrder once when getOrderStatus confirms DPD never received it', async () => {
+      const basicInfo = buildBasicOrderInfo();
+      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
+      jest
+        .spyOn(shopService, 'getOrderCarrierInfo')
+        .mockResolvedValue(shippingDetails.order_carriers[0]);
+      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(5);
+      jest
+        .spyOn(shopService, 'getOrderMessages')
+        .mockResolvedValue(orderMessages);
+      findPointIdMock.mockReturnValue('destination-terminal');
+      convertOrderToDpdMock.mockReturnValue({
+        header: {} as any,
+        order: [{} as any],
+      });
+      const axiosError = new Error('stream has been aborted');
+      axiosError.name = 'AxiosError';
+      dpdService.createOrder
+        .mockRejectedValueOnce(axiosError)
+        .mockResolvedValueOnce({ orderNum: '01010001MOW', status: 'OK' });
+      dpdService.getOrderStatus.mockResolvedValue([]);
+
+      await expect(
+        service.createDpdOrder({ orderId: '1' }, dpdSourceTerminalIds),
+      ).resolves.toEqual({
+        ok: true,
+        data: { track: '01010001MOW', status: 'OK', message: undefined },
+      });
+      expect(dpdService.createOrder).toHaveBeenCalledTimes(2);
+    });
+
+    it('shows a distinct message when the safe retry also aborts', async () => {
+      const basicInfo = buildBasicOrderInfo();
+      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
+      jest
+        .spyOn(shopService, 'getOrderCarrierInfo')
+        .mockResolvedValue(shippingDetails.order_carriers[0]);
+      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(5);
+      jest
+        .spyOn(shopService, 'getOrderMessages')
+        .mockResolvedValue(orderMessages);
+      findPointIdMock.mockReturnValue('destination-terminal');
+      convertOrderToDpdMock.mockReturnValue({
+        header: {} as any,
+        order: [{} as any],
+      });
+      const axiosError = new Error('stream has been aborted');
+      axiosError.name = 'AxiosError';
+      dpdService.createOrder.mockRejectedValue(axiosError);
+      dpdService.getOrderStatus.mockResolvedValue([]);
+
+      await expect(
+        service.createDpdOrder({ orderId: '1' }, dpdSourceTerminalIds),
+      ).resolves.toEqual({
+        ok: false,
+        data: {
+          message: expect.stringContaining('прервалось дважды подряд'),
+        },
+      });
+      expect(dpdService.createOrder).toHaveBeenCalledTimes(2);
     });
 
     it('returns a failure when no DPD pickup point is found in the order messages', async () => {

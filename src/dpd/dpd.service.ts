@@ -90,4 +90,58 @@ export class DpdService {
       );
     });
   }
+
+  /**
+   * Сверка после обрыва соединения при createOrder2: сама документация DPD рекомендует
+   * getOrderStatus по orderNumberInternal, чтобы узнать, успел ли заказ создаться, не
+   * дожидаясь ответа исходного запроса (раздел "Delivery order creation" в руководстве).
+   * Возвращает пустой массив, если DPD не находит такой заказ (значит, исходный запрос
+   * не дошёл и создание можно безопасно повторить).
+   */
+  async getOrderStatus(
+    orderNumberInternal: string,
+    datePickup?: string,
+  ): Promise<DpdOrderResult[]> {
+    return new Promise((resolve, reject) => {
+      soap.createClient(
+        this.createEndpoint,
+        { wsdl_options: { timeout: this.createOrderTimeoutMs } },
+        (err, client) => {
+          if (err) {
+            return reject(err);
+          }
+
+          client.getOrderStatus(
+            {
+              orderStatus: {
+                auth: {
+                  clientNumber: +this.clientNumber,
+                  clientKey: this.token,
+                },
+                order: [
+                  {
+                    orderNumberInternal,
+                    ...(datePickup ? { datePickup } : {}),
+                  },
+                ],
+              },
+            },
+            (err: unknown, result: DpdCreationResDTO) => {
+              if (err) {
+                return reject(err);
+              }
+
+              const results = Array.isArray(result.return)
+                ? result.return
+                : result.return
+                  ? [result.return]
+                  : [];
+              resolve(results);
+            },
+            { timeout: this.createOrderTimeoutMs },
+          );
+        },
+      );
+    });
+  }
 }

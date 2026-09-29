@@ -504,9 +504,11 @@ export class AppService {
 
   /**
    * SOAP-вызов createOrder2 иногда прерывается сетью до получения ответа (axios
-   * "stream has been aborted") — DPD при этом мог уже создать заказ. Глухая повторная
-   * попытка рискует создать дубль, поэтому в этом случае сотрудник должен увидеть явное
-   * предупреждение, а не сырую ошибку axios.
+   * "stream has been aborted"), причём независимо от размера таймаута — обрыв происходит
+   * на уровне соединения, а не по истечении времени ожидания. DPD при этом мог уже создать
+   * заказ, поэтому вместо немедленной сдачи сверяемся через getOrderStatus (см. документацию
+   * DPD, раздел "Delivery order creation") — это официальный способ узнать судьбу заказа,
+   * не создавая дубль повторной отправкой createOrder2.
    */
   private async createDpdOrderSafely(
     request: CreatingOrderRequest,
@@ -515,12 +517,37 @@ export class AppService {
     try {
       return await this.dpdService.createOrder(request);
     } catch (error) {
-      if (this.isTransientNetworkError(error)) {
+      if (!this.isTransientNetworkError(error)) {
+        throw error;
+      }
+
+      const reconciled = await this.dpdService
+        .getOrderStatus(reference, request.header.datePickup)
+        .catch(() => undefined);
+
+      if (reconciled === undefined) {
+        // Сверка тоже не удалась — не знаем, создан ли заказ, повторять запрос небезопасно.
         throw new Error(
           `Соединение с DPD прервалось, не дождавшись подтверждения. Отправка могла всё же зарегистрироваться — проверьте заказ ${reference} в личном кабинете DPD, прежде чем повторять попытку.`,
         );
       }
-      throw error;
+
+      if (reconciled.length > 0) {
+        // DPD знает про этот заказ — значит, прерванный запрос всё же дошёл до создания.
+        return reconciled[0];
+      }
+
+      // DPD не находит заказ — исходный запрос не дошёл, повтор безопасен.
+      try {
+        return await this.dpdService.createOrder(request);
+      } catch (retryError) {
+        if (this.isTransientNetworkError(retryError)) {
+          throw new Error(
+            `Соединение с DPD прервалось дважды подряд, не дождавшись подтверждения. Проверьте заказ ${reference} в личном кабинете DPD вручную.`,
+          );
+        }
+        throw retryError;
+      }
     }
   }
 
