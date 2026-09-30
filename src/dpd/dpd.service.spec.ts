@@ -1,4 +1,3 @@
-import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DpdService } from './dpd.service';
 import * as soap from 'soap';
@@ -146,7 +145,6 @@ describe('DpdService', () => {
       });
       expect(createClientMock).toHaveBeenCalledWith(
         service.orderWsdlPath,
-        { wsdl_options: { timeout: 30_000 } },
         expect.any(Function),
       );
     });
@@ -189,28 +187,15 @@ describe('DpdService', () => {
       );
     });
 
-    it('logs whether WSDL loading failed without exposing authentication', async () => {
-      const logSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
-      createClientMock.mockImplementation((_endpoint, _options, callback) => {
-        callback?.(new Error('socket hang up'), undefined as any);
+    it('reports a local WSDL failure without claiming the order was sent', async () => {
+      createClientMock.mockImplementation((_endpoint, options, callback) => {
+        const done = typeof options === 'function' ? options : callback;
+        done?.(new Error('socket hang up'), undefined as any);
       });
 
-      try {
-        await expect(service.createOrder(orderRequest)).rejects.toThrow(
-          'Запрос на регистрацию отправки не был отправлен',
-        );
-        const diagnostic = JSON.parse(logSpy.mock.calls[0][0] as string);
-        expect(diagnostic).toEqual(
-          expect.objectContaining({
-            operation: 'createOrder2',
-            phase: 'wsdl',
-            durationMs: expect.any(Number),
-          }),
-        );
-        expect(JSON.stringify(diagnostic)).not.toContain('secret');
-      } finally {
-        logSpy.mockRestore();
-      }
+      await expect(service.createOrder(orderRequest)).rejects.toThrow(
+        'Запрос на регистрацию отправки не был отправлен',
+      );
     });
   });
 
@@ -250,7 +235,6 @@ describe('DpdService', () => {
       ]);
       expect(createClientMock).toHaveBeenCalledWith(
         service.orderWsdlPath,
-        { wsdl_options: { timeout: 30_000 } },
         expect.any(Function),
       );
     });

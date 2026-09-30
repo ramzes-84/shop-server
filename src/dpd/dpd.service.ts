@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ServicesUrl } from 'src/types/services-url';
 import { join } from 'node:path';
 import * as soap from 'soap';
@@ -11,11 +11,9 @@ import {
   TrackingRequest,
 } from './dto/dpd.dto';
 import { EXTERNAL_REQUEST_TIMEOUT_MS } from 'src/common/fetch-with-timeout';
-import { getCurrentRequestId } from 'src/common/request-id.storage';
 
 @Injectable()
 export class DpdService {
-  private readonly logger = new Logger(DpdService.name);
   token = process.env.DPD_TOKEN!;
   trackingEndpoint = ServicesUrl.DPD + 'tracing1-1?wsdl';
   orderWsdlPath = join(__dirname, 'wsdl', 'order2.wsdl');
@@ -23,32 +21,6 @@ export class DpdService {
 
   // Схема локальная; SOAP-операции по-прежнему отправляются на адрес DPD из WSDL.
   private readonly createOrderTimeoutMs = 30_000;
-
-  private logOrderFailure(
-    operation: string,
-    phase: 'wsdl' | 'soap',
-    startedAt: number,
-    error: unknown,
-  ): void {
-    const failure = error as {
-      name?: string;
-      message?: string;
-      code?: string;
-      response?: { status?: number };
-    };
-    this.logger.error(
-      JSON.stringify({
-        requestId: getCurrentRequestId(),
-        operation,
-        phase,
-        durationMs: Date.now() - startedAt,
-        name: failure?.name,
-        message: failure?.message,
-        code: failure?.code,
-        status: failure?.response?.status,
-      }),
-    );
-  }
 
   async getStatesByDPDOrder(dpdOrderNr: string): Promise<DpdStatesResDTO> {
     const args: DpdRequestDTO<TrackingRequest> = {
@@ -84,49 +56,36 @@ export class DpdService {
   }
 
   /**
-   * Регистрирует отправку через createOrder2 (order2?wsdl). Внешний тег запроса — "orders",
+   * Регистрирует отправку через createOrder2 (локальный order2.wsdl). Внешний тег запроса — "orders",
    * ответ — "return": DPD объявляет его как maxOccurs="unbounded" даже для одного заказа в запросе,
    * а node-soap может развернуть массив из одного элемента в голый объект — нормализуем сами.
    */
   async createOrder(orders: CreatingOrderRequest): Promise<DpdOrderResult> {
     return new Promise((resolve, reject) => {
-      const wsdlStartedAt = Date.now();
-      soap.createClient(
-        this.orderWsdlPath,
-        { wsdl_options: { timeout: this.createOrderTimeoutMs } },
-        (err, client) => {
-          if (err) {
-            this.logOrderFailure('createOrder2', 'wsdl', wsdlStartedAt, err);
-            return reject(
-              new Error(
-                'Не удалось загрузить схему DPD. Запрос на регистрацию отправки не был отправлен; повторите попытку позже.',
-              ),
-            );
-          }
-
-          const soapStartedAt = Date.now();
-          client.createOrder2(
-            { orders },
-            (err: unknown, result: DpdCreationResDTO) => {
-              if (err) {
-                this.logOrderFailure(
-                  'createOrder2',
-                  'soap',
-                  soapStartedAt,
-                  err,
-                );
-                return reject(err);
-              }
-
-              const results = Array.isArray(result.return)
-                ? result.return
-                : [result.return];
-              resolve(results[0]);
-            },
-            { timeout: this.createOrderTimeoutMs },
+      soap.createClient(this.orderWsdlPath, (err, client) => {
+        if (err) {
+          return reject(
+            new Error(
+              'Не удалось загрузить локальную схему DPD. Запрос на регистрацию отправки не был отправлен — обратитесь к администратору.',
+            ),
           );
-        },
-      );
+        }
+
+        client.createOrder2(
+          { orders },
+          (err: unknown, result: DpdCreationResDTO) => {
+            if (err) {
+              return reject(err);
+            }
+
+            const results = Array.isArray(result.return)
+              ? result.return
+              : [result.return];
+            resolve(results[0]);
+          },
+          { timeout: this.createOrderTimeoutMs },
+        );
+      });
     });
   }
 
@@ -141,60 +100,47 @@ export class DpdService {
     datePickup?: string,
   ): Promise<DpdOrderResult[]> {
     return new Promise((resolve, reject) => {
-      const wsdlStartedAt = Date.now();
-      soap.createClient(
-        this.orderWsdlPath,
-        { wsdl_options: { timeout: this.createOrderTimeoutMs } },
-        (err, client) => {
-          if (err) {
-            this.logOrderFailure('getOrderStatus', 'wsdl', wsdlStartedAt, err);
-            return reject(err);
-          }
+      soap.createClient(this.orderWsdlPath, (err, client) => {
+        if (err) {
+          return reject(err);
+        }
 
-          const soapStartedAt = Date.now();
-          client.getOrderStatus(
-            {
-              orderStatus: {
-                auth: {
-                  clientNumber: +this.clientNumber,
-                  clientKey: this.token,
-                },
-                order: [
-                  {
-                    orderNumberInternal,
-                    ...(datePickup ? { datePickup } : {}),
-                  },
-                ],
+        client.getOrderStatus(
+          {
+            orderStatus: {
+              auth: {
+                clientNumber: +this.clientNumber,
+                clientKey: this.token,
               },
+              order: [
+                {
+                  orderNumberInternal,
+                  ...(datePickup ? { datePickup } : {}),
+                },
+              ],
             },
-            (err: unknown, result: DpdCreationResDTO) => {
-              if (err) {
-                if (
-                  err instanceof Error &&
-                  /\bno-data-found\b/i.test(err.message)
-                ) {
-                  return resolve([]);
-                }
-                this.logOrderFailure(
-                  'getOrderStatus',
-                  'soap',
-                  soapStartedAt,
-                  err,
-                );
-                return reject(err);
+          },
+          (err: unknown, result: DpdCreationResDTO) => {
+            if (err) {
+              if (
+                err instanceof Error &&
+                /\bno-data-found\b/i.test(err.message)
+              ) {
+                return resolve([]);
               }
+              return reject(err);
+            }
 
-              const results = Array.isArray(result.return)
-                ? result.return
-                : result.return
-                  ? [result.return]
-                  : [];
-              resolve(results);
-            },
-            { timeout: this.createOrderTimeoutMs },
-          );
-        },
-      );
+            const results = Array.isArray(result.return)
+              ? result.return
+              : result.return
+                ? [result.return]
+                : [];
+            resolve(results);
+          },
+          { timeout: this.createOrderTimeoutMs },
+        );
+      });
     });
   }
 }
