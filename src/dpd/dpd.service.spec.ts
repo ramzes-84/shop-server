@@ -130,7 +130,7 @@ describe('DpdService', () => {
       });
       expect(createClientMock).toHaveBeenCalledWith(
         service.createEndpoint,
-        { wsdl_options: { timeout: expect.any(Number) } },
+        { wsdl_options: { timeout: 45_000 } },
         expect.any(Function),
       );
     });
@@ -181,7 +181,7 @@ describe('DpdService', () => {
 
       try {
         await expect(service.createOrder(orderRequest)).rejects.toThrow(
-          'socket hang up',
+          'Запрос на регистрацию отправки не был отправлен',
         );
         const diagnostic = JSON.parse(logSpy.mock.calls[0][0] as string);
         expect(diagnostic).toEqual(
@@ -232,6 +232,11 @@ describe('DpdService', () => {
       expect(result).toEqual([
         { orderNumberInternal: 'REF-1', orderNum: '01010001MOW', status: 'OK' },
       ]);
+      expect(createClientMock).toHaveBeenCalledWith(
+        service.createEndpoint,
+        { wsdl_options: { timeout: 45_000 } },
+        expect.any(Function),
+      );
     });
 
     it('omits datePickup from the request when not provided', async () => {

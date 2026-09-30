@@ -762,6 +762,39 @@ describe('AppService', () => {
       expect(shopService.updateOrderCarrierTracking).not.toHaveBeenCalled();
     });
 
+    it('does not reconcile when the WSDL failed before sending the order', async () => {
+      const basicInfo = buildBasicOrderInfo();
+      jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
+      jest
+        .spyOn(shopService, 'getOrderCarrierInfo')
+        .mockResolvedValue(shippingDetails.order_carriers[0]);
+      jest.spyOn(shopService, 'getMessagesThread').mockResolvedValue(5);
+      jest
+        .spyOn(shopService, 'getOrderMessages')
+        .mockResolvedValue(orderMessages);
+      findPointIdMock.mockReturnValue('destination-terminal');
+      convertOrderToDpdMock.mockReturnValue({
+        header: {} as any,
+        order: [{} as any],
+      });
+      dpdService.createOrder.mockRejectedValue(
+        new Error(
+          'Не удалось загрузить схему DPD. Запрос на регистрацию отправки не был отправлен; повторите попытку позже.',
+        ),
+      );
+
+      await expect(
+        service.createDpdOrder({ orderId: '1' }, dpdSourceTerminalIds),
+      ).resolves.toEqual({
+        ok: false,
+        data: {
+          message: expect.stringContaining('не был отправлен'),
+        },
+      });
+      expect(dpdService.getOrderStatus).not.toHaveBeenCalled();
+      expect(shopService.updateOrderCarrierTracking).not.toHaveBeenCalled();
+    });
+
     it('shows a safe message and suggests checking DPD manually when reconciliation also fails', async () => {
       const basicInfo = buildBasicOrderInfo();
       jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);

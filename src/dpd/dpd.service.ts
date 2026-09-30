@@ -10,6 +10,7 @@ import {
   TrackingRequest,
 } from './dto/dpd.dto';
 import { EXTERNAL_REQUEST_TIMEOUT_MS } from 'src/common/fetch-with-timeout';
+import { getCurrentRequestId } from 'src/common/request-id.storage';
 
 @Injectable()
 export class DpdService {
@@ -19,11 +20,10 @@ export class DpdService {
   createEndpoint = ServicesUrl.DPD + 'order2?wsdl';
   clientNumber = process.env.DPD_CLIENT!;
 
-  // createOrder2 обрабатывает адрес и формирует данные для чека (54-ФЗ) — заметно
-  // дольше, чем чтение статусов. При стандартном таймауте (10 с) соединение иногда
-  // рвётся до получения ответа (axios "stream has been aborted"), хотя DPD успевает
-  // создать заказ — сотрудник получает ошибку про несуществующую отправку.
+  // Обработка createOrder2 дольше чтения статусов; WSDL загружается отдельно
+  // и может обрываться до вызова метода при меньшем таймауте.
   private readonly createOrderTimeoutMs = 30_000;
+  private readonly orderWsdlTimeoutMs = 45_000;
 
   private logOrderFailure(
     operation: string,
@@ -39,6 +39,7 @@ export class DpdService {
     };
     this.logger.error(
       JSON.stringify({
+        requestId: getCurrentRequestId(),
         operation,
         phase,
         durationMs: Date.now() - startedAt,
@@ -93,11 +94,15 @@ export class DpdService {
       const wsdlStartedAt = Date.now();
       soap.createClient(
         this.createEndpoint,
-        { wsdl_options: { timeout: this.createOrderTimeoutMs } },
+        { wsdl_options: { timeout: this.orderWsdlTimeoutMs } },
         (err, client) => {
           if (err) {
             this.logOrderFailure('createOrder2', 'wsdl', wsdlStartedAt, err);
-            return reject(err);
+            return reject(
+              new Error(
+                'Не удалось загрузить схему DPD. Запрос на регистрацию отправки не был отправлен; повторите попытку позже.',
+              ),
+            );
           }
 
           const soapStartedAt = Date.now();
@@ -140,7 +145,7 @@ export class DpdService {
       const wsdlStartedAt = Date.now();
       soap.createClient(
         this.createEndpoint,
-        { wsdl_options: { timeout: this.createOrderTimeoutMs } },
+        { wsdl_options: { timeout: this.orderWsdlTimeoutMs } },
         (err, client) => {
           if (err) {
             this.logOrderFailure('getOrderStatus', 'wsdl', wsdlStartedAt, err);
