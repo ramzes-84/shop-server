@@ -780,7 +780,7 @@ describe('AppService', () => {
       const axiosError = new Error('stream has been aborted');
       axiosError.name = 'AxiosError';
       dpdService.createOrder.mockRejectedValue(axiosError);
-      dpdService.getOrderStatus.mockRejectedValue(new Error('no-data-found'));
+      dpdService.getOrderStatus.mockRejectedValue(new Error('socket hang up'));
 
       await expect(
         service.createDpdOrder({ orderId: '1' }, dpdSourceTerminalIds),
@@ -792,6 +792,7 @@ describe('AppService', () => {
           ),
         },
       });
+      expect(dpdService.createOrder).toHaveBeenCalledTimes(1);
       expect(shopService.updateOrderCarrierTracking).not.toHaveBeenCalled();
     });
 

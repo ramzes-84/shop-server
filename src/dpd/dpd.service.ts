@@ -128,6 +128,12 @@ export class DpdService {
             },
             (err: unknown, result: DpdCreationResDTO) => {
               if (err) {
+                if (
+                  err instanceof Error &&
+                  /\bno-data-found\b/i.test(err.message)
+                ) {
+                  return resolve([]);
+                }
                 return reject(err);
               }
 

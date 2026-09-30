@@ -521,9 +521,22 @@ export class AppService {
         throw error;
       }
 
-      const reconciled = await this.dpdService
-        .getOrderStatus(reference, request.header.datePickup)
-        .catch(() => undefined);
+      let reconciled: DpdOrderResult[] | undefined;
+      try {
+        reconciled = await this.dpdService.getOrderStatus(
+          reference,
+          request.header.datePickup,
+        );
+      } catch (statusError) {
+        this.logger.error(
+          JSON.stringify({
+            requestId: getCurrentRequestId(),
+            operation: 'reconcileDpdOrder',
+            reference,
+            error: describeError(statusError),
+          }),
+        );
+      }
 
       if (reconciled === undefined) {
         // Сверка тоже не удалась — не знаем, создан ли заказ, повторять запрос небезопасно.

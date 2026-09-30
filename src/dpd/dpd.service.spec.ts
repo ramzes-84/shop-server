@@ -260,7 +260,7 @@ describe('DpdService', () => {
       await expect(service.getOrderStatus('REF-1')).resolves.toEqual([]);
     });
 
-    it('rejects when getOrderStatus call errors', async () => {
+    it('returns no orders when DPD reports no-data-found', async () => {
       createClientMock.mockImplementation((_endpoint, options, cb) => {
         const callback = typeof options === 'function' ? options : cb;
         const client = {
@@ -271,8 +271,22 @@ describe('DpdService', () => {
         callback?.(null, client);
       });
 
+      await expect(service.getOrderStatus('REF-1')).resolves.toEqual([]);
+    });
+
+    it('rejects when getOrderStatus fails for another reason', async () => {
+      createClientMock.mockImplementation((_endpoint, options, cb) => {
+        const callback = typeof options === 'function' ? options : cb;
+        const client = {
+          getOrderStatus: (_args: any, done: (err: any) => void) => {
+            done(new Error('socket hang up'));
+          },
+        } as any;
+        callback?.(null, client);
+      });
+
       await expect(service.getOrderStatus('REF-1')).rejects.toThrow(
-        'no-data-found',
+        'socket hang up',
       );
     });
   });
