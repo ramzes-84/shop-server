@@ -70,6 +70,7 @@ type RequestParams = {
 };
 
 const REQUEST_TIMEOUT_MS = 15_000;
+const DPD_REQUEST_TIMEOUT_MS = 90_000;
 const YA_WIDGET_SRC = 'https://ndd-widget.landpro.site/widget.js';
 const FIVEPOST_WIDGET_SRC = 'https://fivepost.ru/static/5post-widget-v1.0.js';
 const POST_WIDGET_SRC = 'https://widget.pochta.ru/map/widget/widget.js';
@@ -596,7 +597,9 @@ async function fetchFromServer(
   const controller = new AbortController();
   const timeoutId = window.setTimeout(
     () => controller.abort(),
-    REQUEST_TIMEOUT_MS,
+    endpoint === Endpoints.DPD_CREATE
+      ? DPD_REQUEST_TIMEOUT_MS
+      : REQUEST_TIMEOUT_MS,
   );
 
   let response: Response;

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ServicesUrl } from 'src/types/services-url';
 import * as soap from 'soap';
 import {
@@ -13,6 +13,7 @@ import { EXTERNAL_REQUEST_TIMEOUT_MS } from 'src/common/fetch-with-timeout';
 
 @Injectable()
 export class DpdService {
+  private readonly logger = new Logger(DpdService.name);
   token = process.env.DPD_TOKEN!;
   trackingEndpoint = ServicesUrl.DPD + 'tracing1-1?wsdl';
   createEndpoint = ServicesUrl.DPD + 'order2?wsdl';
@@ -23,6 +24,31 @@ export class DpdService {
   // рвётся до получения ответа (axios "stream has been aborted"), хотя DPD успевает
   // создать заказ — сотрудник получает ошибку про несуществующую отправку.
   private readonly createOrderTimeoutMs = 30_000;
+
+  private logOrderFailure(
+    operation: string,
+    phase: 'wsdl' | 'soap',
+    startedAt: number,
+    error: unknown,
+  ): void {
+    const failure = error as {
+      name?: string;
+      message?: string;
+      code?: string;
+      response?: { status?: number };
+    };
+    this.logger.error(
+      JSON.stringify({
+        operation,
+        phase,
+        durationMs: Date.now() - startedAt,
+        name: failure?.name,
+        message: failure?.message,
+        code: failure?.code,
+        status: failure?.response?.status,
+      }),
+    );
+  }
 
   async getStatesByDPDOrder(dpdOrderNr: string): Promise<DpdStatesResDTO> {
     const args: DpdRequestDTO<TrackingRequest> = {
@@ -64,18 +90,27 @@ export class DpdService {
    */
   async createOrder(orders: CreatingOrderRequest): Promise<DpdOrderResult> {
     return new Promise((resolve, reject) => {
+      const wsdlStartedAt = Date.now();
       soap.createClient(
         this.createEndpoint,
         { wsdl_options: { timeout: this.createOrderTimeoutMs } },
         (err, client) => {
           if (err) {
+            this.logOrderFailure('createOrder2', 'wsdl', wsdlStartedAt, err);
             return reject(err);
           }
 
+          const soapStartedAt = Date.now();
           client.createOrder2(
             { orders },
             (err: unknown, result: DpdCreationResDTO) => {
               if (err) {
+                this.logOrderFailure(
+                  'createOrder2',
+                  'soap',
+                  soapStartedAt,
+                  err,
+                );
                 return reject(err);
               }
 
@@ -95,22 +130,24 @@ export class DpdService {
    * Сверка после обрыва соединения при createOrder2: сама документация DPD рекомендует
    * getOrderStatus по orderNumberInternal, чтобы узнать, успел ли заказ создаться, не
    * дожидаясь ответа исходного запроса (раздел "Delivery order creation" в руководстве).
-   * Возвращает пустой массив, если DPD не находит такой заказ (значит, исходный запрос
-   * не дошёл и создание можно безопасно повторить).
+   * Возвращает пустой массив, если DPD не находит такой заказ на момент проверки.
    */
   async getOrderStatus(
     orderNumberInternal: string,
     datePickup?: string,
   ): Promise<DpdOrderResult[]> {
     return new Promise((resolve, reject) => {
+      const wsdlStartedAt = Date.now();
       soap.createClient(
         this.createEndpoint,
         { wsdl_options: { timeout: this.createOrderTimeoutMs } },
         (err, client) => {
           if (err) {
+            this.logOrderFailure('getOrderStatus', 'wsdl', wsdlStartedAt, err);
             return reject(err);
           }
 
+          const soapStartedAt = Date.now();
           client.getOrderStatus(
             {
               orderStatus: {
@@ -134,6 +171,12 @@ export class DpdService {
                 ) {
                   return resolve([]);
                 }
+                this.logOrderFailure(
+                  'getOrderStatus',
+                  'soap',
+                  soapStartedAt,
+                  err,
+                );
                 return reject(err);
               }
 

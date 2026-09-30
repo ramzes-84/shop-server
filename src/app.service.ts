@@ -503,9 +503,8 @@ export class AppService {
   }
 
   /**
-   * SOAP-вызов createOrder2 иногда прерывается сетью до получения ответа (axios
-   * "stream has been aborted"), причём независимо от размера таймаута — обрыв происходит
-   * на уровне соединения, а не по истечении времени ожидания. DPD при этом мог уже создать
+   * SOAP-вызов createOrder2 иногда прерывается до получения полного ответа (axios
+   * "stream has been aborted"). DPD при этом мог уже создать
    * заказ, поэтому вместо немедленной сдачи сверяемся через getOrderStatus (см. документацию
    * DPD, раздел "Delivery order creation") — это официальный способ узнать судьбу заказа,
    * не создавая дубль повторной отправкой createOrder2.
@@ -550,7 +549,7 @@ export class AppService {
         return reconciled[0];
       }
 
-      // DPD не находит заказ — исходный запрос не дошёл, повтор безопасен.
+      // DPD пока не находит заказ; повтор может вернуть OrderDuplicate, если первый ещё обрабатывается.
       try {
         return await this.dpdService.createOrder(request);
       } catch (retryError) {
