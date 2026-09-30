@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ServicesUrl } from 'src/types/services-url';
+import { join } from 'node:path';
 import * as soap from 'soap';
 import {
   CreatingOrderRequest,
@@ -17,13 +18,11 @@ export class DpdService {
   private readonly logger = new Logger(DpdService.name);
   token = process.env.DPD_TOKEN!;
   trackingEndpoint = ServicesUrl.DPD + 'tracing1-1?wsdl';
-  createEndpoint = ServicesUrl.DPD + 'order2?wsdl';
+  orderWsdlPath = join(__dirname, 'wsdl', 'order2.wsdl');
   clientNumber = process.env.DPD_CLIENT!;
 
-  // Обработка createOrder2 дольше чтения статусов; WSDL загружается отдельно
-  // и может обрываться до вызова метода при меньшем таймауте.
+  // Схема локальная; SOAP-операции по-прежнему отправляются на адрес DPD из WSDL.
   private readonly createOrderTimeoutMs = 30_000;
-  private readonly orderWsdlTimeoutMs = 45_000;
 
   private logOrderFailure(
     operation: string,
@@ -93,8 +92,8 @@ export class DpdService {
     return new Promise((resolve, reject) => {
       const wsdlStartedAt = Date.now();
       soap.createClient(
-        this.createEndpoint,
-        { wsdl_options: { timeout: this.orderWsdlTimeoutMs } },
+        this.orderWsdlPath,
+        { wsdl_options: { timeout: this.createOrderTimeoutMs } },
         (err, client) => {
           if (err) {
             this.logOrderFailure('createOrder2', 'wsdl', wsdlStartedAt, err);
@@ -144,8 +143,8 @@ export class DpdService {
     return new Promise((resolve, reject) => {
       const wsdlStartedAt = Date.now();
       soap.createClient(
-        this.createEndpoint,
-        { wsdl_options: { timeout: this.orderWsdlTimeoutMs } },
+        this.orderWsdlPath,
+        { wsdl_options: { timeout: this.createOrderTimeoutMs } },
         (err, client) => {
           if (err) {
             this.logOrderFailure('getOrderStatus', 'wsdl', wsdlStartedAt, err);

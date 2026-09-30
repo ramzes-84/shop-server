@@ -29,6 +29,22 @@ describe('DpdService', () => {
     expect(service).toBeDefined();
   });
 
+  it('loads the bundled order2 WSDL and XSD without fetching the schema from DPD', async () => {
+    const realSoap = jest.requireActual<typeof soap>('soap');
+    const client = await new Promise<soap.Client>((resolve, reject) => {
+      realSoap.createClient(service.orderWsdlPath, (error, result) => {
+        if (error) {
+          return reject(error);
+        }
+        resolve(result);
+      });
+    });
+
+    expect(client.createOrder2).toBeInstanceOf(Function);
+    expect(client.getOrderStatus).toBeInstanceOf(Function);
+    expect(client.describe()).toHaveProperty('DPDOrderService');
+  });
+
   it('retrieves states via SOAP client', async () => {
     const statesResponse = {
       return: { states: [{ newState: 'Delivered' }] },
@@ -129,8 +145,8 @@ describe('DpdService', () => {
         status: 'OK',
       });
       expect(createClientMock).toHaveBeenCalledWith(
-        service.createEndpoint,
-        { wsdl_options: { timeout: 45_000 } },
+        service.orderWsdlPath,
+        { wsdl_options: { timeout: 30_000 } },
         expect.any(Function),
       );
     });
@@ -233,8 +249,8 @@ describe('DpdService', () => {
         { orderNumberInternal: 'REF-1', orderNum: '01010001MOW', status: 'OK' },
       ]);
       expect(createClientMock).toHaveBeenCalledWith(
-        service.createEndpoint,
-        { wsdl_options: { timeout: 45_000 } },
+        service.orderWsdlPath,
+        { wsdl_options: { timeout: 30_000 } },
         expect.any(Function),
       );
     });
