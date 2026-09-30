@@ -1,4 +1,7 @@
 import { calcDiscount, convertOrder, convertOrderToDpd } from './convertOrder';
+import { DOMParser } from '@xmldom/xmldom';
+import { join } from 'node:path';
+import * as soap from 'soap';
 import { CreateYaOrderDto } from 'src/ya/dto/ya.dto';
 import {
   addressDetails,
@@ -170,6 +173,47 @@ describe('convertOrderToDpd', () => {
       { descript: 'Румяна', count: 1, declared_value: '579.99' },
       { descript: 'Пудра', count: 1, declared_value: '799.99' },
     ]);
+  });
+
+  it('serializes unitLoad fields in DPD XSD order', async () => {
+    const request = convertOrderToDpd(
+      orderDetails,
+      addressDetails,
+      customerDetails,
+      shippingDetails.order_carriers[0],
+      destination,
+      sourceTerminalId,
+    );
+    const httpClient = new soap.HttpClient();
+    const sendRequest = jest
+      .spyOn(httpClient, 'request')
+      .mockImplementation((_url, _xml, callback) => {
+        callback(new Error('SOAP request intercepted'));
+        return Promise.resolve(
+          {} as Awaited<ReturnType<typeof httpClient.request>>,
+        );
+      });
+    const client = await soap.createClientAsync(
+      join(__dirname, '..', 'dpd', 'wsdl', 'order2.wsdl'),
+      { httpClient },
+    );
+
+    client.createOrder2(
+      { orders: { auth: { clientNumber: 1, clientKey: 'test' }, ...request } },
+      () => {},
+    );
+
+    const document = new DOMParser().parseFromString(
+      sendRequest.mock.calls[0][1] as string,
+      'text/xml',
+    );
+    const unitLoad = document.getElementsByTagName('unitLoad')[0];
+    expect(unitLoad).toBeDefined();
+    expect(
+      Array.from(unitLoad.childNodes)
+        .filter((node) => node.nodeType === 1)
+        .map((node) => node.localName),
+    ).toEqual(['descript', 'declared_value', 'count']);
   });
 
   it('respects a configured cargo category', () => {

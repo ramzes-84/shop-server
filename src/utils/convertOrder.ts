@@ -159,11 +159,11 @@ export function convertOrderToDpd(
   const unitLoad: DpdUnitLoad[] = orderDetails.associations.order_rows.map(
     (row) => ({
       descript: row.product_name,
-      count: Number.parseInt(row.product_quantity, 10),
       declared_value: roundMoney(
         row.unit_price_tax_incl,
         `товара ${row.product_name}`,
       ).toString(),
+      count: Number.parseInt(row.product_quantity, 10),
     }),
   );
 
