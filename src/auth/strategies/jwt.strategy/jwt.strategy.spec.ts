@@ -84,11 +84,13 @@ describe('JwtStrategy', () => {
     it('should preserve the configured 5Post sender location', () => {
       expect(
         strategy.validate(
-          buildPayload({ fivePostSenderLocation: 'fivepost-warehouse-123' }),
+          buildPayload({
+            fivePostSender: { email: 'shop@example.com', phone: '79000000001' },
+          }),
         ),
       ).toEqual(
         expect.objectContaining({
-          fivePostSenderLocation: 'fivepost-warehouse-123',
+          fivePostSender: { email: 'shop@example.com', phone: '79000000001' },
         }),
       );
     });

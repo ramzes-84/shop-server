@@ -49,7 +49,7 @@ export class AppController {
   ) {
     return this.appService.createFivePostOrder(
       body,
-      request.user.fivePostSenderLocation,
+      request.user.fivePostSender,
     );
   }
 

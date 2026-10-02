@@ -1,8 +1,9 @@
-import { CreateFivePostOrdersRequest } from 'src/five/dto/create-order.dto';
+import { CreateFivePostC2COrderRequest } from 'src/five/dto/create-order.dto';
 import { AddressInfoResDto } from 'src/shop/dto/address-info.dto';
 import { CustomerInfoResDto } from 'src/shop/dto/customer-info.dto';
 import { OrderCarrierInfo } from 'src/shop/dto/order-carrier-info.dto';
 import { OrderInfoResDto } from 'src/shop/dto/order-info.dto';
+import { FivePostSender } from 'src/auth/jwt-claims';
 import { normalizePhoneToE164 } from './normalize-phone';
 
 const CARGO_LENGTH_MM = 150;
@@ -25,17 +26,21 @@ export function convertFivePostOrder(
   customerDetails: CustomerInfoResDto['customer'],
   shippingDetails: OrderCarrierInfo,
   receiverLocation: string,
-  senderLocation: string,
-): CreateFivePostOrdersRequest {
-  if (!senderLocation) {
-    throw new Error('Не настроен ID склада отправителя 5Post');
+  sender?: FivePostSender,
+): CreateFivePostC2COrderRequest {
+  const senderEmail = sender?.email?.trim();
+  const senderPhone = normalizePhoneToE164(sender?.phone);
+
+  if (!senderEmail || !senderPhone) {
+    throw new Error(
+      'Не настроены контакты магазина (email и телефон) для отправителя 5Post',
+    );
   }
 
   const productValues = orderDetails.associations.order_rows.map((row) => ({
     name: row.product_name,
     value: Number.parseInt(row.product_quantity, 10),
     price: money(row.unit_price_tax_incl, `товара ${row.product_name}`),
-    currency: 'RUB' as const,
     vat: -1 as const,
     ...(row.product_reference ? { vendorCode: row.product_reference } : {}),
   }));
@@ -73,39 +78,28 @@ export function convertFivePostOrder(
   }
 
   return {
-    partnerOrders: [
-      {
-        senderOrderId: orderDetails.reference,
-        clientOrderId: orderDetails.reference,
-        clientName,
-        clientPhone,
-        ...(customerDetails.email
-          ? { clientEmail: customerDetails.email }
-          : {}),
-        senderLocation,
-        receiverLocation,
-        undeliverableOption: 'RETURN',
-        cost: {
-          paymentValue: 0,
-          paymentCurrency: 'RUB',
-          paymentType: 'PREPAYMENT',
-          price: cargoPrice,
-          priceCurrency: 'RUB',
-        },
-        cargoes: [
-          {
-            senderCargoId: orderDetails.reference,
-            height: CARGO_HEIGHT_MM,
-            length: CARGO_LENGTH_MM,
-            width: CARGO_WIDTH_MM,
-            weight: Math.round(weightKg * 1_000_000) + PACKAGE_WEIGHT_MG,
-            price: cargoPrice,
-            currency: 'RUB',
-            vat: -1,
-            productValues,
-          },
-        ],
-      },
-    ],
+    senderOrderId: orderDetails.reference,
+    clientOrderId: orderDetails.reference,
+    receiverLocation,
+    receiverClientName: clientName,
+    receiverClientPhone: clientPhone,
+    ...(customerDetails.email
+      ? { receiverClientEmail: customerDetails.email }
+      : {}),
+    senderClientEmail: senderEmail,
+    senderClientPhone: senderPhone,
+    cargo: {
+      senderCargoId: orderDetails.reference,
+      height: CARGO_HEIGHT_MM,
+      length: CARGO_LENGTH_MM,
+      width: CARGO_WIDTH_MM,
+      weight: Math.round(weightKg * 1_000_000) + PACKAGE_WEIGHT_MG,
+      price: cargoPrice,
+      productValues,
+    },
+    cost: {
+      paymentType: 'PREPAYMENT',
+      price: cargoPrice,
+    },
   };
 }

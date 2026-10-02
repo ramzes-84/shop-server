@@ -164,7 +164,7 @@ describe('AppService', () => {
           provide: FiveService,
           useValue: {
             getOrderStatus: jest.fn(),
-            createOrders: jest.fn(),
+            createC2COrder: jest.fn(),
             requestWithAuth: jest.fn(),
             getToken: jest.fn(),
           },
@@ -487,6 +487,11 @@ describe('AppService', () => {
   });
 
   describe('createFivePostOrder', () => {
+    const fivePostSender = {
+      email: 'shop@example.com',
+      phone: '+7 900 000-00-01',
+    };
+
     it('creates a 5Post shipment using the pickup point from the order message', async () => {
       const basicInfo = buildBasicOrderInfo();
       jest.spyOn(service, 'getOrderBasicInfo').mockResolvedValue(basicInfo);
@@ -498,33 +503,28 @@ describe('AppService', () => {
         .spyOn(shopService, 'getOrderMessages')
         .mockResolvedValue(orderMessages);
       findPointIdMock.mockReturnValue('receiver-location');
-      fiveService.createOrders.mockResolvedValue([
-        {
-          created: true,
-          senderOrderId: basicInfo.orderDetails.reference,
-          cargoes: [
-            {
-              senderCargoId: basicInfo.orderDetails.reference,
-              barcode: 'five-barcode',
-            },
-          ],
-        },
-      ]);
+      fiveService.createC2COrder.mockResolvedValue({
+        created: true,
+        senderOrderId: basicInfo.orderDetails.reference,
+        cargoes: [
+          {
+            senderCargoId: basicInfo.orderDetails.reference,
+            barcode: 'five-barcode',
+          },
+        ],
+      });
 
       await expect(
-        service.createFivePostOrder({ orderId: '1' }, 'sender-location'),
+        service.createFivePostOrder({ orderId: '1' }, fivePostSender),
       ).resolves.toEqual({
         ok: true,
         data: { track: 'five-barcode' },
       });
-      expect(fiveService.createOrders).toHaveBeenCalledWith(
+      expect(fiveService.createC2COrder).toHaveBeenCalledWith(
         expect.objectContaining({
-          partnerOrders: [
-            expect.objectContaining({
-              senderLocation: 'sender-location',
-              receiverLocation: 'receiver-location',
-            }),
-          ],
+          receiverLocation: 'receiver-location',
+          senderClientEmail: 'shop@example.com',
+          senderClientPhone: '79000000001',
         }),
       );
       expect(shopService.updateOrderCarrierTracking).toHaveBeenCalledWith(
@@ -544,19 +544,17 @@ describe('AppService', () => {
         .spyOn(shopService, 'getOrderMessages')
         .mockResolvedValue(orderMessages);
       findPointIdMock.mockReturnValue('receiver-location');
-      fiveService.createOrders.mockResolvedValue([
-        {
-          created: false,
-          senderOrderId: basicInfo.orderDetails.reference,
-          cargoes: [],
-          errors: [
-            { code: 20, message: 'Заказ с таким senderOrderId уже существует' },
-          ],
-        },
-      ]);
+      fiveService.createC2COrder.mockResolvedValue({
+        created: false,
+        senderOrderId: basicInfo.orderDetails.reference,
+        cargoes: [],
+        errors: [
+          { code: 20, message: 'Заказ с таким senderOrderId уже существует' },
+        ],
+      });
 
       await expect(
-        service.createFivePostOrder({ orderId: '1' }, 'sender-location'),
+        service.createFivePostOrder({ orderId: '1' }, fivePostSender),
       ).resolves.toEqual({
         ok: false,
         data: {

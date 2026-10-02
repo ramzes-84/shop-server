@@ -10,6 +10,9 @@ import {
 } from './dto/telegram-update.dto';
 import { YaParcelStatus } from 'src/ya/dto/ya.dto';
 
+const SENDER_1 = { email: 'shop-1@example.com', phone: '79000000001' };
+const SENDER_2 = { email: 'shop-2@example.com', phone: '79000000002' };
+
 describe('BotController', () => {
   let controller: BotController;
   let botService: BotService;
@@ -409,7 +412,7 @@ describe('BotController', () => {
     jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
       orders: registrationCandidates,
       yaSourcePlatformIds: {},
-      fivePostSenderLocation: 'loc-1',
+      fivePostSender: SENDER_1,
       dpdSourceTerminalIds: {},
     });
     jest.spyOn(appService, 'createYaOrder').mockResolvedValue({
@@ -444,7 +447,7 @@ describe('BotController', () => {
     await controller.handleWebhook(groupUpdate('2', 79));
     expect(appService.createFivePostOrder).toHaveBeenCalledWith(
       { orderId: '102' },
-      'loc-1',
+      SENDER_1,
     );
   });
 
@@ -455,7 +458,7 @@ describe('BotController', () => {
       jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
         orders: registrationCandidates,
         yaSourcePlatformIds: {},
-        fivePostSenderLocation: undefined,
+        fivePostSender: undefined,
         dpdSourceTerminalIds: {},
       });
       jest.spyOn(appService, 'createYaOrder').mockResolvedValue({
@@ -510,7 +513,7 @@ describe('BotController', () => {
       jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
         orders: registrationCandidates,
         yaSourcePlatformIds: {},
-        fivePostSenderLocation: undefined,
+        fivePostSender: undefined,
         dpdSourceTerminalIds: {},
       });
       jest.spyOn(yaService, 'findTrackByOrderReference').mockResolvedValue({
@@ -558,7 +561,7 @@ describe('BotController', () => {
         ...registrationCandidates.slice(1),
       ],
       yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
-      fivePostSenderLocation: 'loc-1',
+      fivePostSender: SENDER_1,
       dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
     });
 
@@ -591,7 +594,7 @@ describe('BotController', () => {
         { id: 201, reference: 'ZZZ111', lastname: 'Сидоров', carrier: 'post' },
       ],
       yaSourcePlatformIds: {},
-      fivePostSenderLocation: undefined,
+      fivePostSender: undefined,
       dpdSourceTerminalIds: {},
     });
 
@@ -617,7 +620,7 @@ describe('BotController', () => {
     jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
       orders: registrationCandidates,
       yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
-      fivePostSenderLocation: 'loc-1',
+      fivePostSender: SENDER_1,
       dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
     });
     jest.spyOn(appService, 'createYaOrder').mockResolvedValue({
@@ -655,7 +658,7 @@ describe('BotController', () => {
     jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
       orders: registrationCandidates,
       yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
-      fivePostSenderLocation: 'loc-1',
+      fivePostSender: SENDER_1,
       dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
     });
     jest.spyOn(appService, 'createFivePostOrder').mockResolvedValue({
@@ -680,7 +683,7 @@ describe('BotController', () => {
 
     expect(appService.createFivePostOrder).toHaveBeenCalledWith(
       { orderId: '102' },
-      'loc-1',
+      SENDER_1,
     );
     expect(botService.sendEmployeeMessage).toHaveBeenCalledWith(
       expect.stringContaining('AXQ12345Z'),
@@ -693,7 +696,7 @@ describe('BotController', () => {
     jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
       orders: registrationCandidates,
       yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
-      fivePostSenderLocation: 'loc-1',
+      fivePostSender: SENDER_1,
       dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
     });
     jest.spyOn(appService, 'createDpdOrder').mockResolvedValue({
@@ -733,7 +736,7 @@ describe('BotController', () => {
       .mockResolvedValueOnce({
         orders: registrationCandidates,
         yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
-        fivePostSenderLocation: 'loc-1',
+        fivePostSender: SENDER_1,
         dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
       })
       .mockResolvedValue({
@@ -743,7 +746,7 @@ describe('BotController', () => {
           registrationCandidates[2],
         ],
         yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
-        fivePostSenderLocation: 'loc-2',
+        fivePostSender: SENDER_2,
         dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
       });
     jest.spyOn(appService, 'createYaOrder').mockResolvedValue({
@@ -789,7 +792,7 @@ describe('BotController', () => {
 
     expect(appService.createFivePostOrder).toHaveBeenCalledWith(
       { orderId: '102' },
-      'loc-2',
+      SENDER_2,
     );
   });
 
@@ -799,13 +802,13 @@ describe('BotController', () => {
       .mockResolvedValueOnce({
         orders: [registrationCandidates[0]],
         yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
-        fivePostSenderLocation: 'loc-1',
+        fivePostSender: SENDER_1,
         dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
       })
       .mockResolvedValue({
         orders: [],
         yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
-        fivePostSenderLocation: 'loc-1',
+        fivePostSender: SENDER_1,
         dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
       });
     jest.spyOn(appService, 'createYaOrder').mockResolvedValue({
@@ -852,7 +855,7 @@ describe('BotController', () => {
       jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
         orders: registrationCandidates,
         yaSourcePlatformIds: {},
-        fivePostSenderLocation: undefined,
+        fivePostSender: undefined,
         dpdSourceTerminalIds: {},
       });
 
@@ -890,7 +893,7 @@ describe('BotController', () => {
     jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
       orders: registrationCandidates,
       yaSourcePlatformIds: { rnd: 'rnd-1', tul: 'tul-1' },
-      fivePostSenderLocation: 'loc-1',
+      fivePostSender: SENDER_1,
       dpdSourceTerminalIds: { rnd: 'dpd-rnd-1', tul: 'dpd-tul-1' },
     });
     jest.spyOn(appService, 'createYaOrder').mockResolvedValue({
@@ -927,7 +930,7 @@ describe('BotController', () => {
     );
     expect(appService.createFivePostOrder).toHaveBeenCalledWith(
       { orderId: '102' },
-      'loc-1',
+      SENDER_1,
     );
     expect(appService.createDpdOrder).toHaveBeenCalledWith(
       { orderId: '103' },
@@ -959,7 +962,7 @@ describe('BotController', () => {
     jest.spyOn(shopService, 'getOrdersForBotRegistration').mockResolvedValue({
       orders: registrationCandidates,
       yaSourcePlatformIds: {},
-      fivePostSenderLocation: undefined,
+      fivePostSender: undefined,
       dpdSourceTerminalIds: {},
     });
 

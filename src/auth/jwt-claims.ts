@@ -16,12 +16,18 @@ export interface DpdSourceTerminalIds {
   tul?: string;
 }
 
+/** Контакты отправителя для C2C-заказов 5Post — берутся из настроек магазина PrestaShop. */
+export interface FivePostSender {
+  email?: string;
+  phone?: string;
+}
+
 export interface JwtPayload {
   sub: string;
   email?: string;
   scope?: string;
   yaSourcePlatformIds?: YaSourcePlatformIds;
-  fivePostSenderLocation?: string;
+  fivePostSender?: FivePostSender;
   dpdSourceTerminalIds?: DpdSourceTerminalIds;
   iss: string;
   aud: string;
@@ -35,6 +41,6 @@ export interface AuthenticatedEmployee {
   email?: string;
   scope?: string;
   yaSourcePlatformIds?: YaSourcePlatformIds;
-  fivePostSenderLocation?: string;
+  fivePostSender?: FivePostSender;
   dpdSourceTerminalIds?: DpdSourceTerminalIds;
 }

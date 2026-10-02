@@ -84,7 +84,7 @@ describe('AppController', () => {
   });
 
   describe('fivePostOrderCreate', () => {
-    it('forwards the order ID and signed sender location to AppService', async () => {
+    it('forwards the order ID and signed sender contacts to AppService', async () => {
       const mockResponse = { ok: true, data: { track: 'five-barcode' } };
       jest
         .spyOn(service, 'createFivePostOrder')
@@ -93,13 +93,16 @@ describe('AppController', () => {
 
       await expect(
         controller.fivePostOrderCreate(query, {
-          user: { id: '1', fivePostSenderLocation: 'fivepost-warehouse-123' },
+          user: {
+            id: '1',
+            fivePostSender: { email: 'shop@example.com', phone: '79000000001' },
+          },
         } as any),
       ).resolves.toBe(mockResponse);
-      expect(service.createFivePostOrder).toHaveBeenCalledWith(
-        query,
-        'fivepost-warehouse-123',
-      );
+      expect(service.createFivePostOrder).toHaveBeenCalledWith(query, {
+        email: 'shop@example.com',
+        phone: '79000000001',
+      });
     });
   });
 

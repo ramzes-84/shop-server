@@ -8,7 +8,7 @@ import type {
 } from './dto/get-order-status.dto';
 import type {
   CreateFivePostOrderResponse,
-  CreateFivePostOrdersRequest,
+  CreateFivePostC2COrderRequest,
 } from './dto/create-order.dto';
 
 @Injectable()
@@ -162,10 +162,13 @@ export class FiveService {
     return res;
   }
 
-  public async createOrders(
-    order: CreateFivePostOrdersRequest,
-  ): Promise<CreateFivePostOrderResponse[]> {
-    const res = await this.requestWithAuth('/api/v3/orders', {
+  /**
+   * Регистрирует C2C-заказ: отправитель сдаёт посылку в пункте 5Post, склад не нужен.
+   */
+  public async createC2COrder(
+    order: CreateFivePostC2COrderRequest,
+  ): Promise<CreateFivePostOrderResponse> {
+    const res = await this.requestWithAuth('/api/v1/orders/c2c', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(order),
@@ -176,14 +179,17 @@ export class FiveService {
       throw new Error(`Failed to create 5Post order: ${res.status} ${text}`);
     }
 
-    const createdOrders = (await res.json()) as CreateFivePostOrderResponse[];
-    if (!Array.isArray(createdOrders) || createdOrders.length === 0) {
+    const body = (await res.json()) as
+      CreateFivePostOrderResponse | CreateFivePostOrderResponse[];
+    // Документация показывает и объект, и массив из одного элемента.
+    const created = Array.isArray(body) ? body[0] : body;
+
+    if (!created || typeof created.created !== 'boolean') {
       throw new Error('Invalid 5Post order creation response');
     }
 
-    return createdOrders;
+    return created;
   }
-
   /**
    * Get statuses for multiple orders by senderOrderId.
    * - Uses local in-memory cache to avoid requesting the same senderOrderId more than once per hour

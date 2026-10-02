@@ -24,7 +24,7 @@ final class ShopServerJwtSigner
         return $header . '.' . $payload . '.' . self::base64UrlEncode($signature);
     }
 
-    public static function issueForEmployee(int $employeeId, string $email, int $ttl, string $secret, string $yaSourcePlatformIdRnd, string $yaSourcePlatformIdTul, string $fivePostSenderLocation, string $dpdSourceTerminalRnd, string $dpdSourceTerminalTul): string
+    public static function issueForEmployee(int $employeeId, string $email, int $ttl, string $secret, string $yaSourcePlatformIdRnd, string $yaSourcePlatformIdTul, array $fivePostSender, string $dpdSourceTerminalRnd, string $dpdSourceTerminalTul): string
     {
         $now = time();
 
@@ -37,7 +37,10 @@ final class ShopServerJwtSigner
                 'rnd' => $yaSourcePlatformIdRnd,
                 'tul' => $yaSourcePlatformIdTul,
             ],
-            'fivePostSenderLocation' => $fivePostSenderLocation,
+            'fivePostSender' => [
+                'email' => (string) ($fivePostSender['email'] ?? ''),
+                'phone' => (string) ($fivePostSender['phone'] ?? ''),
+            ],
             'dpdSourceTerminalIds' => [
                 'rnd' => $dpdSourceTerminalRnd,
                 'tul' => $dpdSourceTerminalTul,

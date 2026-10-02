@@ -6,7 +6,11 @@ import { TelegramMessage, TelegramUpdate } from './dto/telegram-update.dto';
 import { ShopService } from 'src/shop/shop.service';
 import { BotOrderCandidate } from 'src/shop/dto/bot-orders.dto';
 import { AppService } from 'src/app.service';
-import { DpdSourceTerminalIds, YaSourcePlatformIds } from 'src/auth/jwt-claims';
+import {
+  DpdSourceTerminalIds,
+  FivePostSender,
+  YaSourcePlatformIds,
+} from 'src/auth/jwt-claims';
 
 const YA_COMMAND_ONLY_RE = /^\/?ya\s*$/i;
 const YA_COMMAND = '/ya';
@@ -24,7 +28,7 @@ type BotCommandInfo = {
 type PendingRegistrationData = {
   candidates: BotOrderCandidate[];
   yaSourcePlatformIds: YaSourcePlatformIds;
-  fivePostSenderLocation?: string;
+  fivePostSender?: FivePostSender;
   dpdSourceTerminalIds: DpdSourceTerminalIds;
 };
 
@@ -163,7 +167,7 @@ export class BotController {
       const {
         orders,
         yaSourcePlatformIds,
-        fivePostSenderLocation,
+        fivePostSender,
         dpdSourceTerminalIds,
       } = await this.shopService.getOrdersForBotRegistration();
 
@@ -187,7 +191,7 @@ export class BotController {
       const data = {
         candidates,
         yaSourcePlatformIds,
-        fivePostSenderLocation,
+        fivePostSender,
         dpdSourceTerminalIds,
       };
 
@@ -237,7 +241,7 @@ export class BotController {
       : order.carrier === 'fivepost'
         ? await this.appService.createFivePostOrder(
             { orderId },
-            pending.fivePostSenderLocation,
+            pending.fivePostSender,
           )
         : await this.appService.createDpdOrder(
             { orderId },

@@ -1,43 +1,32 @@
-export interface CreateFivePostOrdersRequest {
-  partnerOrders: CreateFivePostOrder[];
-}
-
-export interface CreateFivePostOrder {
+/** Тело запроса POST /api/v1/orders/c2c — сдача заказа в пункте 5Post, без склада отправителя. */
+export interface CreateFivePostC2COrderRequest {
   senderOrderId: string;
   clientOrderId: string;
-  clientName: string;
-  clientPhone: string;
-  clientEmail?: string;
-  senderLocation: string;
   receiverLocation: string;
-  undeliverableOption: 'RETURN';
+  receiverClientName: string;
+  receiverClientPhone: string;
+  receiverClientEmail?: string;
+  senderClientEmail: string;
+  senderClientPhone: string;
+  cargo: {
+    senderCargoId: string;
+    height: number;
+    length: number;
+    width: number;
+    weight: number;
+    price: number;
+    productValues: Array<{
+      name: string;
+      value: number;
+      price: number;
+      vat: -1;
+      vendorCode?: string;
+    }>;
+  };
   cost: {
-    paymentValue: number;
-    paymentCurrency: 'RUB';
     paymentType: 'PREPAYMENT';
     price: number;
-    priceCurrency: 'RUB';
   };
-  cargoes: [
-    {
-      senderCargoId: string;
-      height: number;
-      length: number;
-      width: number;
-      weight: number;
-      price: number;
-      currency: 'RUB';
-      vat: -1;
-      productValues: Array<{
-        name: string;
-        value: number;
-        price: number;
-        currency: 'RUB';
-        vat: -1;
-        vendorCode?: string;
-      }>;
-    },
-  ];
 }
 
 export interface CreateFivePostOrderResponse {

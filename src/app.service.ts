@@ -30,7 +30,11 @@ import { checkDeliveryCost } from './utils/check-delivery-cost';
 import { FiveService } from './five/five.service';
 import { describeError, toSafeMessage } from './common/request-context';
 import { getCurrentRequestId } from './common/request-id.storage';
-import { YaSourcePlatformIds, DpdSourceTerminalIds } from './auth/jwt-claims';
+import {
+  YaSourcePlatformIds,
+  DpdSourceTerminalIds,
+  FivePostSender,
+} from './auth/jwt-claims';
 import { convertFivePostOrder } from './utils/convert-five-post-order';
 import { OrderCarrierInfo } from './shop/dto/order-carrier-info.dto';
 
@@ -321,7 +325,7 @@ export class AppService {
 
   async createFivePostOrder(
     { orderId }: CreateOrderQueries,
-    senderLocation?: string,
+    sender?: FivePostSender,
   ): Promise<TransferInterface> {
     try {
       const { addressDetails, customerDetails, orderDetails } =
@@ -343,17 +347,16 @@ export class AppService {
         };
       }
 
-      const createdOrders = await this.fiveService.createOrders(
+      const createdOrder = await this.fiveService.createC2COrder(
         convertFivePostOrder(
           orderDetails,
           addressDetails,
           customerDetails,
           shippingDetails,
           receiverLocation,
-          senderLocation ?? '',
+          sender,
         ),
       );
-      const createdOrder = createdOrders[0];
 
       if (!createdOrder.created) {
         const details = createdOrder.errors
