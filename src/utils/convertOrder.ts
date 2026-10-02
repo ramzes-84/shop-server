@@ -181,15 +181,59 @@ export function convertOrderToDpd(
       ) * 100,
     ) / 100;
 
-  // DPD — единственный подключённый перевозчик, поддерживающий наложенный платёж (НПП):
-  // если клиент оплатил заказ не полностью, разницу должен собрать курьер при вручении.
-  const outstandingAmount =
+  const codCents = Math.max(
+    0,
     Math.round(
       (roundMoney(orderDetails.total_paid, 'заказа') -
         roundMoney(orderDetails.total_paid_real, 'заказа')) *
         100,
-    ) / 100;
-  const codAmount = outstandingAmount > 0.01 ? outstandingAmount : 0;
+    ),
+  );
+
+  if (codCents > 0) {
+    const cargoCents = unitLoad.reduce(
+      (total, item) =>
+        total + Math.round(Number(item.declared_value) * 100) * item.count,
+      0,
+    );
+    if (codCents > cargoCents || cargoCents === 0) {
+      throw new Error('Сумма НПП превышает стоимость товаров в заказе');
+    }
+
+    const paidUnitLoad: DpdUnitLoad[] = [];
+    let accumulatedCents = 0;
+    let allocatedCents = 0;
+    for (const item of unitLoad) {
+      const priceCents = Math.round(Number(item.declared_value) * 100);
+      for (let quantity = 0; quantity < item.count; quantity++) {
+        accumulatedCents += priceCents;
+        const nextAllocated = Math.round(
+          (codCents * accumulatedCents) / cargoCents,
+        );
+        const nppCents = nextAllocated - allocatedCents;
+        allocatedCents = nextAllocated;
+        const nppAmount =
+          nppCents > 0 ? (nppCents / 100).toFixed(2) : undefined;
+        const previous = paidUnitLoad.at(-1);
+        if (
+          previous &&
+          previous.descript === item.descript &&
+          previous.declared_value === item.declared_value &&
+          previous.npp_amount === nppAmount
+        ) {
+          previous.count++;
+        } else {
+          paidUnitLoad.push({
+            descript: item.descript,
+            declared_value: item.declared_value,
+            ...(nppAmount ? { npp_amount: nppAmount } : {}),
+            count: 1,
+          });
+        }
+      }
+    }
+    unitLoad.splice(0, unitLoad.length, ...paidUnitLoad);
+  }
 
   return {
     header: {
@@ -221,16 +265,6 @@ export function convertOrderToDpd(
           contactPhone: receiverPhone,
           contactEmail: customerDetails.email,
         },
-        ...(codAmount > 0
-          ? {
-              extraService: [
-                {
-                  esCode: 'НПП',
-                  param: [{ name: 'sum_npp', value: codAmount.toFixed(2) }],
-                },
-              ],
-            }
-          : {}),
         unitLoad,
       },
     ],

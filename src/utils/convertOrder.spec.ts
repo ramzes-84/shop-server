@@ -177,7 +177,7 @@ describe('convertOrderToDpd', () => {
 
   it('serializes unitLoad fields in DPD XSD order', async () => {
     const request = convertOrderToDpd(
-      orderDetails,
+      { ...orderDetails, total_paid_real: '0.00' },
       addressDetails,
       customerDetails,
       shippingDetails.order_carriers[0],
@@ -213,7 +213,8 @@ describe('convertOrderToDpd', () => {
       Array.from(unitLoad.childNodes)
         .filter((node) => node.nodeType === 1)
         .map((node) => node.localName),
-    ).toEqual(['descript', 'declared_value', 'count']);
+    ).toEqual(['descript', 'declared_value', 'npp_amount', 'count']);
+    expect(document.getElementsByTagName('extraService').length).toBe(0);
   });
 
   it('respects a configured cargo category', () => {
@@ -244,7 +245,7 @@ describe('convertOrderToDpd', () => {
     expect(result.order[0].extraService).toBeUndefined();
   });
 
-  it('adds a НПП extraService with the outstanding balance when the order is not fully paid', () => {
+  it('distributes the outstanding balance over real goods without a НПП extraService', () => {
     const unpaidOrderDetails = {
       ...orderDetails,
       total_paid: '2603.470000',
@@ -260,12 +261,80 @@ describe('convertOrderToDpd', () => {
       sourceTerminalId,
     );
 
-    expect(result.order[0].extraService).toEqual([
-      {
-        esCode: 'НПП',
-        param: [{ name: 'sum_npp', value: '1603.47' }],
-      },
+    expect(result.order[0].extraService).toBeUndefined();
+    expect(result.order[0].unitLoad.map((item) => item.descript)).toEqual([
+      'Основа',
+      'Румяна',
+      'Пудра',
     ]);
+    expect(
+      result.order[0].unitLoad.reduce(
+        (total, item) =>
+          total + Math.round(Number(item.npp_amount ?? 0) * 100) * item.count,
+        0,
+      ),
+    ).toBe(160347);
+  });
+
+  it('splits units when rounding gives them different per-piece НПП amounts', () => {
+    const unpaidOrderDetails = {
+      ...orderDetails,
+      total_paid: '1.00',
+      total_paid_real: '0.00',
+      associations: {
+        order_rows: [
+          {
+            ...orderDetails.associations.order_rows[0],
+            unit_price_tax_incl: '1.00',
+            product_quantity: '3',
+          },
+        ],
+      },
+    };
+
+    const result = convertOrderToDpd(
+      unpaidOrderDetails,
+      addressDetails,
+      customerDetails,
+      shippingDetails.order_carriers[0],
+      destination,
+      sourceTerminalId,
+    );
+
+    expect(result.order[0].unitLoad).toEqual([
+      { descript: 'Основа', declared_value: '1', npp_amount: '0.33', count: 1 },
+      { descript: 'Основа', declared_value: '1', npp_amount: '0.34', count: 1 },
+      { descript: 'Основа', declared_value: '1', npp_amount: '0.33', count: 1 },
+    ]);
+  });
+
+  it('rejects НПП exceeding the value of actual goods', () => {
+    expect(() =>
+      convertOrderToDpd(
+        { ...orderDetails, total_paid: '3000.00', total_paid_real: '0.00' },
+        addressDetails,
+        customerDetails,
+        shippingDetails.order_carriers[0],
+        destination,
+        sourceTerminalId,
+      ),
+    ).toThrow('Сумма НПП превышает стоимость товаров в заказе');
+  });
+
+  it('collects even a one-kopeck outstanding balance', () => {
+    const result = convertOrderToDpd(
+      { ...orderDetails, total_paid_real: '2603.46' },
+      addressDetails,
+      customerDetails,
+      shippingDetails.order_carriers[0],
+      destination,
+      sourceTerminalId,
+    );
+
+    expect(
+      result.order[0].unitLoad.some((item) => item.npp_amount === '0.01'),
+    ).toBe(true);
+    expect(result.order[0].extraService).toBeUndefined();
   });
 
   it('ignores negligible rounding differences between total_paid and total_paid_real', () => {

@@ -473,11 +473,12 @@ export class AppService {
         );
       }
 
-      const codAmount = Number(
-        order[0].extraService
-          ?.find((service) => service.esCode === 'НПП')
-          ?.param?.find((param) => param.name === 'sum_npp')?.value ?? 0,
-      );
+      const codAmount =
+        (order[0].unitLoad?.reduce(
+          (total, item) =>
+            total + Math.round(Number(item.npp_amount ?? 0) * 100) * item.count,
+          0,
+        ) ?? 0) / 100;
       const message = [
         createdOrder.status === 'OrderPending'
           ? 'Заказ принят DPD, номер отправления появится после ручной обработки'

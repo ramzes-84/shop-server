@@ -966,11 +966,9 @@ describe('AppService', () => {
         header: {} as any,
         order: [
           {
-            extraService: [
-              {
-                esCode: 'НПП',
-                param: [{ name: 'sum_npp', value: '1603.47' }],
-              },
+            unitLoad: [
+              { descript: 'Основа', count: 2, npp_amount: '800.00' },
+              { descript: 'Румяна', count: 1, npp_amount: '3.47' },
             ],
           } as any,
         ],
