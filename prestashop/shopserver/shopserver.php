@@ -33,6 +33,8 @@ class ShopServer extends Module
     public const CONF_NOTIFY_DELIVERED_TEMPLATE = 'SHOPSERVER_NOTIFY_DELIVERED_TEMPLATE';
     public const CONF_NOTIFY_TRACKING_TEMPLATE = 'SHOPSERVER_NOTIFY_TRACKING_TEMPLATE';
 
+    public const TRACKING_NOTIFY_PARAM = 'shopserver_notify';
+
     private const DEFAULT_TOKEN_TTL = 7200;
     private const MIN_TOKEN_TTL = 300;
     private const MAX_TOKEN_TTL = 43200;
@@ -41,7 +43,7 @@ class ShopServer extends Module
     {
         $this->name = 'shopserver';
         $this->tab = 'shipping_logistics';
-        $this->version = '1.13.0';
+        $this->version = '1.14.0';
         $this->author = 'Mineral Magic';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = ['min' => '8.0.0', 'max' => _PS_VERSION_];
@@ -208,12 +210,15 @@ class ShopServer extends Module
     }
 
     /**
-     * Срабатывает и на правку в БО, и на PUT через webservice — так сервер может
-     * записать трек созданной отправки через API, сохранив автоматическое письмо
-     * клиенту, которое раньше отправлялось только при ручной вставке трека в БО.
+     * Хук срабатывает и на правку в БО, но там PrestaShop сам шлёт письмо in_transit;
+     * второе письмо уходит только на PUT, который сервер помечает параметром запроса.
      */
     public function hookActionObjectOrderCarrierUpdateAfter(array $params): void
     {
+        if (Tools::getValue(self::TRACKING_NOTIFY_PARAM) !== '1') {
+            return;
+        }
+
         if (empty($params['object']) || !($params['object'] instanceof OrderCarrier)) {
             return;
         }
@@ -458,7 +463,7 @@ class ShopServer extends Module
                 ['type' => 'text', 'label' => 'Шаблон для статуса «Ожидание получения»', 'name' => self::CONF_NOTIFY_WAITING_TEMPLATE, 'desc' => 'Имя шаблона из /mails без языкового суффикса. Например: order_changed.'],
                 ['type' => 'text', 'label' => 'ID статуса «Доставлен»', 'name' => self::CONF_NOTIFY_DELIVERED_STATE, 'class' => 'fixed-width-sm', 'desc' => 'При создании этого статуса клиенту отправляется указанный шаблон. Оставьте оба поля пустыми, чтобы отключить уведомление.'],
                 ['type' => 'text', 'label' => 'Шаблон для статуса «Доставлен»', 'name' => self::CONF_NOTIFY_DELIVERED_TEMPLATE, 'desc' => 'Имя шаблона из /mails без языкового суффикса. Например: order_changed.'],
-                ['type' => 'text', 'label' => 'Шаблон при получении трек-номера', 'name' => self::CONF_NOTIFY_TRACKING_TEMPLATE, 'desc' => 'Отправляется, когда сервер записывает трек отправки в заказ через API (Яндекс.Доставка, 5Post) — так же, как при ручной вставке трека в этом заказе. В шаблон дополнительно передаются {tracking_number} и {follow_url}. Оставьте пустым, чтобы отключить уведомление.'],
+                ['type' => 'text', 'label' => 'Шаблон при получении трек-номера', 'name' => self::CONF_NOTIFY_TRACKING_TEMPLATE, 'desc' => 'Отправляется, когда сервер записывает трек в заказ через API (Яндекс.Доставка, 5Post). При ручной вставке трека в БО письмо шлёт сама PrestaShop. Переменные те же, что у шаблона in_transit: {shipping_number} и {followup}. Оставьте пустым, чтобы отключить уведомление.'],
             ];
         }
 
@@ -876,14 +881,14 @@ class ShopServer extends Module
             $sent = Mail::Send(
                 $languageId,
                 $template,
-                'Ваш заказ отправлен: ' . $order->reference,
+                'Доступен трек-номер: ' . $order->reference,
                 [
                     '{firstname}' => $customer->firstname,
                     '{lastname}' => $customer->lastname,
-                    '{order_name}' => $order->reference,
+                    '{order_name}' => $order->getUniqReference(),
                     '{id_order}' => (int) $order->id,
-                    '{tracking_number}' => $trackingNumber,
-                    '{follow_url}' => $followUrl,
+                    '{shipping_number}' => $trackingNumber,
+                    '{followup}' => $followUrl,
                 ],
                 $customer->email,
                 $customer->firstname . ' ' . $customer->lastname,

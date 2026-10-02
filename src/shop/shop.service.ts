@@ -177,6 +177,8 @@ export class ShopService {
     trackingNumber: string,
   ) {
     const url = new URL(`${this.endpoint}/order_carriers/${orderCarrier.id}`);
+    // Модуль шлёт письмо о треке только на помеченный PUT; в БО его шлёт сама PrestaShop.
+    url.searchParams.append('shopserver_notify', '1');
     const payload = `<?xml version="1.0" encoding="UTF-8"?>
 <prestashop xmlns:xlink="http://www.w3.org/1999/xlink">
   <order_carrier>

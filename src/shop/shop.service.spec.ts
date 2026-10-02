@@ -258,7 +258,7 @@ describe('ShopService', () => {
       await service.updateOrderCarrierTracking(orderCarrier, 'TRACK-123');
 
       expect(fetch).toHaveBeenCalledWith(
-        'https://mineralmagic.ru/api/order_carriers/1',
+        'https://mineralmagic.ru/api/order_carriers/1?shopserver_notify=1',
         expect.objectContaining({
           method: 'PUT',
           headers: expect.objectContaining({
