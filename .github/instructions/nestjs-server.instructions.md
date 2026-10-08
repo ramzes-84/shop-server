@@ -41,5 +41,7 @@ applyTo: "src/**, test/**"
 - В `tsconfig.json` отключены `strictNullChecks` и `noImplicitAny`.
 - Нет `helmet`, rate limiting и healthcheck.
 - `pendingYaReferences` в `BotController` без TTL.
+- `pendingRegistrations` в `BotController` (команда `/register`) — то же самое, без TTL.
+- `BotController` зарегистрирован в `AppModule`, а не в `BotModule`, чтобы напрямую вызывать `AppService.createYaOrder`/`createFivePostOrder` без цикла модулей.
 
 Подробности и причины — в [docs/decisions.md](../../docs/decisions.md).

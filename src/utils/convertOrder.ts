@@ -1,9 +1,10 @@
-import { CreatingOrderRequest, DpdSourceTerminal } from 'src/dpd/dto/dpd.dto';
+import { CreatingOrderRequest, DpdUnitLoad } from 'src/dpd/dto/dpd.dto';
 import { AddressInfoResDto } from 'src/shop/dto/address-info.dto';
 import { CustomerInfoResDto } from 'src/shop/dto/customer-info.dto';
 import { OrderCarrierInfo } from 'src/shop/dto/order-carrier-info.dto';
 import { OrderInfoResDto } from 'src/shop/dto/order-info.dto';
 import { CreateYaOrderDto, YaCostCalculationReqDto } from 'src/ya/dto/ya.dto';
+import { normalizePhoneToE164 } from './normalize-phone';
 
 export function convertOrder(
   orderDetails: OrderInfoResDto['order'],
@@ -123,27 +124,126 @@ export function convertYaOrderToCostReq(
   };
 }
 
+function roundMoney(value: string, field: string): number {
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Некорректная сумма ${field} в заказе`);
+  }
+
+  return Math.round(parsed * 100) / 100;
+}
+
 export function convertOrderToDpd(
   orderDetails: OrderInfoResDto['order'],
   addressDetails: AddressInfoResDto['address'],
   customerDetails: CustomerInfoResDto['customer'],
   shippingDetails: OrderCarrierInfo,
   destination: string,
+  sourceTerminalId: string,
 ): Pick<CreatingOrderRequest, 'header' | 'order'> {
+  const receiverName = `${addressDetails.firstname} ${addressDetails.lastname}`;
+  const receiverPhone =
+    normalizePhoneToE164(addressDetails.phone_mobile) ||
+    normalizePhoneToE164(addressDetails.phone);
+
+  if (!receiverPhone) {
+    throw new Error('В заказе отсутствует телефон получателя');
+  }
+
+  const weightKg = Number.parseFloat(shippingDetails.weight);
+
+  if (!Number.isFinite(weightKg) || weightKg <= 0) {
+    throw new Error('Некорректный вес отправления в заказе');
+  }
+
+  const unitLoad: DpdUnitLoad[] = orderDetails.associations.order_rows.map(
+    (row) => ({
+      descript: row.product_name,
+      declared_value: roundMoney(
+        row.unit_price_tax_incl,
+        `товара ${row.product_name}`,
+      ).toString(),
+      count: Number.parseInt(row.product_quantity, 10),
+    }),
+  );
+
+  if (
+    unitLoad.some((item) => !Number.isInteger(item.count) || item.count <= 0)
+  ) {
+    throw new Error('Некорректное количество товара в заказе');
+  }
+
+  const cargoValue =
+    Math.round(
+      unitLoad.reduce(
+        (total, item) => total + Number(item.declared_value) * item.count,
+        0,
+      ) * 100,
+    ) / 100;
+
+  const codCents = Math.max(
+    0,
+    Math.round(
+      (roundMoney(orderDetails.total_paid, 'заказа') -
+        roundMoney(orderDetails.total_paid_real, 'заказа')) *
+        100,
+    ),
+  );
+
+  if (codCents > 0) {
+    const cargoCents = unitLoad.reduce(
+      (total, item) =>
+        total + Math.round(Number(item.declared_value) * 100) * item.count,
+      0,
+    );
+    if (codCents > cargoCents || cargoCents === 0) {
+      throw new Error('Сумма НПП превышает стоимость товаров в заказе');
+    }
+
+    const paidUnitLoad: DpdUnitLoad[] = [];
+    let accumulatedCents = 0;
+    let allocatedCents = 0;
+    for (const item of unitLoad) {
+      const priceCents = Math.round(Number(item.declared_value) * 100);
+      for (let quantity = 0; quantity < item.count; quantity++) {
+        accumulatedCents += priceCents;
+        const nextAllocated = Math.round(
+          (codCents * accumulatedCents) / cargoCents,
+        );
+        const nppCents = nextAllocated - allocatedCents;
+        allocatedCents = nextAllocated;
+        const nppAmount =
+          nppCents > 0 ? (nppCents / 100).toFixed(2) : undefined;
+        const previous = paidUnitLoad.at(-1);
+        if (
+          previous &&
+          previous.descript === item.descript &&
+          previous.declared_value === item.declared_value &&
+          previous.npp_amount === nppAmount
+        ) {
+          previous.count++;
+        } else {
+          paidUnitLoad.push({
+            descript: item.descript,
+            declared_value: item.declared_value,
+            ...(nppAmount ? { npp_amount: nppAmount } : {}),
+            count: 1,
+          });
+        }
+      }
+    }
+    unitLoad.splice(0, unitLoad.length, ...paidUnitLoad);
+  }
+
   return {
     header: {
       datePickup: new Date().toISOString().split('T')[0],
       senderAddress: {
         name: process.env.SHOP_NAME!,
-        terminalCode:
-          orderDetails.current_state === '12'
-            ? DpdSourceTerminal.RND
-            : DpdSourceTerminal.TUL,
+        terminalCode: sourceTerminalId,
         contactFio: process.env.SHOP_OWNER!,
         contactPhone: process.env.SHOP_PHONE!,
-        contactEmail: process.env.MAIL_ADMIN!,
-        instructions: '',
-        needPass: '0',
+        contactEmail: process.env.MAIL_ADMIN,
       },
       pickupTimePeriod: '9-18',
     },
@@ -153,33 +253,19 @@ export function convertOrderToDpd(
         serviceCode: 'PCL',
         serviceVariant: 'ТТ',
         cargoNumPack: 1,
-        cargoWeight: (parseFloat(shippingDetails.weight) + 0.08).toString(),
-        cargoVolume: '0.01',
+        cargoWeight: Math.round((weightKg + 0.08) * 1000) / 1000,
+        cargoVolume: 0.01,
         cargoRegistered: false,
-        cargoCategory: 'Минеральная пудра',
+        cargoValue,
+        cargoCategory: process.env.DPD_CARGO_CATEGORY || 'Косметика',
         receiverAddress: {
-          name: addressDetails.firstname + ' ' + addressDetails.lastname,
+          name: receiverName,
           terminalCode: destination,
-          contactFio: addressDetails.firstname + ' ' + addressDetails.lastname,
-          contactPhone: addressDetails.phone_mobile,
+          contactFio: receiverName,
+          contactPhone: receiverPhone,
           contactEmail: customerDetails.email,
-          instructions: '',
-          needPass: '0',
         },
-        extraService: [
-          // { ЭСД: { email: process.env.MAIL_ADMIN } },
-          // { SMS: { phone: addressDetails.phone_mobile } },
-          // { EML: { email: customerDetails.email } },
-          // { ЭСЗ: { email: customerDetails.email } },
-          // {
-          //   НПП: {
-          //     sum_npp: (
-          //       parseFloat(orderDetails.total_paid) -
-          //       parseFloat(orderDetails.total_paid_real)
-          //     ).toString(),
-          //   },
-          // },
-        ],
+        unitLoad,
       },
     ],
   };

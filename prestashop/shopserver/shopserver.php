@@ -15,8 +15,11 @@ class ShopServer extends Module
     public const CONF_API_URL = 'SHOPSERVER_API_URL';
     public const CONF_TOKEN_TTL = 'SHOPSERVER_TOKEN_TTL';
     public const CONF_CRON_KEY = 'SHOPSERVER_CRON_KEY';
+    public const CONF_BOT_KEY = 'SHOPSERVER_BOT_KEY';
     public const CONF_YA_SOURCE_PLATFORM_ID_RND = 'SHOPSERVER_YA_SOURCE_PLATFORM_ID_RND';
     public const CONF_YA_SOURCE_PLATFORM_ID_TUL = 'SHOPSERVER_YA_SOURCE_PLATFORM_ID_TUL';
+    public const CONF_DPD_SOURCE_TERMINAL_RND = 'SHOPSERVER_DPD_SOURCE_TERMINAL_RND';
+    public const CONF_DPD_SOURCE_TERMINAL_TUL = 'SHOPSERVER_DPD_SOURCE_TERMINAL_TUL';
     public const CONF_CARRIER_YANDEX = 'SHOPSERVER_CARRIER_YANDEX';
     public const CONF_CARRIER_FIVEPOST = 'SHOPSERVER_CARRIER_FIVEPOST';
     public const CONF_CARRIER_POST = 'SHOPSERVER_CARRIER_POST';
@@ -28,6 +31,9 @@ class ShopServer extends Module
     public const CONF_NOTIFY_WAITING_TEMPLATE = 'SHOPSERVER_NOTIFY_WAITING_TEMPLATE';
     public const CONF_NOTIFY_DELIVERED_STATE = 'SHOPSERVER_NOTIFY_DELIVERED_STATE';
     public const CONF_NOTIFY_DELIVERED_TEMPLATE = 'SHOPSERVER_NOTIFY_DELIVERED_TEMPLATE';
+    public const CONF_NOTIFY_TRACKING_TEMPLATE = 'SHOPSERVER_NOTIFY_TRACKING_TEMPLATE';
+
+    public const TRACKING_NOTIFY_PARAM = 'shopserver_notify';
 
     private const DEFAULT_TOKEN_TTL = 7200;
     private const MIN_TOKEN_TTL = 300;
@@ -37,7 +43,7 @@ class ShopServer extends Module
     {
         $this->name = 'shopserver';
         $this->tab = 'shipping_logistics';
-        $this->version = '1.6.0';
+        $this->version = '1.14.0';
         $this->author = 'Mineral Magic';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = ['min' => '8.0.0', 'max' => _PS_VERSION_];
@@ -56,12 +62,16 @@ class ShopServer extends Module
             && $this->registerHook('displayAdminOrderTop')
             && $this->registerHook('actionFrontControllerSetMedia')
             && $this->registerHook('actionObjectOrderHistoryAddAfter')
+            && $this->registerHook('actionObjectOrderCarrierUpdateAfter')
             && Configuration::updateValue(self::CONF_SECRET, $this->generateSecret())
             && Configuration::updateValue(self::CONF_API_URL, '')
             && Configuration::updateValue(self::CONF_TOKEN_TTL, self::DEFAULT_TOKEN_TTL)
             && Configuration::updateValue(self::CONF_CRON_KEY, $this->generateSecret())
+            && Configuration::updateValue(self::CONF_BOT_KEY, $this->generateSecret())
             && Configuration::updateValue(self::CONF_YA_SOURCE_PLATFORM_ID_RND, '')
             && Configuration::updateValue(self::CONF_YA_SOURCE_PLATFORM_ID_TUL, '')
+            && Configuration::updateValue(self::CONF_DPD_SOURCE_TERMINAL_RND, '')
+            && Configuration::updateValue(self::CONF_DPD_SOURCE_TERMINAL_TUL, '')
             && Configuration::updateValue(self::CONF_CARRIER_YANDEX, 0)
             && Configuration::updateValue(self::CONF_CARRIER_FIVEPOST, 0)
             && Configuration::updateValue(self::CONF_CARRIER_POST, 0)
@@ -72,7 +82,8 @@ class ShopServer extends Module
             && Configuration::updateValue(self::CONF_NOTIFY_WAITING_STATE, 0)
             && Configuration::updateValue(self::CONF_NOTIFY_WAITING_TEMPLATE, '')
             && Configuration::updateValue(self::CONF_NOTIFY_DELIVERED_STATE, 0)
-            && Configuration::updateValue(self::CONF_NOTIFY_DELIVERED_TEMPLATE, '');
+            && Configuration::updateValue(self::CONF_NOTIFY_DELIVERED_TEMPLATE, '')
+            && Configuration::updateValue(self::CONF_NOTIFY_TRACKING_TEMPLATE, '');
     }
 
     public function uninstall(): bool
@@ -114,7 +125,10 @@ class ShopServer extends Module
             $this->tokenTtl(),
             $secret,
             (string) Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_RND),
-            (string) Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_TUL)
+            (string) Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_TUL),
+            $this->fivePostSender(),
+            (string) Configuration::get(self::CONF_DPD_SOURCE_TERMINAL_RND),
+            (string) Configuration::get(self::CONF_DPD_SOURCE_TERMINAL_TUL)
         );
 
         $config = [
@@ -124,6 +138,7 @@ class ShopServer extends Module
             'carrier' => $this->resolveCarrierType($order),
             'fivePostKey' => (string) Configuration::get(self::CONF_FIVEPOST_KEY),
             'pochtaWidgetId' => (string) Configuration::get(self::CONF_POCHTA_WIDGET_ID),
+            'dpdSid' => (string) Configuration::get(self::CONF_DPD_SID),
         ];
 
         $this->context->smarty->assign([
@@ -194,6 +209,36 @@ class ShopServer extends Module
         $this->sendStatusNotification($history, $template);
     }
 
+    /**
+     * Хук срабатывает и на правку в БО, но там PrestaShop сам шлёт письмо in_transit;
+     * второе письмо уходит только на PUT, который сервер помечает параметром запроса.
+     */
+    public function hookActionObjectOrderCarrierUpdateAfter(array $params): void
+    {
+        if (Tools::getValue(self::TRACKING_NOTIFY_PARAM) !== '1') {
+            return;
+        }
+
+        if (empty($params['object']) || !($params['object'] instanceof OrderCarrier)) {
+            return;
+        }
+
+        /** @var OrderCarrier $orderCarrier */
+        $orderCarrier = $params['object'];
+        $trackingNumber = trim((string) $orderCarrier->tracking_number);
+
+        if ($trackingNumber === '' || !(int) $orderCarrier->id_order) {
+            return;
+        }
+
+        $template = trim((string) Configuration::get(self::CONF_NOTIFY_TRACKING_TEMPLATE));
+        if ($template === '') {
+            return;
+        }
+
+        $this->sendTrackingNotification($orderCarrier, $trackingNumber, $template);
+    }
+
     public function getContent(): string
     {
         $output = '';
@@ -210,6 +255,13 @@ class ShopServer extends Module
             Configuration::updateValue(self::CONF_CRON_KEY, $this->generateSecret());
             $output .= $this->displayConfirmation(
                 'Ключ CRON перевыпущен. Обновите заголовок X-ShopServer-Cron-Key в сервисе расписания.'
+            );
+        }
+
+        if (Tools::isSubmit('submitShopServerRegenerateBotKey')) {
+            Configuration::updateValue(self::CONF_BOT_KEY, $this->generateSecret());
+            $output .= $this->displayConfirmation(
+                'Ключ бота перевыпущен. Обновите переменную SHOPSERVER_BOT_KEY на сервере.'
             );
         }
 
@@ -247,6 +299,7 @@ class ShopServer extends Module
             Configuration::updateValue(self::CONF_NOTIFY_WAITING_TEMPLATE, trim((string) Tools::getValue(self::CONF_NOTIFY_WAITING_TEMPLATE)));
             Configuration::updateValue(self::CONF_NOTIFY_DELIVERED_STATE, (int) Tools::getValue(self::CONF_NOTIFY_DELIVERED_STATE));
             Configuration::updateValue(self::CONF_NOTIFY_DELIVERED_TEMPLATE, trim((string) Tools::getValue(self::CONF_NOTIFY_DELIVERED_TEMPLATE)));
+            Configuration::updateValue(self::CONF_NOTIFY_TRACKING_TEMPLATE, trim((string) Tools::getValue(self::CONF_NOTIFY_TRACKING_TEMPLATE)));
 
             return $this->displayConfirmation('Настройки сохранены.');
         }
@@ -280,17 +333,27 @@ class ShopServer extends Module
     {
         $yaSourcePlatformIdRnd = trim((string) Tools::getValue(self::CONF_YA_SOURCE_PLATFORM_ID_RND));
         $yaSourcePlatformIdTul = trim((string) Tools::getValue(self::CONF_YA_SOURCE_PLATFORM_ID_TUL));
+        $fivePostCarrier = (int) Tools::getValue(self::CONF_CARRIER_FIVEPOST);
+        $dpdSourceTerminalRnd = trim((string) Tools::getValue(self::CONF_DPD_SOURCE_TERMINAL_RND));
+        $dpdSourceTerminalTul = trim((string) Tools::getValue(self::CONF_DPD_SOURCE_TERMINAL_TUL));
+        $dpdCarrier = (int) Tools::getValue(self::CONF_CARRIER_DPD);
 
         if ($yaSourcePlatformIdRnd === '' || $yaSourcePlatformIdTul === '') {
             return $this->displayError('Укажите ID пунктов приёма Яндекс.Доставки для Ростова и Тулы.');
         }
 
+        if ($dpdCarrier !== 0 && ($dpdSourceTerminalRnd === '' || $dpdSourceTerminalTul === '')) {
+            return $this->displayError('Укажите терминалы отправки DPD для Ростова и Тулы.');
+        }
+
         Configuration::updateValue(self::CONF_YA_SOURCE_PLATFORM_ID_RND, $yaSourcePlatformIdRnd);
         Configuration::updateValue(self::CONF_YA_SOURCE_PLATFORM_ID_TUL, $yaSourcePlatformIdTul);
+        Configuration::updateValue(self::CONF_DPD_SOURCE_TERMINAL_RND, $dpdSourceTerminalRnd);
+        Configuration::updateValue(self::CONF_DPD_SOURCE_TERMINAL_TUL, $dpdSourceTerminalTul);
         Configuration::updateValue(self::CONF_CARRIER_YANDEX, (int) Tools::getValue(self::CONF_CARRIER_YANDEX));
-        Configuration::updateValue(self::CONF_CARRIER_FIVEPOST, (int) Tools::getValue(self::CONF_CARRIER_FIVEPOST));
+        Configuration::updateValue(self::CONF_CARRIER_FIVEPOST, $fivePostCarrier);
         Configuration::updateValue(self::CONF_CARRIER_POST, (int) Tools::getValue(self::CONF_CARRIER_POST));
-        Configuration::updateValue(self::CONF_CARRIER_DPD, (int) Tools::getValue(self::CONF_CARRIER_DPD));
+        Configuration::updateValue(self::CONF_CARRIER_DPD, $dpdCarrier);
 
         return $this->displayConfirmation('Настройки сохранены.');
     }
@@ -377,6 +440,8 @@ class ShopServer extends Module
             return [
                 ['type' => 'text', 'label' => 'ID пункта приёма Яндекс.Доставки, Ростов', 'name' => self::CONF_YA_SOURCE_PLATFORM_ID_RND, 'desc' => 'platform_id пункта для заказов со статусом 12.', 'required' => true],
                 ['type' => 'text', 'label' => 'ID пункта приёма Яндекс.Доставки, Тула', 'name' => self::CONF_YA_SOURCE_PLATFORM_ID_TUL, 'desc' => 'platform_id пункта для заказов со статусом 13.', 'required' => true],
+                ['type' => 'text', 'label' => 'Терминал отправки DPD, Ростов', 'name' => self::CONF_DPD_SOURCE_TERMINAL_RND, 'desc' => 'Код терминала DPD, куда сотрудник отвозит отправления для заказов со статусом 12. Обязателен при выбранном перевозчике DPD.'],
+                ['type' => 'text', 'label' => 'Терминал отправки DPD, Тула', 'name' => self::CONF_DPD_SOURCE_TERMINAL_TUL, 'desc' => 'Код терминала DPD, куда сотрудник отвозит отправления для заказов со статусом 13. Обязателен при выбранном перевозчике DPD.'],
                 ['type' => 'select', 'label' => 'Перевозчик Яндекс.Доставка', 'name' => self::CONF_CARRIER_YANDEX, 'options' => ['query' => $carrierOptions, 'id' => 'id', 'name' => 'name']],
                 ['type' => 'select', 'label' => 'Перевозчик 5Post', 'name' => self::CONF_CARRIER_FIVEPOST, 'options' => ['query' => $carrierOptions, 'id' => 'id', 'name' => 'name']],
                 ['type' => 'select', 'label' => 'Перевозчик Почта России', 'name' => self::CONF_CARRIER_POST, 'options' => ['query' => $carrierOptions, 'id' => 'id', 'name' => 'name']],
@@ -398,6 +463,7 @@ class ShopServer extends Module
                 ['type' => 'text', 'label' => 'Шаблон для статуса «Ожидание получения»', 'name' => self::CONF_NOTIFY_WAITING_TEMPLATE, 'desc' => 'Имя шаблона из /mails без языкового суффикса. Например: order_changed.'],
                 ['type' => 'text', 'label' => 'ID статуса «Доставлен»', 'name' => self::CONF_NOTIFY_DELIVERED_STATE, 'class' => 'fixed-width-sm', 'desc' => 'При создании этого статуса клиенту отправляется указанный шаблон. Оставьте оба поля пустыми, чтобы отключить уведомление.'],
                 ['type' => 'text', 'label' => 'Шаблон для статуса «Доставлен»', 'name' => self::CONF_NOTIFY_DELIVERED_TEMPLATE, 'desc' => 'Имя шаблона из /mails без языкового суффикса. Например: order_changed.'],
+                ['type' => 'text', 'label' => 'Шаблон при получении трек-номера', 'name' => self::CONF_NOTIFY_TRACKING_TEMPLATE, 'desc' => 'Отправляется, когда сервер записывает трек в заказ через API (Яндекс.Доставка, 5Post). При ручной вставке трека в БО письмо шлёт сама PrestaShop. Переменные те же, что у шаблона in_transit: {shipping_number} и {followup}. Оставьте пустым, чтобы отключить уведомление.'],
             ];
         }
 
@@ -431,6 +497,13 @@ class ShopServer extends Module
                         'readonly' => true,
                         'desc' => 'Скопируйте это значение в переменную окружения сервера. Кнопка ниже выпускает новый секрет.',
                     ],
+                    [
+                        'type' => 'text',
+                        'label' => 'SHOPSERVER_BOT_KEY',
+                        'name' => 'SHOPSERVER_BOT_KEY_READONLY',
+                        'readonly' => true,
+                        'desc' => 'Ключ, которым Telegram-бот подтверждает себя при запросе списка заказов на регистрацию. Скопируйте в переменную окружения сервера.',
+                    ],
         ];
     }
 
@@ -449,6 +522,13 @@ class ShopServer extends Module
                         'type' => 'submit',
                         'title' => 'Перевыпустить ключ CRON',
                         'name' => 'submitShopServerRegenerateCronKey',
+                        'icon' => 'process-icon-refresh',
+                        'class' => 'btn btn-default pull-right',
+                    ],
+                    [
+                        'type' => 'submit',
+                        'title' => 'Перевыпустить ключ бота',
+                        'name' => 'submitShopServerRegenerateBotKey',
                         'icon' => 'process-icon-refresh',
                         'class' => 'btn btn-default pull-right',
                     ],
@@ -475,7 +555,10 @@ class ShopServer extends Module
             self::CONF_TOKEN_TTL => $this->tokenTtl(),
             self::CONF_YA_SOURCE_PLATFORM_ID_RND => Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_RND),
             self::CONF_YA_SOURCE_PLATFORM_ID_TUL => Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_TUL),
+            self::CONF_DPD_SOURCE_TERMINAL_RND => Configuration::get(self::CONF_DPD_SOURCE_TERMINAL_RND),
+            self::CONF_DPD_SOURCE_TERMINAL_TUL => Configuration::get(self::CONF_DPD_SOURCE_TERMINAL_TUL),
             'SHOPSERVER_CRON_KEY_READONLY' => Configuration::get(self::CONF_CRON_KEY),
+            'SHOPSERVER_BOT_KEY_READONLY' => Configuration::get(self::CONF_BOT_KEY),
             self::CONF_CARRIER_YANDEX => (int) Configuration::get(self::CONF_CARRIER_YANDEX),
             self::CONF_CARRIER_FIVEPOST => (int) Configuration::get(self::CONF_CARRIER_FIVEPOST),
             self::CONF_CARRIER_POST => (int) Configuration::get(self::CONF_CARRIER_POST),
@@ -487,6 +570,7 @@ class ShopServer extends Module
             self::CONF_NOTIFY_WAITING_TEMPLATE => Configuration::get(self::CONF_NOTIFY_WAITING_TEMPLATE),
             self::CONF_NOTIFY_DELIVERED_STATE => (int) Configuration::get(self::CONF_NOTIFY_DELIVERED_STATE),
             self::CONF_NOTIFY_DELIVERED_TEMPLATE => Configuration::get(self::CONF_NOTIFY_DELIVERED_TEMPLATE),
+            self::CONF_NOTIFY_TRACKING_TEMPLATE => Configuration::get(self::CONF_NOTIFY_TRACKING_TEMPLATE),
             'SHOPSERVER_SECRET_READONLY' => Configuration::get(self::CONF_SECRET),
         ];
     }
@@ -557,6 +641,63 @@ class ShopServer extends Module
         }
 
         return $this->carrierTypesByReference()[(int) $carrier->id_reference] ?? '';
+    }
+
+    /**
+        * Заказы, готовые к регистрации отправки ботом: reference, фамилия получателя,
+        * трек последней записи order_carrier и тип перевозчика по id_reference.
+     *
+     * @param int[] $orderStateIds
+     */
+    public function ordersForBotRegistration(array $orderStateIds): array
+    {
+        $stateIds = array_values(array_unique(array_filter(array_map('intval', $orderStateIds))));
+
+        $orders = [];
+
+        if ($stateIds) {
+            $rows = Db::getInstance()->executeS(
+                'SELECT o.id_order, o.reference, o.id_address_delivery, o.id_carrier,'
+                . ' (SELECT oc.tracking_number FROM `' . _DB_PREFIX_ . 'order_carrier` oc'
+                . ' WHERE oc.id_order = o.id_order ORDER BY oc.id_order_carrier DESC LIMIT 1) AS tracking_number'
+                . ' FROM `' . _DB_PREFIX_ . 'orders` o'
+                . ' WHERE o.current_state IN (' . implode(',', $stateIds) . ')'
+                . ' ORDER BY o.date_add ASC'
+            );
+
+            $carrierTypesByReference = $this->carrierTypesByReference();
+
+            foreach ((array) $rows as $row) {
+                $carrier = new Carrier((int) $row['id_carrier']);
+                $carrierType = Validate::isLoadedObject($carrier)
+                    ? ($carrierTypesByReference[(int) $carrier->id_reference] ?? '')
+                    : '';
+
+                $address = new Address((int) $row['id_address_delivery']);
+                $lastname = Validate::isLoadedObject($address) ? (string) $address->lastname : '';
+
+                $orders[] = [
+                    'id' => (int) $row['id_order'],
+                    'reference' => (string) $row['reference'],
+                    'lastname' => $lastname,
+                    'carrier' => $carrierType,
+                    'trackingNumber' => trim((string) $row['tracking_number']),
+                ];
+            }
+        }
+
+        return [
+            'orders' => $orders,
+            'yaSourcePlatformIds' => [
+                'rnd' => (string) Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_RND),
+                'tul' => (string) Configuration::get(self::CONF_YA_SOURCE_PLATFORM_ID_TUL),
+            ],
+            'fivePostSender' => $this->fivePostSender(),
+            'dpdSourceTerminalIds' => [
+                'rnd' => (string) Configuration::get(self::CONF_DPD_SOURCE_TERMINAL_RND),
+                'tul' => (string) Configuration::get(self::CONF_DPD_SOURCE_TERMINAL_TUL),
+            ],
+        ];
     }
 
     /**
@@ -701,6 +842,99 @@ class ShopServer extends Module
         }
     }
 
+    private function sendTrackingNotification(OrderCarrier $orderCarrier, string $trackingNumber, string $template): void
+    {
+        $order = new Order((int) $orderCarrier->id_order);
+
+        if (!Validate::isLoadedObject($order)) {
+            PrestaShopLogger::addLog(
+                sprintf('[%s] Unable to load order for tracking notification.', $this->name),
+                3,
+                null,
+                __CLASS__,
+                (int) $orderCarrier->id
+            );
+            return;
+        }
+
+        $customer = new Customer((int) $order->id_customer);
+        if (!Validate::isLoadedObject($customer)) {
+            PrestaShopLogger::addLog(
+                sprintf('[%s] Unable to load customer for tracking notification.', $this->name),
+                3,
+                null,
+                __CLASS__,
+                (int) $orderCarrier->id
+            );
+            return;
+        }
+
+        $carrier = new Carrier((int) $orderCarrier->id_carrier);
+        $followUrl = Validate::isLoadedObject($carrier) && $carrier->url
+            ? str_replace('@', $trackingNumber, $carrier->url)
+            : '';
+
+        $languageId = (int) $order->id_lang ?: (int) $this->context->language->id;
+        $sent = false;
+
+        try {
+            $sent = Mail::Send(
+                $languageId,
+                $template,
+                'Доступен трек-номер: ' . $order->reference,
+                [
+                    '{firstname}' => $customer->firstname,
+                    '{lastname}' => $customer->lastname,
+                    '{order_name}' => $order->getUniqReference(),
+                    '{id_order}' => (int) $order->id,
+                    '{shipping_number}' => $trackingNumber,
+                    '{followup}' => $followUrl,
+                ],
+                $customer->email,
+                $customer->firstname . ' ' . $customer->lastname,
+                null,
+                null,
+                null,
+                null,
+                _PS_MAIL_DIR_,
+                false,
+                (int) $order->id_shop
+            );
+        } catch (Exception $exception) {
+            PrestaShopLogger::addLog(
+                sprintf('[%s] Unable to send template "%s": %s', $this->name, $template, $exception->getMessage()),
+                3,
+                null,
+                __CLASS__,
+                (int) $orderCarrier->id
+            );
+            return;
+        }
+
+        if (!$sent) {
+            PrestaShopLogger::addLog(
+                sprintf('[%s] Unable to send template "%s" for order %s.', $this->name, $template, $order->reference),
+                3,
+                null,
+                __CLASS__,
+                (int) $orderCarrier->id
+            );
+        }
+    }
+
+    /**
+     * Контакты отправителя для C2C-заказов 5Post: сдача идёт в пункте приёма, склад не нужен.
+     *
+     * @return array{email: string, phone: string}
+     */
+    private function fivePostSender(): array
+    {
+        return [
+            'email' => trim((string) Configuration::get('PS_SHOP_EMAIL')),
+            'phone' => trim((string) Configuration::get('PS_SHOP_PHONE')),
+        ];
+    }
+
     private function configurationKeys(): array
     {
         return [
@@ -708,8 +942,11 @@ class ShopServer extends Module
             self::CONF_API_URL,
             self::CONF_TOKEN_TTL,
             self::CONF_CRON_KEY,
+            self::CONF_BOT_KEY,
             self::CONF_YA_SOURCE_PLATFORM_ID_RND,
             self::CONF_YA_SOURCE_PLATFORM_ID_TUL,
+            self::CONF_DPD_SOURCE_TERMINAL_RND,
+            self::CONF_DPD_SOURCE_TERMINAL_TUL,
             self::CONF_CARRIER_YANDEX,
             self::CONF_CARRIER_FIVEPOST,
             self::CONF_CARRIER_POST,
@@ -721,6 +958,7 @@ class ShopServer extends Module
             self::CONF_NOTIFY_WAITING_TEMPLATE,
             self::CONF_NOTIFY_DELIVERED_STATE,
             self::CONF_NOTIFY_DELIVERED_TEMPLATE,
+            self::CONF_NOTIFY_TRACKING_TEMPLATE,
         ];
     }
 }

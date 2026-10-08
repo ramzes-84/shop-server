@@ -2,7 +2,11 @@ import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ShopService } from './shop/shop.service';
 import { YaService } from './ya/ya.service';
 import { CreateYaOrderDto } from './ya/dto/ya.dto';
-import { convertOrder, convertYaOrderToCostReq } from './utils/convertOrder';
+import {
+  convertOrder,
+  convertOrderToDpd,
+  convertYaOrderToCostReq,
+} from './utils/convertOrder';
 import { parseYaHistoryToHtml } from './utils/parseYaHistoryToHtml';
 import { CreateCashRequest, CreateOrderQueries } from './validation/yandex';
 import { MailService } from './mail/mail.service';
@@ -11,6 +15,7 @@ import { convertOrderShopToCash } from './utils/convert-order-shop-to-cash';
 import { generateCashInvoiceMessage } from './utils/messages';
 import { BotService } from './bot/bot.service';
 import { DpdService } from './dpd/dpd.service';
+import { CreatingOrderRequest, DpdOrderResult } from './dpd/dto/dpd.dto';
 import {
   Cargos,
   RevisingOrderData,
@@ -25,7 +30,13 @@ import { checkDeliveryCost } from './utils/check-delivery-cost';
 import { FiveService } from './five/five.service';
 import { describeError, toSafeMessage } from './common/request-context';
 import { getCurrentRequestId } from './common/request-id.storage';
-import { YaSourcePlatformIds } from './auth/jwt-claims';
+import {
+  YaSourcePlatformIds,
+  DpdSourceTerminalIds,
+  FivePostSender,
+} from './auth/jwt-claims';
+import { convertFivePostOrder } from './utils/convert-five-post-order';
+import { OrderCarrierInfo } from './shop/dto/order-carrier-info.dto';
 
 @Injectable()
 export class AppService {
@@ -197,6 +208,41 @@ export class AppService {
     }
   }
 
+  /**
+   * Пишет трек в order_carrier через webservice: PrestaShop сам вызывает
+   * actionObjectOrderCarrierUpdateAfter, и модуль отправляет клиенту письмо с
+   * треком — так же, как при ручной вставке в админке. Ошибка записи не должна
+   * рушить создание отправки: сотрудник всё ещё получает трек в буфер обмена.
+   */
+  private async writeTrackingNumber(
+    shippingDetails: OrderCarrierInfo,
+    trackNumber: string,
+    reference: string,
+  ) {
+    try {
+      await this.shopService.updateOrderCarrierTracking(
+        shippingDetails,
+        trackNumber,
+      );
+    } catch (error) {
+      const reason =
+        error instanceof Error ? error.message : String(error ?? 'Unknown');
+      this.logger.warn(
+        JSON.stringify({
+          operation: 'writeTrackingNumber',
+          event: 'failed',
+          reference,
+          reason,
+        }),
+      );
+      await this.botService
+        .sendEmployeeMessage(
+          `⚠️ ${reference}: не удалось записать трек-номер в PrestaShop (${reason}). Трек: ${trackNumber}`,
+        )
+        .catch(() => undefined);
+    }
+  }
+
   async createYaOrder(
     { orderId }: CreateOrderQueries,
     sourcePlatformIds?: YaSourcePlatformIds,
@@ -258,6 +304,16 @@ export class AppService {
 
       await new Promise((resolve) => setTimeout(resolve, 5000));
       const orderInfo = await this.yaService.getOrderInfo(request_id);
+      const trackNumber = orderInfo.sharing_url?.split('/').at(-1) ?? '';
+
+      if (trackNumber) {
+        await this.writeTrackingNumber(
+          shippingDetails,
+          trackNumber,
+          orderDetails.reference,
+        );
+      }
+
       return {
         ok: true,
         data: { sharing_url: orderInfo.sharing_url },
@@ -265,6 +321,263 @@ export class AppService {
     } catch (error) {
       return this.failure('createYaOrder', error, { orderId });
     }
+  }
+
+  async createFivePostOrder(
+    { orderId }: CreateOrderQueries,
+    sender?: FivePostSender,
+  ): Promise<TransferInterface> {
+    try {
+      const { addressDetails, customerDetails, orderDetails } =
+        await this.getOrderBasicInfo(orderId);
+      const [shippingDetails, threadId] = await Promise.all([
+        this.shopService.getOrderCarrierInfo(+orderId),
+        this.shopService.getMessagesThread(+orderId),
+      ]);
+      const receiverLocation = findPointId(
+        await this.shopService.getOrderMessages(threadId),
+      );
+
+      if (!receiverLocation) {
+        return {
+          ok: false,
+          data: {
+            message: 'Пункт выдачи 5Post не найден в переписке по заказу',
+          },
+        };
+      }
+
+      const createdOrder = await this.fiveService.createC2COrder(
+        convertFivePostOrder(
+          orderDetails,
+          addressDetails,
+          customerDetails,
+          shippingDetails,
+          receiverLocation,
+          sender,
+        ),
+      );
+
+      if (!createdOrder.created) {
+        const details = createdOrder.errors
+          ?.map((e) => `${e.code}: ${e.message}`)
+          .join('; ');
+        throw new Error(
+          details
+            ? `5Post не подтвердил создание отправки: ${details}`
+            : '5Post не подтвердил создание отправки',
+        );
+      }
+
+      const trackNumber =
+        createdOrder.cargoes[0]?.barcode ?? orderDetails.reference;
+
+      await this.writeTrackingNumber(
+        shippingDetails,
+        trackNumber,
+        orderDetails.reference,
+      );
+
+      return {
+        ok: true,
+        data: {
+          track: trackNumber,
+        },
+      };
+    } catch (error) {
+      return this.failure('createFivePostOrder', error, { orderId });
+    }
+  }
+
+  async createDpdOrder(
+    { orderId }: CreateOrderQueries,
+    sourceTerminalIds?: DpdSourceTerminalIds,
+  ): Promise<TransferInterface> {
+    try {
+      const { addressDetails, customerDetails, orderDetails } =
+        await this.getOrderBasicInfo(orderId);
+      const sourceTerminalId =
+        orderDetails.current_state === '12'
+          ? sourceTerminalIds?.rnd
+          : orderDetails.current_state === '13'
+            ? sourceTerminalIds?.tul
+            : undefined;
+
+      if (!sourceTerminalId) {
+        throw new HttpException(
+          `Не настроен терминал отправки DPD для статуса заказа ${orderDetails.current_state}`,
+          HttpStatus.SERVICE_UNAVAILABLE,
+        );
+      }
+
+      const [shippingDetails, threadId] = await Promise.all([
+        this.shopService.getOrderCarrierInfo(+orderId),
+        this.shopService.getMessagesThread(+orderId),
+      ]);
+      const destination = findPointId(
+        await this.shopService.getOrderMessages(threadId),
+      );
+
+      if (!destination) {
+        return {
+          ok: false,
+          data: { message: 'Пункт выдачи DPD не найден в переписке по заказу' },
+        };
+      }
+
+      const { header, order } = convertOrderToDpd(
+        orderDetails,
+        addressDetails,
+        customerDetails,
+        shippingDetails,
+        destination,
+        sourceTerminalId,
+      );
+
+      const createdOrder = await this.createDpdOrderSafely(
+        {
+          auth: {
+            clientNumber: +this.dpdService.clientNumber,
+            clientKey: this.dpdService.token,
+          },
+          header,
+          order,
+        },
+        orderDetails.reference,
+      );
+
+      if (createdOrder.status === 'OrderDuplicate') {
+        return {
+          ok: false,
+          data: {
+            message: `DPD сообщает, что заказ ${orderDetails.reference} уже зарегистрирован — возможно, из-за прерванного соединения при предыдущей попытке. Найдите трек-номер в личном кабинете DPD по этому номеру заказа и впишите его вручную — повторная регистрация создаст дубль.`,
+          },
+        };
+      }
+
+      if (
+        createdOrder.status !== 'OK' &&
+        createdOrder.status !== 'OrderPending'
+      ) {
+        throw new Error(
+          createdOrder.errorMessage
+            ? `DPD не подтвердил создание отправки: ${createdOrder.errorMessage}`
+            : `DPD не подтвердил создание отправки (статус ${createdOrder.status})`,
+        );
+      }
+
+      const trackNumber = createdOrder.orderNum;
+
+      if (trackNumber) {
+        await this.writeTrackingNumber(
+          shippingDetails,
+          trackNumber,
+          orderDetails.reference,
+        );
+      }
+
+      const codAmount =
+        (order[0].unitLoad?.reduce(
+          (total, item) =>
+            total + Math.round(Number(item.npp_amount ?? 0) * 100) * item.count,
+          0,
+        ) ?? 0) / 100;
+      const message = [
+        createdOrder.status === 'OrderPending'
+          ? 'Заказ принят DPD, номер отправления появится после ручной обработки'
+          : undefined,
+        codAmount > 0
+          ? `Клиент не оплатил заказ полностью — DPD соберёт наложенный платёж ${codAmount.toFixed(2)} ₽ при вручении.`
+          : undefined,
+      ]
+        .filter(Boolean)
+        .join(' ');
+
+      return {
+        ok: true,
+        data: {
+          track: trackNumber ?? null,
+          status: createdOrder.status,
+          message: message || undefined,
+        },
+      };
+    } catch (error) {
+      return this.failure('createDpdOrder', error, { orderId });
+    }
+  }
+
+  /**
+   * SOAP-вызов createOrder2 иногда прерывается до получения полного ответа (axios
+   * "stream has been aborted"). DPD при этом мог уже создать
+   * заказ, поэтому вместо немедленной сдачи сверяемся через getOrderStatus (см. документацию
+   * DPD, раздел "Delivery order creation") — это официальный способ узнать судьбу заказа,
+   * не создавая дубль повторной отправкой createOrder2.
+   */
+  private async createDpdOrderSafely(
+    request: CreatingOrderRequest,
+    reference: string,
+  ): Promise<DpdOrderResult> {
+    try {
+      return await this.dpdService.createOrder(request);
+    } catch (error) {
+      if (!this.isTransientNetworkError(error)) {
+        throw error;
+      }
+
+      let reconciled: DpdOrderResult[] | undefined;
+      try {
+        reconciled = await this.dpdService.getOrderStatus(
+          reference,
+          request.header.datePickup,
+        );
+      } catch (statusError) {
+        this.logger.error(
+          JSON.stringify({
+            requestId: getCurrentRequestId(),
+            operation: 'reconcileDpdOrder',
+            reference,
+            error: describeError(statusError),
+          }),
+        );
+      }
+
+      if (reconciled === undefined) {
+        // Сверка тоже не удалась — не знаем, создан ли заказ, повторять запрос небезопасно.
+        throw new Error(
+          `Соединение с DPD прервалось, не дождавшись подтверждения. Отправка могла всё же зарегистрироваться — проверьте заказ ${reference} в личном кабинете DPD, прежде чем повторять попытку.`,
+        );
+      }
+
+      if (reconciled.length > 0) {
+        // DPD знает про этот заказ — значит, прерванный запрос всё же дошёл до создания.
+        return reconciled[0];
+      }
+
+      // DPD пока не находит заказ; повтор может вернуть OrderDuplicate, если первый ещё обрабатывается.
+      try {
+        return await this.dpdService.createOrder(request);
+      } catch (retryError) {
+        if (this.isTransientNetworkError(retryError)) {
+          throw new Error(
+            `Соединение с DPD прервалось дважды подряд, не дождавшись подтверждения. Проверьте заказ ${reference} в личном кабинете DPD вручную.`,
+          );
+        }
+        throw retryError;
+      }
+    }
+  }
+
+  private isTransientNetworkError(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+
+    return (
+      error.name === 'AxiosError' ||
+      /stream has been aborted|ECONNRESET|ECONNABORTED|socket hang up|EPIPE/i.test(
+        error.message,
+      )
+    );
   }
 
   async getYaOrderHistory(id: string) {
@@ -388,6 +701,8 @@ export class AppService {
 
     revisingOrdersData.forEach((order, index) => {
       let currState: string | undefined;
+      // DPD повторно использует те же newState на обратном пути к магазину — без isReturn нельзя отличить от движения к клиенту.
+      let isDpdReturn = false;
       const settled = allStatuses[index];
       if (settled.status === 'fulfilled') {
         switch (order.cargo) {
@@ -424,7 +739,16 @@ export class AppService {
           }
           case Cargos.DPD: {
             if ('return' in settled.value) {
-              currState = settled.value.return.states.at(-1).newState;
+              // Документация DPD: порядок массива не гарантирован, актуальное состояние
+              // выбирается по transitionTime.
+              const latestState = [...settled.value.return.states]
+                .sort(
+                  (a, b) =>
+                    Date.parse(a.transitionTime) - Date.parse(b.transitionTime),
+                )
+                .at(-1);
+              currState = latestState?.newState;
+              isDpdReturn = latestState?.isReturn === true;
             }
             break;
           }
@@ -451,7 +775,9 @@ export class AppService {
 
       if (currState !== undefined) {
         order.actualCargoState = currState;
-        order.unifiedCargoState = unifyParcelStatus(currState);
+        order.unifiedCargoState = isDpdReturn
+          ? UnifiedOrderState.RETURNING
+          : unifyParcelStatus(currState);
 
         if (
           order.cargo === Cargos.YA &&
@@ -504,8 +830,7 @@ export class AppService {
       if (
         cargoState &&
         shopState !== cargoState &&
-        cargoState !== UnifiedOrderState.UNKNOWN &&
-        order.cargo !== Cargos.DPD
+        cargoState !== UnifiedOrderState.UNKNOWN
       ) {
         if (!this.canAutoTransition(shopState, cargoState)) {
           errors.push(

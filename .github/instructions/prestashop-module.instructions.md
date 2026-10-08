@@ -1,5 +1,5 @@
 ---
-description: "Use when editing the PrestaShop module: PHP hooks, Smarty templates, module config, carriers, upgrade scripts, or the packaging script. Covers PHP 7.4 constraints, id_reference matching and zip packaging pitfalls."
+description: "Use when editing the PrestaShop module: PHP hooks, Smarty templates, module config, carriers, upgrade scripts, or the packaging script. Covers PHP 8.1 target, id_reference matching and zip packaging pitfalls."
 applyTo: "prestashop/**, scripts/**"
 ---
 
@@ -7,7 +7,7 @@ applyTo: "prestashop/**, scripts/**"
 
 ## Целевая среда
 
-Магазин работает на **PHP 7.4.33**. Не используйте синтаксис PHP 8: `?->`, `match`, promotion в конструкторе, union-типы, `str_contains`, `str_starts_with`, именованные аргументы, `enum`, `readonly`, атрибуты. Приводите типы явно перед вызовом функций (`trim((string) Tools::getValue(...))`), чтобы код оставался корректным и после апгрейда на 8.1+.
+Магазин работает на **PHP 8.1.32** (обновлено с 7.4.33, понижение не планируется). Синтаксис PHP 8 (`?->`, `match`, promotion в конструкторе, union-типы, `str_contains`, `str_starts_with`, именованные аргументы, `enum`, `readonly`, атрибуты) можно использовать.
 
 ## Перевозчики
 

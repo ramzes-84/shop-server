@@ -18,12 +18,22 @@
         🌍 Пункты Яндекс.Доставки
       </button>
     {elseif $shopserver_carrier === 'fivepost'}
+      <button type="button" class="btn btn-primary" data-shopserver-action="create-order">
+        🚛 Зарегистрировать отправку
+      </button>
       <button type="button" class="btn btn-light" data-shopserver-action="map">
         🌍 Пункты 5Post
       </button>
     {elseif $shopserver_carrier === 'post'}
       <button type="button" class="btn btn-light" data-shopserver-action="map">
         🌍 Почтоматы Почты России
+      </button>
+    {elseif $shopserver_carrier === 'dpd'}
+      <button type="button" class="btn btn-primary" data-shopserver-action="create-order">
+        🚛 Зарегистрировать отправку
+      </button>
+      <button type="button" class="btn btn-light" data-shopserver-action="map">
+        🌍 Пункты DPD
       </button>
     {/if}
   </div>

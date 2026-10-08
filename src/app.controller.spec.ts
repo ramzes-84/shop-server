@@ -22,6 +22,8 @@ describe('AppController', () => {
           useValue: {
             getHello: jest.fn(),
             createYaOrder: jest.fn(),
+            createFivePostOrder: jest.fn(),
+            createDpdOrder: jest.fn(),
             getYaOrderHistory: jest.fn(),
             getOrderInfo: jest.fn(),
             createCashInvoice: jest.fn(),
@@ -77,6 +79,55 @@ describe('AppController', () => {
       expect(service.createYaOrder).toHaveBeenCalledWith(query, {
         rnd: 'rnd-platform-123',
         tul: 'tul-platform-123',
+      });
+    });
+  });
+
+  describe('fivePostOrderCreate', () => {
+    it('forwards the order ID and signed sender contacts to AppService', async () => {
+      const mockResponse = { ok: true, data: { track: 'five-barcode' } };
+      jest
+        .spyOn(service, 'createFivePostOrder')
+        .mockResolvedValue(mockResponse as TransferInterface);
+      const query: CreateOrderQueries = { orderId: '1' };
+
+      await expect(
+        controller.fivePostOrderCreate(query, {
+          user: {
+            id: '1',
+            fivePostSender: { email: 'shop@example.com', phone: '79000000001' },
+          },
+        } as any),
+      ).resolves.toBe(mockResponse);
+      expect(service.createFivePostOrder).toHaveBeenCalledWith(query, {
+        email: 'shop@example.com',
+        phone: '79000000001',
+      });
+    });
+  });
+
+  describe('dpdOrderCreate', () => {
+    it('forwards the order ID and configured source terminal ids to AppService.createDpdOrder', async () => {
+      const mockResponse = { ok: true, data: { track: '01010001MOW' } };
+      jest
+        .spyOn(service, 'createDpdOrder')
+        .mockResolvedValue(mockResponse as TransferInterface);
+      const query: CreateOrderQueries = { orderId: '1' };
+
+      await expect(
+        controller.dpdOrderCreate(query, {
+          user: {
+            id: '1',
+            dpdSourceTerminalIds: {
+              rnd: 'terminal-rnd-1',
+              tul: 'terminal-tul-1',
+            },
+          },
+        } as any),
+      ).resolves.toBe(mockResponse);
+      expect(service.createDpdOrder).toHaveBeenCalledWith(query, {
+        rnd: 'terminal-rnd-1',
+        tul: 'terminal-tul-1',
       });
     });
   });

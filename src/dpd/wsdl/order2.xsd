@@ -1,0 +1,1155 @@
+<?xml version='1.0' encoding='UTF-8'?><!-- Published by JAX-WS RI (https://github.com/eclipse-ee4j/metro-jax-ws). RI's version is JAX-WS RI 2.3.3 git-revision#b4c5bb6. --><xs:schema xmlns:tns="http://dpd.ru/ws/order2/2012-04-04" xmlns:xs="http://www.w3.org/2001/XMLSchema" version="1.0" targetNamespace="http://dpd.ru/ws/order2/2012-04-04">
+
+<xs:element name="WSFault" type="tns:WSFault"/>
+
+<xs:element name="addAirwayBill" type="tns:addAirwayBill"/>
+
+<xs:element name="addAirwayBillResponse" type="tns:addAirwayBillResponse"/>
+
+<xs:element name="addParcels" type="tns:addParcels"/>
+
+<xs:element name="addParcelsResponse" type="tns:addParcelsResponse"/>
+
+<xs:element name="cancelOrder" type="tns:cancelOrder"/>
+
+<xs:element name="cancelOrderResponse" type="tns:cancelOrderResponse"/>
+
+<xs:element name="changeDeliveryDate" type="tns:changeDeliveryDate"/>
+
+<xs:element name="changeDeliveryDateResponse" type="tns:changeDeliveryDateResponse"/>
+
+<xs:element name="changeOrderParams" type="tns:changeOrderParams"/>
+
+<xs:element name="changeOrderParamsResponse" type="tns:changeOrderParamsResponse"/>
+
+<xs:element name="changeOrderPickupDate" type="tns:changeOrderPickupDate"/>
+
+<xs:element name="changeOrderPickupDateResponse" type="tns:changeOrderPickupDateResponse"/>
+
+<xs:element name="changeOrderReceiver" type="tns:changeOrderReceiver"/>
+
+<xs:element name="changeOrderReceiverResponse" type="tns:changeOrderReceiverResponse"/>
+
+<xs:element name="changeUnitLoad" type="tns:changeUnitLoad"/>
+
+<xs:element name="changeUnitLoadResponse" type="tns:changeUnitLoadResponse"/>
+
+<xs:element name="createAddress" type="tns:createAddress"/>
+
+<xs:element name="createAddressResponse" type="tns:createAddressResponse"/>
+
+<xs:element name="createAddressSchedule" type="tns:createAddressSchedule"/>
+
+<xs:element name="createAddressScheduleResponse" type="tns:createAddressScheduleResponse"/>
+
+<xs:element name="createOrder" type="tns:createOrder"/>
+
+<xs:element name="createOrder2" type="tns:createOrder2"/>
+
+<xs:element name="createOrder2Response" type="tns:createOrder2Response"/>
+
+<xs:element name="createOrderResponse" type="tns:createOrderResponse"/>
+
+<xs:element name="getClientNumPayerByInn" type="tns:getClientNumPayerByInn"/>
+
+<xs:element name="getClientNumPayerByInnResponse" type="tns:getClientNumPayerByInnResponse"/>
+
+<xs:element name="getInvoiceFile" type="tns:getInvoiceFile"/>
+
+<xs:element name="getInvoiceFileResponse" type="tns:getInvoiceFileResponse"/>
+
+<xs:element name="getOrderDates" type="tns:getOrderDates"/>
+
+<xs:element name="getOrderDatesResponse" type="tns:getOrderDatesResponse"/>
+
+<xs:element name="getOrderSMS" type="tns:getOrderSMS"/>
+
+<xs:element name="getOrderSMSResponse" type="tns:getOrderSMSResponse"/>
+
+<xs:element name="getOrderStatus" type="tns:getOrderStatus"/>
+
+<xs:element name="getOrderStatusResponse" type="tns:getOrderStatusResponse"/>
+
+<xs:element name="getRegisterFile" type="tns:getRegisterFile"/>
+
+<xs:element name="getRegisterFileResponse" type="tns:getRegisterFileResponse"/>
+
+<xs:element name="orderDates" type="tns:orderValidateResponse"/>
+
+<xs:element name="orderReDirect" type="tns:orderReDirect"/>
+
+<xs:element name="orderReDirectResponse" type="tns:orderReDirectResponse"/>
+
+<xs:element name="registerParcelsForTrip" type="tns:registerParcelsForTrip"/>
+
+<xs:element name="registerParcelsForTripResponse" type="tns:registerParcelsForTripResponse"/>
+
+<xs:element name="removeParcels" type="tns:removeParcels"/>
+
+<xs:element name="removeParcelsResponse" type="tns:removeParcelsResponse"/>
+
+<xs:element name="updateAddress" type="tns:updateAddress"/>
+
+<xs:element name="updateAddressResponse" type="tns:updateAddressResponse"/>
+
+<xs:element name="updateAddressSchedule" type="tns:updateAddressSchedule"/>
+
+<xs:element name="updateAddressScheduleResponse" type="tns:updateAddressScheduleResponse"/>
+
+<xs:complexType name="updateAddressSchedule">
+<xs:sequence>
+<xs:element name="address" type="tns:dpdClientAddressSchedule" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdClientAddressSchedule">
+<xs:complexContent>
+<xs:extension base="tns:headerParams">
+<xs:sequence>
+<xs:element name="auth" type="tns:auth"/>
+<xs:element name="clientAddress" type="tns:clientAddress"/>
+<xs:element name="schedule" minOccurs="0">
+<xs:complexType>
+<xs:sequence>
+<xs:element name="workDay" type="tns:clientWorkDay" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+</xs:element>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="headerParams">
+<xs:sequence/>
+</xs:complexType>
+
+<xs:complexType name="auth">
+<xs:sequence>
+<xs:element name="clientNumber" type="xs:long"/>
+<xs:element name="clientKey" type="xs:string"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="clientAddress">
+<xs:sequence>
+<xs:element name="code" type="xs:string"/>
+<xs:element name="name" type="xs:string"/>
+<xs:element name="addressString" type="xs:string" minOccurs="0"/>
+<xs:element name="countryName" type="xs:string" minOccurs="0"/>
+<xs:element name="index" type="xs:string" minOccurs="0"/>
+<xs:element name="region" type="xs:string" minOccurs="0"/>
+<xs:element name="city" type="xs:string"/>
+<xs:element name="street" type="xs:string"/>
+<xs:element name="streetAbbr" type="xs:string" minOccurs="0"/>
+<xs:element name="house" type="xs:string" minOccurs="0"/>
+<xs:element name="houseKorpus" type="xs:string" minOccurs="0"/>
+<xs:element name="str" type="xs:string" minOccurs="0"/>
+<xs:element name="vlad" type="xs:string" minOccurs="0"/>
+<xs:element name="extraInfo" type="xs:string" minOccurs="0"/>
+<xs:element name="office" type="xs:string" minOccurs="0"/>
+<xs:element name="flat" type="xs:string" minOccurs="0"/>
+<xs:element name="workTimeFrom" type="xs:string" minOccurs="0"/>
+<xs:element name="workTimeTo" type="xs:string" minOccurs="0"/>
+<xs:element name="dinnerTimeFrom" type="xs:string" minOccurs="0"/>
+<xs:element name="dinnerTimeTo" type="xs:string" minOccurs="0"/>
+<xs:element name="contactFio" type="xs:string"/>
+<xs:element name="contactPhone" type="xs:string"/>
+<xs:element name="contactEmail" type="xs:string" minOccurs="0"/>
+<xs:element name="instructions" type="xs:string" minOccurs="0"/>
+<xs:element name="needPass" type="xs:boolean" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="clientWorkDay">
+<xs:sequence>
+<xs:element name="dayOfweek" type="xs:int"/>
+<xs:element name="openTimeFrom" type="xs:string"/>
+<xs:element name="openTimeTo" type="xs:string"/>
+<xs:element name="isPickup" type="xs:boolean" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="updateAddressScheduleResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:dpdClientAddressStatus" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdClientAddressStatus">
+<xs:sequence>
+<xs:element name="code" type="xs:string"/>
+<xs:element name="status" type="xs:string"/>
+<xs:element name="errorMessage" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="WSFault">
+<xs:sequence>
+<xs:element name="code" type="xs:string" minOccurs="0"/>
+<xs:element name="message" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="getOrderSMS">
+<xs:sequence>
+<xs:element name="request" type="tns:dpdOrderSmsRequest" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdOrderSmsRequest">
+<xs:complexContent>
+<xs:extension base="tns:headerParams">
+<xs:sequence>
+<xs:element name="auth" type="tns:auth"/>
+<xs:element name="order" type="tns:orderNum" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="orderNum">
+<xs:sequence>
+<xs:element name="orderNum" type="xs:string"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="getOrderSMSResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:dpdOrderSmsResult" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdOrderSmsResult">
+<xs:sequence>
+<xs:element name="order" type="tns:dpdOrderSmsStatus" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdOrderSmsStatus">
+<xs:sequence>
+<xs:element name="orderNum" type="xs:string" minOccurs="0"/>
+<xs:element name="status" type="xs:string" minOccurs="0"/>
+<xs:element name="errorMessage" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="changeOrderPickupDate">
+<xs:sequence>
+<xs:element name="request" type="tns:dpdChangePickupDateRequest" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdChangePickupDateRequest">
+<xs:complexContent>
+<xs:extension base="tns:headerParams">
+<xs:sequence>
+<xs:element name="auth" type="tns:auth"/>
+<xs:element name="order" type="tns:changeOrderData"/>
+<xs:element name="pickupDateNew" type="xs:date"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="changeOrderData">
+<xs:sequence>
+<xs:element name="orderNumberInternal" type="xs:string" minOccurs="0"/>
+<xs:element name="orderNum" type="xs:string" minOccurs="0"/>
+<xs:element name="pickupDate" type="xs:date" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="changeOrderPickupDateResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:dpdChangeOrderDataStatus" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdChangeOrderDataStatus">
+<xs:sequence>
+<xs:element name="orderNum" type="xs:string" minOccurs="0"/>
+<xs:element name="status" type="xs:string"/>
+<xs:element name="message" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="changeDeliveryDate">
+<xs:sequence>
+<xs:element name="request" type="tns:dpdChangeDeliveryDate" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdChangeDeliveryDate">
+<xs:complexContent>
+<xs:extension base="tns:headerParams">
+<xs:sequence>
+<xs:element name="auth" type="tns:auth"/>
+<xs:element name="order" type="tns:orderDeliveryDate" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="orderDeliveryDate">
+<xs:sequence>
+<xs:element name="orderNum" type="xs:string"/>
+<xs:element name="newDeliveryDate" type="xs:date"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="changeDeliveryDateResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:dpdOrderStatus" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdOrderStatus">
+<xs:sequence>
+<xs:element name="orderNumberInternal" type="xs:string" minOccurs="0"/>
+<xs:element name="orderNum" type="xs:string" minOccurs="0"/>
+<xs:element name="status" type="xs:string"/>
+<xs:element name="errorMessage" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="getClientNumPayerByInn">
+<xs:sequence>
+<xs:element name="request" type="tns:clientNumPayerByInnRequest" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="clientNumPayerByInnRequest">
+<xs:complexContent>
+<xs:extension base="tns:headerParams">
+<xs:sequence>
+<xs:element name="auth" type="tns:auth"/>
+<xs:element name="payers">
+<xs:complexType>
+<xs:sequence>
+<xs:element name="payer" type="tns:payer" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+</xs:element>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="payer">
+<xs:sequence>
+<xs:element name="name" type="xs:string"/>
+<xs:element name="inn" type="xs:string"/>
+<xs:element name="kpp" type="xs:string"/>
+<xs:element name="contactFI" type="xs:string"/>
+<xs:element name="contactTelephone" type="xs:string"/>
+<xs:element name="contactEmail" type="xs:string"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="getClientNumPayerByInnResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:clientNumPayerByInnResponse" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="clientNumPayerByInnResponse">
+<xs:sequence>
+<xs:element name="payersWithClientNum" minOccurs="0">
+<xs:complexType>
+<xs:sequence>
+<xs:element name="payerWithClientNum" type="tns:payerWithClientNum" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+</xs:element>
+<xs:element name="error" type="tns:errorEl" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="payerWithClientNum">
+<xs:sequence>
+<xs:element name="name" type="xs:string" minOccurs="0"/>
+<xs:element name="inn" type="xs:string" minOccurs="0"/>
+<xs:element name="kpp" type="xs:string" minOccurs="0"/>
+<xs:element name="clientNum" type="xs:string" minOccurs="0"/>
+<xs:element name="error" type="tns:errorEl" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="errorEl">
+<xs:sequence>
+<xs:element name="errorCode" type="xs:string"/>
+<xs:element name="errorText" type="xs:string"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="createOrder">
+<xs:sequence>
+<xs:element name="orders" type="tns:dpdOrdersData" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdOrdersData">
+<xs:sequence>
+<xs:element name="auth" type="tns:auth"/>
+<xs:element name="header" type="tns:header"/>
+<xs:element name="order" type="tns:order" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="header">
+<xs:sequence>
+<xs:element name="datePickup" type="xs:date"/>
+<xs:element name="payer" type="xs:long" minOccurs="0"/>
+<xs:element name="senderAddress" type="tns:address"/>
+<xs:element name="pickupTimePeriod" type="xs:string" minOccurs="0"/>
+<xs:element name="regularNum" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="address">
+<xs:sequence>
+<xs:element name="code" type="xs:string" minOccurs="0"/>
+<xs:element name="name" type="xs:string" minOccurs="0"/>
+<xs:element name="terminalCode" type="xs:string" minOccurs="0"/>
+<xs:element name="addressString" type="xs:string" minOccurs="0"/>
+<xs:element name="countryName" type="xs:string" minOccurs="0"/>
+<xs:element name="index" type="xs:string" minOccurs="0"/>
+<xs:element name="region" type="xs:string" minOccurs="0"/>
+<xs:element name="city" type="xs:string" minOccurs="0"/>
+<xs:element name="street" type="xs:string" minOccurs="0"/>
+<xs:element name="streetAbbr" type="xs:string" minOccurs="0"/>
+<xs:element name="house" type="xs:string" minOccurs="0"/>
+<xs:element name="houseKorpus" type="xs:string" minOccurs="0"/>
+<xs:element name="str" type="xs:string" minOccurs="0"/>
+<xs:element name="vlad" type="xs:string" minOccurs="0"/>
+<xs:element name="extraInfo" type="xs:string" minOccurs="0"/>
+<xs:element name="office" type="xs:string" minOccurs="0"/>
+<xs:element name="flat" type="xs:string" minOccurs="0"/>
+<xs:element name="workTimeFrom" type="xs:string" minOccurs="0"/>
+<xs:element name="workTimeTo" type="xs:string" minOccurs="0"/>
+<xs:element name="dinnerTimeFrom" type="xs:string" minOccurs="0"/>
+<xs:element name="dinnerTimeTo" type="xs:string" minOccurs="0"/>
+<xs:element name="contactFio" type="xs:string" minOccurs="0"/>
+<xs:element name="contactPhone" type="xs:string" minOccurs="0"/>
+<xs:element name="contactEmail" type="xs:string" minOccurs="0"/>
+<xs:element name="instructions" type="xs:string" minOccurs="0"/>
+<xs:element name="needPass" type="xs:boolean" minOccurs="0"/>
+<xs:element name="latitude" type="xs:string" minOccurs="0"/>
+<xs:element name="longitude" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="order">
+<xs:sequence>
+<xs:element name="preOrderNumber" type="xs:string" minOccurs="0"/>
+<xs:element name="orderNumberInternal" type="xs:string"/>
+<xs:element name="serviceCode" type="xs:string"/>
+<xs:element name="serviceVariant" type="xs:string"/>
+<xs:element name="cargoNumPack" type="xs:int"/>
+<xs:element name="cargoWeight" type="xs:double"/>
+<xs:element name="cargoVolume" type="xs:double" minOccurs="0"/>
+<xs:element name="cargoRegistered" type="xs:boolean"/>
+<xs:element name="cargoValue" type="xs:double" minOccurs="0"/>
+<xs:element name="cargoCategory" type="xs:string"/>
+<xs:element name="deliveryTimePeriod" type="xs:string" minOccurs="0"/>
+<xs:element name="paymentType" type="xs:string" minOccurs="0"/>
+<xs:element name="extraParam" type="tns:parameter" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+<xs:element name="dataInt" type="tns:dataInternational" minOccurs="0"/>
+<xs:element name="receiverAddress" type="tns:address"/>
+<xs:element name="returnAddress" type="tns:address" minOccurs="0"/>
+<xs:element name="extraService" type="tns:extraService" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+<xs:element name="parcel" type="tns:parcel" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+<xs:element name="unitLoad" type="tns:unitLoad" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="parameter">
+<xs:sequence>
+<xs:element name="name" type="xs:string"/>
+<xs:element name="value" type="xs:string"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dataInternational">
+<xs:sequence>
+<xs:element name="currency" type="xs:string" minOccurs="0"/>
+<xs:element name="currencyDeclaredValue" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="extraService">
+<xs:sequence>
+<xs:element name="esCode" type="xs:string"/>
+<xs:element name="param" type="tns:parameter" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="parcel">
+<xs:sequence>
+<xs:element name="number" type="xs:string"/>
+<xs:element name="dpdParcelNumber" type="xs:string" minOccurs="0"/>
+<xs:element name="number_for_print" type="xs:string" minOccurs="0"/>
+<xs:element name="box_needed" type="xs:int" minOccurs="0"/>
+<xs:element name="weight" type="xs:double" minOccurs="0"/>
+<xs:element name="length" type="xs:double" minOccurs="0"/>
+<xs:element name="width" type="xs:double" minOccurs="0"/>
+<xs:element name="height" type="xs:double" minOccurs="0"/>
+<xs:element name="insuranceCost" type="xs:double" minOccurs="0"/>
+<xs:element name="insuranceCostVat" type="xs:double" minOccurs="0"/>
+<xs:element name="codAmount" type="xs:double" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="unitLoad">
+<xs:sequence>
+<xs:element name="article" type="xs:string" minOccurs="0"/>
+<xs:element name="descript" type="xs:string"/>
+<xs:element name="client_code" type="xs:string" minOccurs="0"/>
+<xs:element name="declared_value" type="xs:string" minOccurs="0"/>
+<xs:element name="parcel_num" type="xs:string" minOccurs="0"/>
+<xs:element name="npp_amount" type="xs:string" minOccurs="0"/>
+<xs:element name="vat_percent" type="xs:int" minOccurs="0"/>
+<xs:element name="without_vat" type="xs:boolean" minOccurs="0"/>
+<xs:element name="country_code" type="xs:string" minOccurs="0"/>
+<xs:element name="GTD" type="xs:string" minOccurs="0"/>
+<xs:element name="GTIN" type="xs:string" minOccurs="0"/>
+<xs:element name="serial" type="xs:string" minOccurs="0"/>
+<xs:element name="count" type="xs:int"/>
+<xs:element name="providerName" type="xs:string" minOccurs="0"/>
+<xs:element name="providerInn" type="xs:string" minOccurs="0"/>
+<xs:element name="providerPhone" type="xs:string" minOccurs="0"/>
+<xs:element name="sellingPrice" type="xs:decimal" minOccurs="0"/>
+<xs:element name="quantityMeasureType" type="xs:string" minOccurs="0"/>
+<xs:element name="numerator" type="xs:long" minOccurs="0"/>
+<xs:element name="denominator" type="xs:long" minOccurs="0"/>
+<xs:element name="excise" type="xs:decimal" minOccurs="0"/>
+<xs:element name="feaCode" type="xs:string" minOccurs="0"/>
+<xs:element name="feaNumber" type="xs:string" minOccurs="0"/>
+<xs:element name="feaValue" type="xs:string" minOccurs="0"/>
+<xs:element name="feaDate" type="xs:date" minOccurs="0"/>
+<xs:element name="unitMarkCode" type="xs:string" minOccurs="0"/>
+<xs:element name="unitMarkCodeKind" type="xs:string" minOccurs="0"/>
+<xs:element name="unitLoadParams" minOccurs="0">
+<xs:complexType>
+<xs:sequence>
+<xs:element name="unitLoadParam" type="tns:parameter" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+</xs:element>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="createOrderResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:dpdOrderStatus" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="createAddress">
+<xs:sequence>
+<xs:element name="address" type="tns:dpdClientAddress" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdClientAddress">
+<xs:complexContent>
+<xs:extension base="tns:headerParams">
+<xs:sequence>
+<xs:element name="auth" type="tns:auth"/>
+<xs:element name="clientAddress" type="tns:clientAddress"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="createAddressResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:dpdClientAddressStatus" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="updateAddress">
+<xs:sequence>
+<xs:element name="address" type="tns:dpdClientAddress" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="updateAddressResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:dpdClientAddressStatus" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="changeOrderParams">
+<xs:sequence>
+<xs:element name="request" type="tns:dpdChangeOrderParamsRequest" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdChangeOrderParamsRequest">
+<xs:sequence>
+<xs:element name="auth" type="tns:auth"/>
+<xs:element name="order_num" type="xs:string"/>
+<xs:element name="param" type="tns:parameter" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="changeOrderParamsResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:dpdChangeOrderParamsStatus" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdChangeOrderParamsStatus">
+<xs:sequence>
+<xs:element name="orderNum" type="xs:string" minOccurs="0"/>
+<xs:element name="paramResult" type="tns:changeOrderParamResult" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="changeOrderParamResult">
+<xs:sequence>
+<xs:element name="name" type="xs:string" minOccurs="0"/>
+<xs:element name="value" type="xs:string" minOccurs="0"/>
+<xs:element name="status" type="xs:string" minOccurs="0"/>
+<xs:element name="message" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="cancelOrder">
+<xs:sequence>
+<xs:element name="orders" type="tns:dpdOrderCancellation" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdOrderCancellation">
+<xs:sequence>
+<xs:element name="auth" type="tns:auth"/>
+<xs:element name="cancel" type="tns:orderCancel" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="orderCancel">
+<xs:sequence>
+<xs:element name="orderNumberInternal" type="xs:string" minOccurs="0"/>
+<xs:element name="orderNum" type="xs:string" minOccurs="0"/>
+<xs:element name="pickupdate" type="xs:date" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="cancelOrderResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:dpdOrderStatus" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="addParcels">
+<xs:sequence>
+<xs:element name="parcels" type="tns:dpdOrderCorrection" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdOrderCorrection">
+<xs:complexContent>
+<xs:extension base="tns:headerParams">
+<xs:sequence>
+<xs:element name="auth" type="tns:auth"/>
+<xs:element name="orderNum" type="xs:string"/>
+<xs:element name="orderNumberInternal" type="xs:string" minOccurs="0"/>
+<xs:element name="cargoNumPack" type="xs:int" minOccurs="0"/>
+<xs:element name="cargoWeight" type="xs:double" minOccurs="0"/>
+<xs:element name="cargoVolume" type="xs:double" minOccurs="0"/>
+<xs:element name="cargoValue" type="xs:double" minOccurs="0"/>
+<xs:element name="cargoCategory" type="xs:string" minOccurs="0"/>
+<xs:element name="parcel" type="tns:parcel" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="addParcelsResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:dpdOrderCorrectionStatus" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdOrderCorrectionStatus">
+<xs:sequence>
+<xs:element name="orderNum" type="xs:string"/>
+<xs:element name="status" type="xs:string"/>
+<xs:element name="errorMessage" type="xs:string" minOccurs="0"/>
+<xs:element name="parcelStatus" type="tns:parcelStatus" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="parcelStatus">
+<xs:sequence>
+<xs:element name="number" type="xs:string"/>
+<xs:element name="status" type="xs:string"/>
+<xs:element name="errorMessage" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="orderReDirect">
+<xs:sequence>
+<xs:element name="orders" type="tns:dpdOrdersReDirect" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdOrdersReDirect">
+<xs:complexContent>
+<xs:extension base="tns:headerParams">
+<xs:sequence>
+<xs:element name="auth" type="tns:auth"/>
+<xs:element name="order" type="tns:reDirectOrder" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="reDirectOrder">
+<xs:sequence>
+<xs:element name="orderNum" type="xs:string" minOccurs="0"/>
+<xs:element name="datePickup" type="xs:date" minOccurs="0"/>
+<xs:element name="reDirectionType" type="xs:string" minOccurs="0"/>
+<xs:element name="department" type="xs:string" minOccurs="0"/>
+<xs:element name="pointCode" type="xs:string" minOccurs="0"/>
+<xs:element name="cargoValue" type="xs:string" minOccurs="0"/>
+<xs:element name="extraParam" type="tns:parameter" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+<xs:element name="receiver" type="tns:receiver" minOccurs="0"/>
+<xs:element name="unitLoad" type="tns:unitLoad" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="receiver">
+<xs:sequence>
+<xs:element name="name" type="xs:string" minOccurs="0"/>
+<xs:element name="contactPhone" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="orderReDirectResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:dpdOrderResult" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdOrderResult">
+<xs:sequence>
+<xs:element name="orderNum" type="xs:string" minOccurs="0"/>
+<xs:element name="statusCode" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="createAddressSchedule">
+<xs:sequence>
+<xs:element name="address" type="tns:dpdClientAddressSchedule" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="createAddressScheduleResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:dpdClientAddressStatus" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="changeOrderReceiver">
+<xs:sequence>
+<xs:element name="request" type="tns:dpdChangeReceiverRequest" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdChangeReceiverRequest">
+<xs:complexContent>
+<xs:extension base="tns:headerParams">
+<xs:sequence>
+<xs:element name="auth" type="tns:auth"/>
+<xs:element name="order" type="tns:changeOrderData"/>
+<xs:element name="receiver" type="tns:receiverInfo"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="receiverInfo">
+<xs:sequence>
+<xs:element name="name" type="xs:string"/>
+<xs:element name="contactFio" type="xs:string"/>
+<xs:element name="contactPhone" type="xs:string"/>
+<xs:element name="contactEmail" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="changeOrderReceiverResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:dpdChangeOrderDataStatus" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="changeUnitLoad">
+<xs:sequence>
+<xs:element name="request" type="tns:dpdUnitLoadChange" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdUnitLoadChange">
+<xs:complexContent>
+<xs:extension base="tns:headerParams">
+<xs:sequence>
+<xs:element name="auth" type="tns:auth"/>
+<xs:element name="order" type="tns:orderUnitLoad" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="orderUnitLoad">
+<xs:sequence>
+<xs:element name="orderNum" type="xs:string"/>
+<xs:element name="datePickup" type="xs:date" minOccurs="0"/>
+<xs:element name="deliveryAmount" type="xs:decimal" minOccurs="0"/>
+<xs:element name="goodsReturnAmount" type="xs:decimal" minOccurs="0"/>
+<xs:element name="deliveryAmountVatRate" type="xs:decimal" minOccurs="0"/>
+<xs:element name="deliveryAmountWithoutVat" type="xs:int" minOccurs="0"/>
+<xs:element name="isCompany" type="xs:boolean" minOccurs="0"/>
+<xs:element name="companyName" type="xs:string" minOccurs="0"/>
+<xs:element name="companyAddress" type="xs:string" minOccurs="0"/>
+<xs:element name="INN" type="xs:string" minOccurs="0"/>
+<xs:element name="noCheckNpp" type="xs:boolean" minOccurs="0"/>
+<xs:element name="isUniqueMarking" type="xs:boolean" minOccurs="0"/>
+<xs:element name="unitLoad" type="tns:unitLoad" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="changeUnitLoadResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:dpdOrderStatus" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="getInvoiceFile">
+<xs:sequence>
+<xs:element name="request" type="tns:dpdGetInvoiceFile" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdGetInvoiceFile">
+<xs:complexContent>
+<xs:extension base="tns:headerParams">
+<xs:sequence>
+<xs:element name="auth" type="tns:auth"/>
+<xs:element name="orderNum" type="xs:string"/>
+<xs:element name="parcelCount" type="xs:int" minOccurs="0"/>
+<xs:element name="cargoValue" type="xs:decimal" minOccurs="0"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="getInvoiceFileResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:dpdInvoiceFile" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdInvoiceFile">
+<xs:sequence>
+<xs:element name="file" type="xs:base64Binary" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="getOrderDates">
+<xs:sequence>
+<xs:element name="request" type="tns:orderValidateRequest" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="orderValidateRequest">
+<xs:complexContent>
+<xs:extension base="tns:headerParams">
+<xs:sequence>
+<xs:element name="auth" type="tns:auth"/>
+<xs:element name="order" type="tns:orderValidateData"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="orderValidateData">
+<xs:sequence>
+<xs:element name="datePickup" type="xs:date"/>
+<xs:element name="senderAddress" type="tns:address"/>
+<xs:element name="regularNum" type="xs:string" minOccurs="0"/>
+<xs:element name="serviceCodes">
+<xs:complexType>
+<xs:sequence>
+<xs:element name="serviceCode" type="xs:string" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+</xs:element>
+<xs:element name="serviceVariant" type="xs:string"/>
+<xs:element name="cargoWeight" type="xs:double"/>
+<xs:element name="cargoVolume" type="xs:double" minOccurs="0"/>
+<xs:element name="receiverAddress" type="tns:address"/>
+<xs:element name="extraServices" minOccurs="0">
+<xs:complexType>
+<xs:sequence>
+<xs:element name="extraService" type="xs:string" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+</xs:element>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="getOrderDatesResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:orderValidateResponse" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="orderValidateResponse">
+<xs:sequence>
+<xs:element name="pickupDateChanged" type="xs:boolean"/>
+<xs:element name="pickupDate" type="xs:string"/>
+<xs:element name="services" minOccurs="0">
+<xs:complexType>
+<xs:sequence>
+<xs:element name="service" type="tns:dpdService" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+</xs:element>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdService">
+<xs:sequence>
+<xs:element name="serviceCode" type="xs:string"/>
+<xs:element name="errorMsg" type="xs:string" minOccurs="0"/>
+<xs:element name="deliveryDates" minOccurs="0">
+<xs:complexType>
+<xs:sequence>
+<xs:element name="deliveryDate" type="xs:string" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+</xs:element>
+<xs:element name="pickupTimePeriods" minOccurs="0">
+<xs:complexType>
+<xs:sequence>
+<xs:element name="pickupTimePeriod" type="xs:string" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+</xs:element>
+<xs:element name="deliveryTimePeriods" minOccurs="0">
+<xs:complexType>
+<xs:sequence>
+<xs:element name="deliveryTimePeriod" type="xs:string" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+</xs:element>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="addAirwayBill">
+<xs:sequence>
+<xs:element name="request" type="tns:dpdAirwayBillInput" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdAirwayBillInput">
+<xs:complexContent>
+<xs:extension base="tns:headerParams">
+<xs:sequence>
+<xs:element name="auth" type="tns:auth"/>
+<xs:element name="order" type="tns:orderAirbillInput" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="orderAirbillInput">
+<xs:sequence>
+<xs:element name="orderNumberDPD" type="xs:string"/>
+<xs:element name="orderNumberInternal" type="xs:string" minOccurs="0"/>
+<xs:element name="param" type="tns:paramAirbill" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="paramAirbill">
+<xs:sequence>
+<xs:element name="paramName" type="xs:string"/>
+<xs:element name="paramValue" type="xs:string"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="addAirwayBillResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:dpdAirwayBillOutput" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdAirwayBillOutput">
+<xs:sequence>
+<xs:element name="order" type="tns:orderAirbillOutput" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="orderAirbillOutput">
+<xs:sequence>
+<xs:element name="orderNumberDPD" type="xs:string"/>
+<xs:element name="result" type="xs:string"/>
+<xs:element name="errorCode" type="xs:string" minOccurs="0"/>
+<xs:element name="errorMessage" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="registerParcelsForTrip">
+<xs:sequence>
+<xs:element name="request" type="tns:dpdRegisterForTrip" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdRegisterForTrip">
+<xs:complexContent>
+<xs:extension base="tns:headerParams">
+<xs:sequence>
+<xs:element name="auth" type="tns:auth"/>
+<xs:element name="tripNum" type="xs:string"/>
+<xs:element name="terminalCode" type="xs:string"/>
+<xs:element name="shipment" type="tns:tripShipment" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="tripShipment">
+<xs:sequence>
+<xs:element name="shipmentNum" type="xs:string" minOccurs="0"/>
+<xs:element name="pallet" type="tns:tripPallet" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="tripPallet">
+<xs:sequence>
+<xs:element name="palletNum" type="xs:string" minOccurs="0"/>
+<xs:element name="parcel" type="tns:tripParcel" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="tripParcel">
+<xs:sequence>
+<xs:element name="parcelNum" type="xs:string"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="registerParcelsForTripResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:dpdRegisterForTripStatus" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdRegisterForTripStatus">
+<xs:sequence>
+<xs:element name="tripNum" type="xs:string" minOccurs="0"/>
+<xs:element name="status" type="xs:string" minOccurs="0"/>
+<xs:element name="errorMessage" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="removeParcels">
+<xs:sequence>
+<xs:element name="parcels" type="tns:dpdOrderCorrection" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="removeParcelsResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:dpdOrderCorrectionStatus" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="getRegisterFile">
+<xs:sequence>
+<xs:element name="request" type="tns:dpdGetRegisterFile" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdGetRegisterFile">
+<xs:complexContent>
+<xs:extension base="tns:headerParams">
+<xs:sequence>
+<xs:element name="auth" type="tns:auth"/>
+<xs:element name="datePickup" type="xs:date"/>
+<xs:element name="regularNum" type="xs:string" minOccurs="0"/>
+<xs:element name="cityPickupId" type="xs:long" minOccurs="0"/>
+<xs:element name="addressCode" type="xs:string" minOccurs="0"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="getRegisterFileResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:dpdRegisterFile" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdRegisterFile">
+<xs:sequence>
+<xs:element name="file" type="xs:base64Binary" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="getOrderStatus">
+<xs:sequence>
+<xs:element name="orderStatus" type="tns:dpdGetOrderStatus" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdGetOrderStatus">
+<xs:complexContent>
+<xs:extension base="tns:headerParams">
+<xs:sequence>
+<xs:element name="auth" type="tns:auth"/>
+<xs:element name="order" type="tns:internalOrderNumber" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="internalOrderNumber">
+<xs:sequence>
+<xs:element name="orderNumberInternal" type="xs:string"/>
+<xs:element name="datePickup" type="xs:date" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="getOrderStatusResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:dpdOrderStatus" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="createOrder2">
+<xs:sequence>
+<xs:element name="orders" type="tns:dpdOrdersData" minOccurs="0"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="createOrder2Response">
+<xs:sequence>
+<xs:element name="return" type="tns:dpdOrderStatus2" minOccurs="0" maxOccurs="unbounded"/>
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="dpdOrderStatus2">
+<xs:complexContent>
+<xs:extension base="tns:dpdOrderStatus">
+<xs:sequence>
+<xs:element name="pickupDate" type="xs:string" minOccurs="0"/>
+<xs:element name="dateFlag" type="xs:int" minOccurs="0"/>
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+</xs:schema>

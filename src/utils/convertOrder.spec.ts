@@ -1,4 +1,7 @@
-import { calcDiscount, convertOrder } from './convertOrder';
+import { calcDiscount, convertOrder, convertOrderToDpd } from './convertOrder';
+import { DOMParser } from '@xmldom/xmldom';
+import { join } from 'node:path';
+import * as soap from 'soap';
 import { CreateYaOrderDto } from 'src/ya/dto/ya.dto';
 import {
   addressDetails,
@@ -114,5 +117,275 @@ describe('calcDiscount', () => {
     const discount = '0.005';
     const result = calcDiscount(total, discount);
     expect(result).toBe(0.5);
+  });
+});
+
+describe('convertOrderToDpd', () => {
+  const destination = 'terminal-code-321';
+  const sourceTerminalId = 'source-terminal-777';
+
+  beforeEach(() => {
+    process.env.SHOP_NAME = 'Mineral Magic';
+    process.env.SHOP_OWNER = 'Иванова Мария';
+    process.env.SHOP_PHONE = '79000000001';
+    process.env.MAIL_ADMIN = 'admin@mineralmagic.ru';
+    delete process.env.DPD_CARGO_CATEGORY;
+  });
+
+  it('builds a request matching the createOrder2 schema using the configured source terminal', () => {
+    const result = convertOrderToDpd(
+      orderDetails,
+      addressDetails,
+      customerDetails,
+      shippingDetails.order_carriers[0],
+      destination,
+      sourceTerminalId,
+    );
+
+    expect(result.header.senderAddress).toEqual(
+      expect.objectContaining({
+        name: 'Mineral Magic',
+        terminalCode: sourceTerminalId,
+        contactFio: 'Иванова Мария',
+        contactPhone: '79000000001',
+        contactEmail: 'admin@mineralmagic.ru',
+      }),
+    );
+    expect(result.order[0]).toEqual(
+      expect.objectContaining({
+        orderNumberInternal: 'TESTREFERENCE',
+        serviceVariant: 'ТТ',
+        cargoWeight: 0.153,
+        cargoRegistered: false,
+        cargoValue: 2729.97,
+        cargoCategory: 'Косметика',
+        receiverAddress: expect.objectContaining({
+          name: 'Doe John',
+          terminalCode: destination,
+          contactFio: 'Doe John',
+          contactPhone: '79000000000',
+          contactEmail: 'test@test.com',
+        }),
+      }),
+    );
+    expect(result.order[0].unitLoad).toEqual([
+      { descript: 'Основа', count: 1, declared_value: '1349.99' },
+      { descript: 'Румяна', count: 1, declared_value: '579.99' },
+      { descript: 'Пудра', count: 1, declared_value: '799.99' },
+    ]);
+  });
+
+  it('serializes unitLoad fields in DPD XSD order', async () => {
+    const request = convertOrderToDpd(
+      { ...orderDetails, total_paid_real: '0.00' },
+      addressDetails,
+      customerDetails,
+      shippingDetails.order_carriers[0],
+      destination,
+      sourceTerminalId,
+    );
+    const httpClient = new soap.HttpClient();
+    const sendRequest = jest
+      .spyOn(httpClient, 'request')
+      .mockImplementation((_url, _xml, callback) => {
+        callback(new Error('SOAP request intercepted'));
+        return Promise.resolve(
+          {} as Awaited<ReturnType<typeof httpClient.request>>,
+        );
+      });
+    const client = await soap.createClientAsync(
+      join(__dirname, '..', 'dpd', 'wsdl', 'order2.wsdl'),
+      { httpClient },
+    );
+
+    client.createOrder2(
+      { orders: { auth: { clientNumber: 1, clientKey: 'test' }, ...request } },
+      () => {},
+    );
+
+    const document = new DOMParser().parseFromString(
+      sendRequest.mock.calls[0][1] as string,
+      'text/xml',
+    );
+    const unitLoad = document.getElementsByTagName('unitLoad')[0];
+    expect(unitLoad).toBeDefined();
+    expect(
+      Array.from(unitLoad.childNodes)
+        .filter((node) => node.nodeType === 1)
+        .map((node) => node.localName),
+    ).toEqual(['descript', 'declared_value', 'npp_amount', 'count']);
+    expect(document.getElementsByTagName('extraService').length).toBe(0);
+  });
+
+  it('respects a configured cargo category', () => {
+    process.env.DPD_CARGO_CATEGORY = 'Минеральная пудра';
+
+    const result = convertOrderToDpd(
+      orderDetails,
+      addressDetails,
+      customerDetails,
+      shippingDetails.order_carriers[0],
+      destination,
+      sourceTerminalId,
+    );
+
+    expect(result.order[0].cargoCategory).toBe('Минеральная пудра');
+  });
+
+  it('does not add a НПП extraService when the order is fully paid', () => {
+    const result = convertOrderToDpd(
+      orderDetails,
+      addressDetails,
+      customerDetails,
+      shippingDetails.order_carriers[0],
+      destination,
+      sourceTerminalId,
+    );
+
+    expect(result.order[0].extraService).toBeUndefined();
+  });
+
+  it('distributes the outstanding balance over real goods without a НПП extraService', () => {
+    const unpaidOrderDetails = {
+      ...orderDetails,
+      total_paid: '2603.470000',
+      total_paid_real: '1000.000000',
+    };
+
+    const result = convertOrderToDpd(
+      unpaidOrderDetails,
+      addressDetails,
+      customerDetails,
+      shippingDetails.order_carriers[0],
+      destination,
+      sourceTerminalId,
+    );
+
+    expect(result.order[0].extraService).toBeUndefined();
+    expect(result.order[0].unitLoad.map((item) => item.descript)).toEqual([
+      'Основа',
+      'Румяна',
+      'Пудра',
+    ]);
+    expect(
+      result.order[0].unitLoad.reduce(
+        (total, item) =>
+          total + Math.round(Number(item.npp_amount ?? 0) * 100) * item.count,
+        0,
+      ),
+    ).toBe(160347);
+  });
+
+  it('splits units when rounding gives them different per-piece НПП amounts', () => {
+    const unpaidOrderDetails = {
+      ...orderDetails,
+      total_paid: '1.00',
+      total_paid_real: '0.00',
+      associations: {
+        order_rows: [
+          {
+            ...orderDetails.associations.order_rows[0],
+            unit_price_tax_incl: '1.00',
+            product_quantity: '3',
+          },
+        ],
+      },
+    };
+
+    const result = convertOrderToDpd(
+      unpaidOrderDetails,
+      addressDetails,
+      customerDetails,
+      shippingDetails.order_carriers[0],
+      destination,
+      sourceTerminalId,
+    );
+
+    expect(result.order[0].unitLoad).toEqual([
+      { descript: 'Основа', declared_value: '1', npp_amount: '0.33', count: 1 },
+      { descript: 'Основа', declared_value: '1', npp_amount: '0.34', count: 1 },
+      { descript: 'Основа', declared_value: '1', npp_amount: '0.33', count: 1 },
+    ]);
+  });
+
+  it('rejects НПП exceeding the value of actual goods', () => {
+    expect(() =>
+      convertOrderToDpd(
+        { ...orderDetails, total_paid: '3000.00', total_paid_real: '0.00' },
+        addressDetails,
+        customerDetails,
+        shippingDetails.order_carriers[0],
+        destination,
+        sourceTerminalId,
+      ),
+    ).toThrow('Сумма НПП превышает стоимость товаров в заказе');
+  });
+
+  it('collects even a one-kopeck outstanding balance', () => {
+    const result = convertOrderToDpd(
+      { ...orderDetails, total_paid_real: '2603.46' },
+      addressDetails,
+      customerDetails,
+      shippingDetails.order_carriers[0],
+      destination,
+      sourceTerminalId,
+    );
+
+    expect(
+      result.order[0].unitLoad.some((item) => item.npp_amount === '0.01'),
+    ).toBe(true);
+    expect(result.order[0].extraService).toBeUndefined();
+  });
+
+  it('ignores negligible rounding differences between total_paid and total_paid_real', () => {
+    const almostPaidOrderDetails = {
+      ...orderDetails,
+      total_paid: '2603.470000',
+      total_paid_real: '2603.465000',
+    };
+
+    const result = convertOrderToDpd(
+      almostPaidOrderDetails,
+      addressDetails,
+      customerDetails,
+      shippingDetails.order_carriers[0],
+      destination,
+      sourceTerminalId,
+    );
+
+    expect(result.order[0].extraService).toBeUndefined();
+  });
+
+  it('throws when the recipient has no usable phone number', () => {
+    const brokenAddress = { ...addressDetails, phone: '', phone_mobile: '' };
+
+    expect(() =>
+      convertOrderToDpd(
+        orderDetails,
+        brokenAddress,
+        customerDetails,
+        shippingDetails.order_carriers[0],
+        destination,
+        sourceTerminalId,
+      ),
+    ).toThrow('В заказе отсутствует телефон получателя');
+  });
+
+  it('throws for a non-positive shipment weight', () => {
+    const brokenShipping = {
+      ...shippingDetails.order_carriers[0],
+      weight: '0',
+    };
+
+    expect(() =>
+      convertOrderToDpd(
+        orderDetails,
+        addressDetails,
+        customerDetails,
+        brokenShipping,
+        destination,
+        sourceTerminalId,
+      ),
+    ).toThrow('Некорректный вес отправления в заказе');
   });
 });

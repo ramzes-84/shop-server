@@ -1,5 +1,6 @@
 export enum ServicesUrl {
   SHOP = 'https://mineralmagic.ru/api',
+  SHOP_MODULE = 'https://mineralmagic.ru/module/shopserver',
   YA = 'https://b2b-authproxy.taxi.yandex.net/api/b2b/platform',
   POST = 'https://otpravka-api.pochta.ru/1.0',
   POST_SOAP = 'https://tracking.russianpost.ru/rtm34?wsdl',

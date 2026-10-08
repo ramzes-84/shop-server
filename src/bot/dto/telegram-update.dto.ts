@@ -22,6 +22,9 @@ export type TelegramMessage = {
     username?: string;
     language_code?: string;
   };
+  reply_to_message?: {
+    message_id: number;
+  };
   entities?: TelegramMessageEntity[];
 };
 

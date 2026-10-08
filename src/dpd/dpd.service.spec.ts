@@ -28,6 +28,22 @@ describe('DpdService', () => {
     expect(service).toBeDefined();
   });
 
+  it('loads the bundled order2 WSDL and XSD without fetching the schema from DPD', async () => {
+    const realSoap = jest.requireActual<typeof soap>('soap');
+    const client = await new Promise<soap.Client>((resolve, reject) => {
+      realSoap.createClient(service.orderWsdlPath, (error, result) => {
+        if (error) {
+          return reject(error);
+        }
+        resolve(result);
+      });
+    });
+
+    expect(client.createOrder2).toBeInstanceOf(Function);
+    expect(client.getOrderStatus).toBeInstanceOf(Function);
+    expect(client.describe()).toHaveProperty('DPDOrderService');
+  });
+
   it('retrieves states via SOAP client', async () => {
     const statesResponse = {
       return: { states: [{ newState: 'Delivered' }] },
@@ -74,5 +90,234 @@ describe('DpdService', () => {
     await expect(service.getStatesByDPDOrder('DPD-ERR')).rejects.toThrow(
       'dpd fail',
     );
+  });
+
+  describe('createOrder', () => {
+    const orderRequest = {
+      auth: { clientNumber: 1234, clientKey: 'secret' },
+      header: {
+        datePickup: '2026-09-26',
+        senderAddress: { name: 'Shop', terminalCode: '2N83' },
+        pickupTimePeriod: '9-18',
+      },
+      order: [
+        {
+          orderNumberInternal: 'REF-1',
+          serviceCode: 'PCL',
+          serviceVariant: 'ТТ',
+          cargoNumPack: 1,
+          cargoWeight: 0.15,
+          cargoRegistered: false,
+          cargoCategory: 'Косметика',
+          receiverAddress: { name: 'Client', terminalCode: 'M91' },
+          unitLoad: [{ descript: 'Товар', count: 1 }],
+        },
+      ],
+    } as any;
+
+    it('sends the request under the "orders" tag and normalizes the "return" array', async () => {
+      const creationResponse = {
+        return: [
+          {
+            orderNumberInternal: 'REF-1',
+            orderNum: '01010001MOW',
+            status: 'OK',
+          },
+        ],
+      } as any;
+      createClientMock.mockImplementation((endpoint, options, cb) => {
+        const callback = typeof options === 'function' ? options : cb;
+        const client = {
+          createOrder2: (args: any, done: (err: any, res?: any) => void) => {
+            expect(args).toEqual({ orders: orderRequest });
+            done(null, creationResponse);
+          },
+        } as any;
+        callback?.(null, client);
+      });
+
+      const result = await service.createOrder(orderRequest);
+
+      expect(result).toEqual({
+        orderNumberInternal: 'REF-1',
+        orderNum: '01010001MOW',
+        status: 'OK',
+      });
+      expect(createClientMock).toHaveBeenCalledWith(
+        service.orderWsdlPath,
+        expect.any(Function),
+      );
+    });
+
+    it('normalizes a bare object "return" (single order) into an array', async () => {
+      const creationResponse = {
+        return: { orderNumberInternal: 'REF-1', status: 'OrderPending' },
+      } as any;
+      createClientMock.mockImplementation((_endpoint, options, cb) => {
+        const callback = typeof options === 'function' ? options : cb;
+        const client = {
+          createOrder2: (_args: any, done: (err: any, res?: any) => void) => {
+            done(null, creationResponse);
+          },
+        } as any;
+        callback?.(null, client);
+      });
+
+      const result = await service.createOrder(orderRequest);
+
+      expect(result).toEqual({
+        orderNumberInternal: 'REF-1',
+        status: 'OrderPending',
+      });
+    });
+
+    it('rejects when createOrder2 call errors', async () => {
+      createClientMock.mockImplementation((_endpoint, options, cb) => {
+        const callback = typeof options === 'function' ? options : cb;
+        const client = {
+          createOrder2: (_args: any, done: (err: any) => void) => {
+            done(new Error('dpd create fail'));
+          },
+        } as any;
+        callback?.(null, client);
+      });
+
+      await expect(service.createOrder(orderRequest)).rejects.toThrow(
+        'dpd create fail',
+      );
+    });
+
+    it('reports a local WSDL failure without claiming the order was sent', async () => {
+      createClientMock.mockImplementation((_endpoint, options, callback) => {
+        const done = typeof options === 'function' ? options : callback;
+        done?.(new Error('socket hang up'), undefined as any);
+      });
+
+      await expect(service.createOrder(orderRequest)).rejects.toThrow(
+        'Запрос на регистрацию отправки не был отправлен',
+      );
+    });
+  });
+
+  describe('getOrderStatus', () => {
+    it('sends the request under the "orderStatus" tag and normalizes the "return" array', async () => {
+      const statusResponse = {
+        return: [
+          {
+            orderNumberInternal: 'REF-1',
+            orderNum: '01010001MOW',
+            status: 'OK',
+          },
+        ],
+      } as any;
+      createClientMock.mockImplementation((endpoint, options, cb) => {
+        const callback = typeof options === 'function' ? options : cb;
+        const client = {
+          getOrderStatus: (args: any, done: (err: any, res?: any) => void) => {
+            expect(args).toEqual({
+              orderStatus: {
+                auth: { clientNumber: 1234, clientKey: 'secret' },
+                order: [
+                  { orderNumberInternal: 'REF-1', datePickup: '2026-09-26' },
+                ],
+              },
+            });
+            done(null, statusResponse);
+          },
+        } as any;
+        callback?.(null, client);
+      });
+
+      const result = await service.getOrderStatus('REF-1', '2026-09-26');
+
+      expect(result).toEqual([
+        { orderNumberInternal: 'REF-1', orderNum: '01010001MOW', status: 'OK' },
+      ]);
+      expect(createClientMock).toHaveBeenCalledWith(
+        service.orderWsdlPath,
+        expect.any(Function),
+      );
+    });
+
+    it('omits datePickup from the request when not provided', async () => {
+      createClientMock.mockImplementation((_endpoint, options, cb) => {
+        const callback = typeof options === 'function' ? options : cb;
+        const client = {
+          getOrderStatus: (args: any, done: (err: any, res?: any) => void) => {
+            expect(args.orderStatus.order).toEqual([
+              { orderNumberInternal: 'REF-1' },
+            ]);
+            done(null, { return: [] });
+          },
+        } as any;
+        callback?.(null, client);
+      });
+
+      await service.getOrderStatus('REF-1');
+    });
+
+    it('normalizes a bare object "return" (single order) into an array', async () => {
+      createClientMock.mockImplementation((_endpoint, options, cb) => {
+        const callback = typeof options === 'function' ? options : cb;
+        const client = {
+          getOrderStatus: (_args: any, done: (err: any, res?: any) => void) => {
+            done(null, {
+              return: { orderNumberInternal: 'REF-1', status: 'OrderPending' },
+            });
+          },
+        } as any;
+        callback?.(null, client);
+      });
+
+      const result = await service.getOrderStatus('REF-1');
+
+      expect(result).toEqual([
+        { orderNumberInternal: 'REF-1', status: 'OrderPending' },
+      ]);
+    });
+
+    it('resolves an empty array when DPD returns no matching order', async () => {
+      createClientMock.mockImplementation((_endpoint, options, cb) => {
+        const callback = typeof options === 'function' ? options : cb;
+        const client = {
+          getOrderStatus: (_args: any, done: (err: any, res?: any) => void) => {
+            done(null, {});
+          },
+        } as any;
+        callback?.(null, client);
+      });
+
+      await expect(service.getOrderStatus('REF-1')).resolves.toEqual([]);
+    });
+
+    it('returns no orders when DPD reports no-data-found', async () => {
+      createClientMock.mockImplementation((_endpoint, options, cb) => {
+        const callback = typeof options === 'function' ? options : cb;
+        const client = {
+          getOrderStatus: (_args: any, done: (err: any) => void) => {
+            done(new Error('no-data-found'));
+          },
+        } as any;
+        callback?.(null, client);
+      });
+
+      await expect(service.getOrderStatus('REF-1')).resolves.toEqual([]);
+    });
+
+    it('rejects when getOrderStatus fails for another reason', async () => {
+      createClientMock.mockImplementation((_endpoint, options, cb) => {
+        const callback = typeof options === 'function' ? options : cb;
+        const client = {
+          getOrderStatus: (_args: any, done: (err: any) => void) => {
+            done(new Error('socket hang up'));
+          },
+        } as any;
+        callback?.(null, client);
+      });
+
+      await expect(service.getOrderStatus('REF-1')).rejects.toThrow(
+        'socket hang up',
+      );
+    });
   });
 });

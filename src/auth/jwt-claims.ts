@@ -10,11 +10,25 @@ export interface YaSourcePlatformIds {
   tul?: string;
 }
 
+/** Терминалы отправки DPD (Ростов/Тула) — настраиваются в модуле, не хранятся на сервере. */
+export interface DpdSourceTerminalIds {
+  rnd?: string;
+  tul?: string;
+}
+
+/** Контакты отправителя для C2C-заказов 5Post — берутся из настроек магазина PrestaShop. */
+export interface FivePostSender {
+  email?: string;
+  phone?: string;
+}
+
 export interface JwtPayload {
   sub: string;
   email?: string;
   scope?: string;
   yaSourcePlatformIds?: YaSourcePlatformIds;
+  fivePostSender?: FivePostSender;
+  dpdSourceTerminalIds?: DpdSourceTerminalIds;
   iss: string;
   aud: string;
   iat: number;
@@ -27,4 +41,6 @@ export interface AuthenticatedEmployee {
   email?: string;
   scope?: string;
   yaSourcePlatformIds?: YaSourcePlatformIds;
+  fivePostSender?: FivePostSender;
+  dpdSourceTerminalIds?: DpdSourceTerminalIds;
 }

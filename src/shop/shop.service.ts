@@ -9,9 +9,16 @@ import {
 import { AddressInfoResDto } from './dto/address-info.dto';
 import { CustomerInfoResDto } from './dto/customer-info.dto';
 import { StatusesInfoResDto } from './dto/statuses-info.dto';
-import { OrderCarrierInfoResDto } from './dto/order-carrier-info.dto';
+import {
+  OrderCarrierInfo,
+  OrderCarrierInfoResDto,
+} from './dto/order-carrier-info.dto';
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 import { InTransitOrders } from './dto/in-transit-orders.dto';
+import {
+  BotOrdersForRegistration,
+  BotOrdersForRegistrationRes,
+} from './dto/bot-orders.dto';
 
 @Injectable()
 export class ShopService {
@@ -19,6 +26,7 @@ export class ShopService {
   private readonly tokenBase64 = Buffer.from(`${this.token}:`).toString(
     'base64',
   );
+  private readonly botKey = process.env.SHOPSERVER_BOT_KEY;
   private readonly endpoint = ServicesUrl.SHOP;
 
   async getOrderInfo(id: number) {
@@ -93,6 +101,31 @@ export class ShopService {
     return data.orders;
   }
 
+  /**
+   * Технический эндпоинт модуля PrestaShop (не webservice API): авторизация общим
+   * ключом бота, а не Basic-токеном. Тип перевозчика вычисляется на стороне модуля
+   * по id_reference — единственному стабильному источнику этого сопоставления.
+   */
+  async getOrdersForBotRegistration(): Promise<BotOrdersForRegistration> {
+    const url = `${ServicesUrl.SHOP_MODULE}/botorders`;
+    const response = await fetchWithTimeout(url, {
+      method: 'GET',
+      headers: {
+        'X-ShopServer-Bot-Key': this.botKey ?? '',
+      },
+    });
+
+    if (!response.ok) {
+      throw new HttpException(
+        `Failed to fetch bot orders from Shop: ${response.statusText}`,
+        response.status,
+      );
+    }
+
+    const body: BotOrdersForRegistrationRes = await response.json();
+    return body.data;
+  }
+
   async fetchData<T>(
     url: URL,
     method: RequestMethod = RequestMethod.GET,
@@ -131,6 +164,38 @@ export class ShopService {
     }
 
     return data;
+  }
+
+  /**
+   * Read-modify-write по webservice: PrestaShop требует полный XML ресурса на PUT,
+   * поэтому переданный order_carrier должен быть только что получен через
+   * getOrderCarrierInfo. Именно это (а не BO) вызывает у PrestaShop
+   * actionObjectOrderCarrierUpdateAfter, на который подписан модуль для письма с треком.
+   */
+  async updateOrderCarrierTracking(
+    orderCarrier: OrderCarrierInfo,
+    trackingNumber: string,
+  ) {
+    const url = new URL(`${this.endpoint}/order_carriers/${orderCarrier.id}`);
+    // Модуль шлёт письмо о треке только на помеченный PUT; в БО его шлёт сама PrestaShop.
+    url.searchParams.append('shopserver_notify', '1');
+    const payload = `<?xml version="1.0" encoding="UTF-8"?>
+<prestashop xmlns:xlink="http://www.w3.org/1999/xlink">
+  <order_carrier>
+    <id>${orderCarrier.id}</id>
+    <id_order>${orderCarrier.id_order}</id_order>
+    <id_carrier>${orderCarrier.id_carrier}</id_carrier>
+    <id_order_invoice>${orderCarrier.id_order_invoice}</id_order_invoice>
+    <weight>${orderCarrier.weight}</weight>
+    <shipping_cost_tax_excl>${orderCarrier.shipping_cost_tax_excl}</shipping_cost_tax_excl>
+    <shipping_cost_tax_incl>${orderCarrier.shipping_cost_tax_incl}</shipping_cost_tax_incl>
+    <tracking_number>${this.escapeXml(trackingNumber)}</tracking_number>
+  </order_carrier>
+</prestashop>`;
+
+    await this.fetchData<string>(url, RequestMethod.PUT, true, payload, {
+      'Content-Type': 'application/xml',
+    });
   }
 
   async updateOrderStatus(orderId: number, orderStateId: number) {

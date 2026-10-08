@@ -1,15 +1,26 @@
 import { Injectable } from '@nestjs/common';
 import { ServicesUrl } from 'src/types/services-url';
+import { join } from 'node:path';
 import * as soap from 'soap';
-import { DpdRequestDTO, DpdStatesResDTO, TrackingRequest } from './dto/dpd.dto';
+import {
+  CreatingOrderRequest,
+  DpdCreationResDTO,
+  DpdOrderResult,
+  DpdRequestDTO,
+  DpdStatesResDTO,
+  TrackingRequest,
+} from './dto/dpd.dto';
 import { EXTERNAL_REQUEST_TIMEOUT_MS } from 'src/common/fetch-with-timeout';
 
 @Injectable()
 export class DpdService {
   token = process.env.DPD_TOKEN!;
   trackingEndpoint = ServicesUrl.DPD + 'tracing1-1?wsdl';
-  createEndpoint = ServicesUrl.DPD + 'order2?wsdl';
+  orderWsdlPath = join(__dirname, 'wsdl', 'order2.wsdl');
   clientNumber = process.env.DPD_CLIENT!;
+
+  // Схема локальная; SOAP-операции по-прежнему отправляются на адрес DPD из WSDL.
+  private readonly createOrderTimeoutMs = 30_000;
 
   async getStatesByDPDOrder(dpdOrderNr: string): Promise<DpdStatesResDTO> {
     const args: DpdRequestDTO<TrackingRequest> = {
@@ -41,6 +52,95 @@ export class DpdService {
           );
         },
       );
+    });
+  }
+
+  /**
+   * Регистрирует отправку через createOrder2 (локальный order2.wsdl). Внешний тег запроса — "orders",
+   * ответ — "return": DPD объявляет его как maxOccurs="unbounded" даже для одного заказа в запросе,
+   * а node-soap может развернуть массив из одного элемента в голый объект — нормализуем сами.
+   */
+  async createOrder(orders: CreatingOrderRequest): Promise<DpdOrderResult> {
+    return new Promise((resolve, reject) => {
+      soap.createClient(this.orderWsdlPath, (err, client) => {
+        if (err) {
+          return reject(
+            new Error(
+              'Не удалось загрузить локальную схему DPD. Запрос на регистрацию отправки не был отправлен — обратитесь к администратору.',
+            ),
+          );
+        }
+
+        client.createOrder2(
+          { orders },
+          (err: unknown, result: DpdCreationResDTO) => {
+            if (err) {
+              return reject(err);
+            }
+
+            const results = Array.isArray(result.return)
+              ? result.return
+              : [result.return];
+            resolve(results[0]);
+          },
+          { timeout: this.createOrderTimeoutMs },
+        );
+      });
+    });
+  }
+
+  /**
+   * Сверка после обрыва соединения при createOrder2: сама документация DPD рекомендует
+   * getOrderStatus по orderNumberInternal, чтобы узнать, успел ли заказ создаться, не
+   * дожидаясь ответа исходного запроса (раздел "Delivery order creation" в руководстве).
+   * Возвращает пустой массив, если DPD не находит такой заказ на момент проверки.
+   */
+  async getOrderStatus(
+    orderNumberInternal: string,
+    datePickup?: string,
+  ): Promise<DpdOrderResult[]> {
+    return new Promise((resolve, reject) => {
+      soap.createClient(this.orderWsdlPath, (err, client) => {
+        if (err) {
+          return reject(err);
+        }
+
+        client.getOrderStatus(
+          {
+            orderStatus: {
+              auth: {
+                clientNumber: +this.clientNumber,
+                clientKey: this.token,
+              },
+              order: [
+                {
+                  orderNumberInternal,
+                  ...(datePickup ? { datePickup } : {}),
+                },
+              ],
+            },
+          },
+          (err: unknown, result: DpdCreationResDTO) => {
+            if (err) {
+              if (
+                err instanceof Error &&
+                /\bno-data-found\b/i.test(err.message)
+              ) {
+                return resolve([]);
+              }
+              return reject(err);
+            }
+
+            const results = Array.isArray(result.return)
+              ? result.return
+              : result.return
+                ? [result.return]
+                : [];
+            resolve(results);
+          },
+          { timeout: this.createOrderTimeoutMs },
+        );
+      });
     });
   }
 }
