@@ -1188,7 +1188,9 @@ describe('AppService', () => {
         expect.any(Array),
         expect.any(Array),
       );
-      expect(syncSpy).toHaveBeenCalledWith(
+      // DPD: OnTerminal/OnTerminalDelivery одинаково значат и хаб, и пункт выдачи —
+      // автопереход и письмо клиенту отключены (см. docs/decisions.md).
+      expect(syncSpy).not.toHaveBeenCalledWith(
         expect.objectContaining({ reference: 'REF-DPD' }),
         expect.any(Array),
         expect.any(Array),

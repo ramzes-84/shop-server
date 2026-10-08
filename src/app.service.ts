@@ -830,7 +830,11 @@ export class AppService {
       if (
         cargoState &&
         shopState !== cargoState &&
-        cargoState !== UnifiedOrderState.UNKNOWN
+        cargoState !== UnifiedOrderState.UNKNOWN &&
+        // DPD: OnTerminal/OnTerminalDelivery одинаково обозначают и промежуточный хаб,
+        // и финальный пункт выдачи — подтверждено на реальном треке (см. docs/decisions.md).
+        // Автопереход и письмо клиенту отключены, пока нет доступа к event-tracking (getEvents).
+        order.cargo !== Cargos.DPD
       ) {
         if (!this.canAutoTransition(shopState, cargoState)) {
           errors.push(
